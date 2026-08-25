@@ -74,7 +74,13 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
   <div id="availableThemes" class="grid"></div>
   <div class="title-row" style="margin-top:28px"><h2>Meus investimentos</h2></div>
   <div id="myInvestments" class="grid"></div>
-  <div class="title-row" style="margin-top:28px"><h2>Movimentações e saques</h2><button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button></div>
+  <div class="title-row" style="margin-top:28px">
+  <h2>Movimentações, depósitos e saques</h2>
+  <div class="actions" style="margin-top:0">
+    <button class="btn" onclick="openDepositRequest()">Adicionar saldo</button>
+    <button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button>
+  </div>
+</div>
   <div id="myTransactions" class="card table-wrap"></div>
   <div class="title-row" style="margin-top:28px"><h2>Notificações</h2></div>
   <div id="myNotifications"></div>
@@ -91,6 +97,7 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
     <button class="admin-item" onclick="adminSection('queues')">🔄<br><br>Filas</button>
     <button class="admin-item" onclick="adminSection('deposits')">➕<br><br>Depósitos</button>
     <button class="admin-item" onclick="adminSection('withdrawals')">💸<br><br>Saques</button>
+    <button class="admin-item" onclick="adminSection('notifications')">🔔<br><br>Notificações</button>
     <button class="admin-item" onclick="adminSection('settings')">⚙️<br><br>Configurações</button>
   </div>
   <div id="adminContent" class="section"></div>
@@ -277,9 +284,52 @@ function openInvestment(id,name){
 }
 async function makeInvestment(themeId){
   const amount=Number(document.getElementById("investmentAmount").value);
-  const {error}=await sb.rpc("make_investment",{p_theme_id:themeId,p_amount:amount});
-  if(error){toast(error.message);return}
-  closeModal();toast("Investimento registrado!");await refreshProfile();await loadInvestorDashboard();
+
+  if(!amount || amount<=0){
+    toast("Informe um valor válido para investir.");
+    return;
+  }
+
+  // Se o saldo já for claramente insuficiente, leva direto para depósito.
+  if(Number(currentProfile?.balance||0) < amount){
+    closeModal();
+    toast(
+      "Seu saldo disponível é "+money(currentProfile?.balance||0)+
+      ". Para investir "+money(amount)+", adicione saldo primeiro."
+    );
+    await openDepositRequest("Você não tem saldo suficiente para concluir este investimento.");
+    return;
+  }
+
+  const {error}=await sb.rpc("make_investment",{
+    p_theme_id:themeId,
+    p_amount:amount
+  });
+
+  if(error){
+    const message=String(error.message||"");
+
+    // Segurança extra: se o saldo mudou em outra aba/sessão,
+    // o próprio banco pode retornar saldo insuficiente.
+    if(message.toLowerCase().includes("saldo insuficiente")){
+      await refreshProfile();
+      closeModal();
+      toast(
+        "Saldo insuficiente para este investimento. "+
+        "Você será encaminhado para adicionar saldo."
+      );
+      await openDepositRequest("Saldo insuficiente. Adicione saldo para continuar.");
+      return;
+    }
+
+    toast(message);
+    return;
+  }
+
+  closeModal();
+  toast("Investimento registrado!");
+  await refreshProfile();
+  await loadInvestorDashboard();
 }
 async function loadMyInvestments(){
   const box=document.getElementById("myInvestments");
@@ -300,6 +350,71 @@ async function loadMyNotifications(){
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
   box.innerHTML=(data||[]).map(n=>`<div class="card" style="margin-bottom:10px"><b>${esc(n.title)}</b><div class="muted" style="margin-top:5px">${esc(n.message)}</div><div class="muted" style="margin-top:6px">${new Date(n.created_at).toLocaleString("pt-BR")}</div></div>`).join("")||`<div class="card muted">Nenhuma notificação.</div>`;
 }
+
+async function openDepositRequest(autoMessage=""){
+  const {data,error}=await sb.rpc("get_deposit_info");
+  if(error){toast(error.message);return}
+
+  const info=Array.isArray(data)?data[0]:data;
+  const pix=info?.pix||"";
+  const min=Number(info?.minimum_deposit||settings.minimum_deposit||40);
+  const store=info?.store_name||"Cat Encantus";
+
+  openModal(`
+    <div class="title-row">
+      <h2>Adicionar saldo</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    ${autoMessage ? `<div class="notice"><b>${esc(autoMessage)}</b></div>` : ""}
+
+    <div class="notice">
+      <b>1.</b> Faça um PIX para a loja.<br>
+      <b>2.</b> Informe abaixo o valor enviado.<br>
+      <b>3.</b> O saldo só será liberado depois que o administrador confirmar o recebimento.
+    </div>
+
+    <label>PIX da ${esc(store)}</label>
+    <div class="row">
+      <input id="storePix" value="${esc(pix)}" readonly>
+      <button class="btn secondary" type="button" onclick="copyStorePix()">Copiar PIX</button>
+    </div>
+
+    ${pix ? "" : `<div class="msg error">A loja ainda não configurou a chave PIX para depósitos.</div>`}
+
+    <label>Valor enviado</label>
+    <input id="depositRequestAmount" type="number" min="${min}" step="0.01" placeholder="${min.toFixed(2)}">
+
+    <div class="muted" style="margin-top:8px">
+      Depósito mínimo: <b>${money(min)}</b>
+    </div>
+
+    <button class="btn" style="width:100%;margin-top:15px" ${pix ? "" : "disabled"} onclick="requestDeposit()">
+      Já fiz o PIX — solicitar confirmação
+    </button>
+  `);
+}
+
+async function copyStorePix(){
+  const pix=document.getElementById("storePix")?.value||"";
+  if(!pix)return;
+  try{
+    await navigator.clipboard.writeText(pix);
+    toast("PIX copiado.");
+  }catch(e){
+    toast("Não foi possível copiar automaticamente. Selecione o PIX e copie manualmente.");
+  }
+}
+
+async function requestDeposit(){
+  const amount=Number(document.getElementById("depositRequestAmount").value);
+  const {error}=await sb.rpc("request_deposit",{p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Solicitação enviada. Seu saldo será atualizado após a confirmação do PIX pelo administrador.");
+  await loadMyTransactions();
+}
+
 function openWithdrawal(){openModal(`<div class="title-row"><h2>Solicitar saque</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="muted">Saldo disponível: <b>${money(currentProfile.balance)}</b></div><label>Valor</label><input id="withdrawAmount" type="number" min="0.01" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="requestWithdrawal()">Solicitar</button>`)}
 async function requestWithdrawal(){const amount=Number(document.getElementById("withdrawAmount").value);const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saque solicitado.");await refreshProfile();await loadInvestorDashboard()}
 
@@ -313,6 +428,7 @@ async function adminSection(section){
   if(section==="queues")return loadAdminQueues();
   if(section==="deposits")return loadAdminDeposits();
   if(section==="withdrawals")return loadAdminWithdrawals();
+  if(section==="notifications")return loadAdminNotifications();
   if(section==="settings")return loadAdminSettings();
 }
 
@@ -369,12 +485,87 @@ async function loadAdminQueues(){
 }
 async function loadAdminDeposits(){
   const box=document.getElementById("adminContent");
-  const [{data:deps,error},{data:investors}]=await Promise.all([sb.from("deposits").select("*,profiles(name,email)").order("created_at",{ascending:false}).limit(50),sb.from("profiles").select("id,name").eq("role","investor").eq("status","active").order("name")]);
+  const [{data:deps,error},{data:investors}]=await Promise.all([
+    sb.from("deposits").select("*,profiles(name,email)").order("created_at",{ascending:false}).limit(50),
+    sb.from("profiles").select("id,name").eq("role","investor").eq("status","active").order("name")
+  ]);
+
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><h2>Depósitos</h2><button class="btn" onclick="openDepositSelector()">+ Confirmar depósito</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Investidor</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(deps||[]).map(d=>`<tr><td>${new Date(d.created_at).toLocaleString("pt-BR")}</td><td>${esc(d.profiles?.name||"-")}</td><td>${money(d.amount)}</td><td>${d.status}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum depósito.</td></tr>`}</tbody></table></div></div>`;window._activeInvestors=investors||[];
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div>
+          <h2>Depósitos</h2>
+          <div class="muted">Solicitações feitas pelos investidores e depósitos adicionados manualmente.</div>
+        </div>
+        <button class="btn" onclick="openDepositSelector()">+ Adicionar saldo manualmente</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Investidor</th><th>Valor</th><th>Status</th><th>Ação</th></tr>
+          </thead>
+          <tbody>
+            ${(deps||[]).map(d=>`
+              <tr>
+                <td>${new Date(d.created_at).toLocaleString("pt-BR")}</td>
+                <td>${esc(d.profiles?.name||"-")}<br><span class="muted">${esc(d.profiles?.email||"")}</span></td>
+                <td><b>${money(d.amount)}</b></td>
+                <td><span class="badge ${d.status==="confirmed"?"green":d.status==="rejected"?"red":""}">
+                  ${d.status==="pending"?"PENDENTE":d.status==="confirmed"?"CONFIRMADO":d.status==="rejected"?"REJEITADO":esc(d.status)}
+                </span></td>
+                <td>
+                  ${d.status==="pending" ? `
+                    <div class="actions">
+                      <button class="btn success smallbtn" onclick="processDepositRequest(${d.id},'confirmed')">Confirmar PIX</button>
+                      <button class="btn danger smallbtn" onclick="processDepositRequest(${d.id},'rejected')">Rejeitar</button>
+                    </div>
+                  ` : "-"}
+                </td>
+              </tr>
+            `).join("")||`<tr><td colspan="5">Nenhum depósito.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  window._activeInvestors=investors||[];
 }
-function openDepositSelector(){const inv=window._activeInvestors||[];openModal(`<div class="title-row"><h2>Confirmar depósito</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Investidor</label><select id="depInvestor">${inv.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("")}</select><label>Valor</label><input id="depAmount" type="number" min="${settings.minimum_deposit||40}" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="saveDepositFromSection()">Confirmar</button>`)}
-async function saveDepositFromSection(){const id=document.getElementById("depInvestor").value,amount=Number(document.getElementById("depAmount").value);const {error}=await sb.rpc("admin_add_deposit",{p_investor_id:id,p_amount:amount});if(error){toast(error.message);return}closeModal();await loadAdminDeposits()}
+
+async function processDepositRequest(id,status){
+  const question=status==="confirmed"
+    ?"Confirmar que este PIX foi recebido? O valor será adicionado ao saldo do investidor."
+    :"Rejeitar esta solicitação de depósito?";
+
+  if(!confirm(question))return;
+
+  const {error}=await sb.rpc("admin_process_deposit",{
+    p_deposit_id:id,
+    p_status:status
+  });
+
+  if(error){toast(error.message);return}
+
+  toast(status==="confirmed"?"Depósito confirmado e saldo liberado.":"Solicitação rejeitada.");
+  await loadAdminDeposits();
+}
+
+function openDepositSelector(){
+  const inv=window._activeInvestors||[];
+  openModal(`<div class="title-row"><h2>Confirmar depósito manual</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Investidor</label><select id="depInvestor">${inv.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("")}</select><label>Valor</label><input id="depAmount" type="number" min="${settings.minimum_deposit||40}" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="saveDepositFromSection()">Confirmar</button>`)
+}
+
+async function saveDepositFromSection(){
+  const id=document.getElementById("depInvestor").value;
+  const amount=Number(document.getElementById("depAmount").value);
+  const {error}=await sb.rpc("admin_add_deposit",{p_investor_id:id,p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();
+  await loadAdminDeposits();
+}
 
 async function loadAdminWithdrawals(){
   const box=document.getElementById("adminContent");
@@ -384,12 +575,147 @@ async function loadAdminWithdrawals(){
 }
 async function processWithdrawal(id,status){if(!confirm(status==="paid"?"Confirmar que o PIX foi pago?":"Rejeitar e devolver o valor ao saldo?"))return;const {error}=await sb.rpc("admin_process_withdrawal",{p_withdrawal_id:id,p_status:status});if(error){toast(error.message);return}await loadAdminWithdrawals()}
 
+
+async function loadAdminNotifications(){
+  const box=document.getElementById("adminContent");
+
+  const {data,error}=await sb
+    .from("notifications")
+    .select("id,investor_id,title,message,read,created_at,profiles!notifications_investor_id_fkey(name,email,role)")
+    .order("created_at",{ascending:false})
+    .limit(100);
+
+  if(error){
+    // Fallback sem relacionamento, caso o nome da FK seja diferente.
+    const fallback=await sb
+      .from("notifications")
+      .select("id,investor_id,title,message,read,created_at")
+      .order("created_at",{ascending:false})
+      .limit(100);
+
+    if(fallback.error){
+      box.innerHTML=`<div class="card error">${esc(fallback.error.message)}</div>`;
+      return;
+    }
+
+    box.innerHTML=`
+      <div class="card">
+        <div class="title-row">
+          <h2>Notificações</h2>
+          <span class="muted">Avisos da sua conta administrativa</span>
+        </div>
+
+        ${(fallback.data||[]).map(n=>`
+          <div class="item" style="margin-bottom:10px">
+            <div class="title-row">
+              <h3>${esc(n.title)}</h3>
+              <span class="muted">${new Date(n.created_at).toLocaleString("pt-BR")}</span>
+            </div>
+            <div class="muted">${esc(n.message)}</div>
+          </div>
+        `).join("")||`<div class="muted">Nenhuma notificação.</div>`}
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <h2>Notificações</h2>
+        <span class="muted">Avisos da sua conta administrativa</span>
+      </div>
+
+      ${(data||[]).map(n=>`
+        <div class="item" style="margin-bottom:10px">
+          <div class="title-row">
+            <h3>${esc(n.title)}</h3>
+            <span class="muted">${new Date(n.created_at).toLocaleString("pt-BR")}</span>
+          </div>
+          <div class="muted">${esc(n.message)}</div>
+        </div>
+      `).join("")||`<div class="muted">Nenhuma notificação.</div>`}
+    </div>
+  `;
+}
+
 async function loadAdminSettings(){
   const box=document.getElementById("adminContent");
   await loadSettings();
-  box.innerHTML=`<div class="card"><div class="title-row"><h2>Configurações</h2></div><div class="row"><div><label>Nome da plataforma</label><input id="setPlatform" value="${esc(settings.platform_name||"CATinvestimentos")}"></div><div><label>Nome da loja</label><input id="setStore" value="${esc(settings.store_name||"Cat Encantus")}"></div></div><label>URL da logo (opcional; se vazio usa logo.png)</label><input id="setLogo" value="${esc(settings.logo_url||"")}"><div class="row"><div><label>Cor principal</label><input id="setPrimary" type="color" value="${settings.primary_color||"#a94366"}"></div><div><label>Cor secundária</label><input id="setSecondary" type="color" value="${settings.secondary_color||"#f7dfe6"}"></div></div><div class="row3"><div><label>Retorno-alvo (%)</label><input id="setReturn" type="number" step="0.01" value="${settings.target_return_rate||15}"></div><div><label>Depósito mínimo</label><input id="setMinDeposit" type="number" step="0.01" value="${settings.minimum_deposit||40}"></div><div><label>Investimento mínimo</label><input id="setMinInvest" type="number" step="0.01" value="${settings.minimum_investment||10}"></div></div><div class="row"><div><label>Investimento máximo</label><input id="setMaxInvest" type="number" step="0.01" value="${settings.maximum_investment||100}"></div><div><label>Máximo padrão de investidores</label><input id="setMaxPeople" type="number" value="${settings.maximum_investors_per_theme||3}"></div></div><button class="btn" style="margin-top:15px" onclick="saveSettings()">Salvar configurações</button></div>`;
+
+  const {data:adminProfile}=await sb
+    .from("profiles")
+    .select("pix")
+    .eq("id",currentProfile.id)
+    .single();
+
+  const storePix=adminProfile?.pix||"";
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row"><h2>Configurações</h2></div>
+
+      <div class="row">
+        <div><label>Nome da plataforma</label><input id="setPlatform" value="${esc(settings.platform_name||"CATinvestimentos")}"></div>
+        <div><label>Nome da loja</label><input id="setStore" value="${esc(settings.store_name||"Cat Encantus")}"></div>
+      </div>
+
+      <label>PIX da loja para depósitos</label>
+      <input id="setStorePix" value="${esc(storePix)}" placeholder="CPF, e-mail, telefone ou chave aleatória">
+      <div class="muted" style="margin-top:6px">
+        Esta chave será exibida apenas para investidores autenticados quando clicarem em “Adicionar saldo”.
+      </div>
+
+      <label>URL da logo (opcional; se vazio usa logo.png)</label>
+      <input id="setLogo" value="${esc(settings.logo_url||"")}">
+
+      <div class="row">
+        <div><label>Cor principal</label><input id="setPrimary" type="color" value="${settings.primary_color||"#a94366"}"></div>
+        <div><label>Cor secundária</label><input id="setSecondary" type="color" value="${settings.secondary_color||"#f7dfe6"}"></div>
+      </div>
+
+      <div class="row3">
+        <div><label>Retorno-alvo (%)</label><input id="setReturn" type="number" step="0.01" value="${settings.target_return_rate||15}"></div>
+        <div><label>Depósito mínimo</label><input id="setMinDeposit" type="number" step="0.01" value="${settings.minimum_deposit||40}"></div>
+        <div><label>Investimento mínimo</label><input id="setMinInvest" type="number" step="0.01" value="${settings.minimum_investment||10}"></div>
+      </div>
+
+      <div class="row">
+        <div><label>Investimento máximo</label><input id="setMaxInvest" type="number" step="0.01" value="${settings.maximum_investment||100}"></div>
+        <div><label>Máximo padrão de investidores</label><input id="setMaxPeople" type="number" value="${settings.maximum_investors_per_theme||3}"></div>
+      </div>
+
+      <button class="btn" style="margin-top:15px" onclick="saveSettings()">Salvar configurações</button>
+    </div>
+  `;
 }
-async function saveSettings(){const args={p_platform_name:document.getElementById("setPlatform").value,p_store_name:document.getElementById("setStore").value,p_logo_url:document.getElementById("setLogo").value,p_primary_color:document.getElementById("setPrimary").value,p_secondary_color:document.getElementById("setSecondary").value,p_return_rate:Number(document.getElementById("setReturn").value),p_minimum_deposit:Number(document.getElementById("setMinDeposit").value),p_minimum_investment:Number(document.getElementById("setMinInvest").value),p_maximum_investment:Number(document.getElementById("setMaxInvest").value),p_maximum_investors:Number(document.getElementById("setMaxPeople").value)};const {error}=await sb.rpc("admin_update_settings",args);if(error){toast(error.message);return}await loadSettings();toast("Configurações salvas.");await loadAdminSettings()}
+
+async function saveSettings(){
+  const args={
+    p_platform_name:document.getElementById("setPlatform").value,
+    p_store_name:document.getElementById("setStore").value,
+    p_logo_url:document.getElementById("setLogo").value,
+    p_primary_color:document.getElementById("setPrimary").value,
+    p_secondary_color:document.getElementById("setSecondary").value,
+    p_return_rate:Number(document.getElementById("setReturn").value),
+    p_minimum_deposit:Number(document.getElementById("setMinDeposit").value),
+    p_minimum_investment:Number(document.getElementById("setMinInvest").value),
+    p_maximum_investment:Number(document.getElementById("setMaxInvest").value),
+    p_maximum_investors:Number(document.getElementById("setMaxPeople").value)
+  };
+
+  const {error}=await sb.rpc("admin_update_settings",args);
+  if(error){toast(error.message);return}
+
+  const {error:pixError}=await sb.rpc("admin_set_store_pix",{
+    p_pix:document.getElementById("setStorePix").value
+  });
+  if(pixError){toast(pixError.message);return}
+
+  await loadSettings();
+  toast("Configurações salvas.");
+  await loadAdminSettings();
+}
 
 (async()=>{await loadSettings();await loadUser()})();
 </script>
