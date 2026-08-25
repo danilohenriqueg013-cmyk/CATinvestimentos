@@ -377,54 +377,56 @@ footer{
 
   </div>
 
-  <div class="admin-menu">
+<div class="admin-menu">
 
-    <div class="admin-item">
-      👥<br><br>
-      Investidores
-    </div>
+  <button class="admin-item" onclick="openAdminSection('investors')">
+    👥<br><br>
+    Investidores
+  </button>
 
-    <div class="admin-item">
-      🎨<br><br>
-      Temas
-    </div>
+  <button class="admin-item" onclick="openAdminSection('themes')">
+    🎨<br><br>
+    Temas
+  </button>
 
-    <div class="admin-item">
-      💰<br><br>
-      Investimentos
-    </div>
+  <button class="admin-item" onclick="openAdminSection('investments')">
+    💰<br><br>
+    Investimentos
+  </button>
 
-    <div class="admin-item">
-      🧾<br><br>
-      Registrar Venda
-    </div>
+  <button class="admin-item" onclick="openAdminSection('sales')">
+    🧾<br><br>
+    Registrar Venda
+  </button>
 
-    <div class="admin-item">
-      📦<br><br>
-      Caixinhas
-    </div>
+  <button class="admin-item" onclick="openAdminSection('cashboxes')">
+    📦<br><br>
+    Caixinhas
+  </button>
 
-    <div class="admin-item">
-      🔄<br><br>
-      Filas
-    </div>
+  <button class="admin-item" onclick="openAdminSection('queues')">
+    🔄<br><br>
+    Filas
+  </button>
 
-    <div class="admin-item">
-      ➕<br><br>
-      Depósitos
-    </div>
+  <button class="admin-item" onclick="openAdminSection('deposits')">
+    ➕<br><br>
+    Depósitos
+  </button>
 
-    <div class="admin-item">
-      💸<br><br>
-      Saques
-    </div>
+  <button class="admin-item" onclick="openAdminSection('withdrawals')">
+    💸<br><br>
+    Saques
+  </button>
 
-    <div class="admin-item">
-      ⚙️<br><br>
-      Configurações
-    </div>
+  <button class="admin-item" onclick="openAdminSection('settings')">
+    ⚙️<br><br>
+    Configurações
+  </button>
 
-  </div>
+</div>
+
+<div id="adminSection" class="card hidden" style="margin-top:25px;"></div>
 
 </section>
 
@@ -517,11 +519,42 @@ async function login(){
   await loadUser();
 
 }
+}
+
+function openAdminSection(section){
+
+  const box = document.getElementById("adminSection");
+
+  box.classList.remove("hidden");
+
+  const titles = {
+    investors: "Investidores",
+    themes: "Temas",
+    investments: "Investimentos",
+    sales: "Registrar Venda",
+    cashboxes: "Caixinhas",
+    queues: "Filas",
+    deposits: "Depósitos",
+    withdrawals: "Saques",
+    settings: "Configurações"
+  };
+
+  box.innerHTML = `
+    <h2 style="color:#963c5c; margin-bottom:12px;">
+      ${titles[section]}
+    </h2>
+
+    <p class="small">
+      Esta seção já está aberta e agora vamos conectar os dados reais do Supabase.
+    </p>
+  `;
+}
 
 
 /* =========================================
    CARREGAR USUÁRIO
 ========================================= */
+
 
 async function loadUser(){
 
