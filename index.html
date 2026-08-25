@@ -1,248 +1,259 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>CATinvestimentos | Cat Encantus</title>
+  <title>CATinvestimentos | Cat Encantus</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<style>
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
-}
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-body{
-  font-family:Arial,sans-serif;
-  background:#fff8fa;
-  color:#5f3545;
-  min-height:100vh;
-}
+    body {
+      font-family: Arial, sans-serif;
+      background: #fff8fa;
+      color: #5f3545;
+      min-height: 100vh;
+    }
 
-header{
-  background:#f7dfe6;
-  padding:18px 25px;
-  border-bottom:1px solid #eccbd5;
-}
+    header {
+      background: #f7dfe6;
+      padding: 18px 25px;
+      border-bottom: 1px solid #eccbd5;
+    }
 
-.header-content{
-  max-width:1150px;
-  margin:auto;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
+    .header-content {
+      max-width: 1150px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
 
-.brand{
-  font-size:28px;
-  font-weight:bold;
-  color:#a44365;
-}
+    .brand {
+      font-size: 28px;
+      font-weight: bold;
+      color: #a44365;
+    }
 
-.store-name{
-  font-size:13px;
-  color:#815262;
-  margin-top:3px;
-}
+    .store-name {
+      font-size: 13px;
+      color: #815262;
+      margin-top: 3px;
+    }
 
-.logout{
-  width:auto;
-  margin:0;
-  padding:10px 18px;
-}
+    .logout {
+      width: auto;
+      margin: 0;
+      padding: 10px 18px;
+    }
 
-main{
-  width:min(1150px,92%);
-  margin:45px auto;
-}
+    main {
+      width: min(1150px, 92%);
+      margin: 45px auto;
+    }
 
-.hero{
-  text-align:center;
-  margin-bottom:40px;
-}
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
 
-.hero h1{
-  font-size:38px;
-  color:#963c5c;
-  margin-bottom:10px;
-}
+    .hero h1 {
+      font-size: 38px;
+      color: #963c5c;
+      margin-bottom: 10px;
+    }
 
-.hero p{
-  color:#76515e;
-  line-height:1.6;
-}
+    .hero p {
+      color: #76515e;
+      line-height: 1.6;
+    }
 
-.card{
-  background:white;
-  border-radius:18px;
-  border:1px solid #f0d8e0;
-  box-shadow:0 8px 25px rgba(120,63,84,.10);
-  padding:25px;
-}
+    .card {
+      background: white;
+      border-radius: 18px;
+      border: 1px solid #f0d8e0;
+      box-shadow: 0 8px 25px rgba(120,63,84,.10);
+      padding: 25px;
+    }
 
-.login-card{
-  max-width:430px;
-  margin:auto;
-}
+    .login-card {
+      max-width: 430px;
+      margin: auto;
+    }
 
-.login-card h2{
-  text-align:center;
-  color:#963c5c;
-  margin-bottom:24px;
-}
+    .login-card h2 {
+      text-align: center;
+      color: #963c5c;
+      margin-bottom: 24px;
+    }
 
-label{
-  display:block;
-  margin:14px 0 7px;
-  font-weight:bold;
-  font-size:14px;
-}
+    label {
+      display: block;
+      margin: 14px 0 7px;
+      font-weight: bold;
+      font-size: 14px;
+    }
 
-input{
-  width:100%;
-  padding:13px;
-  border:1px solid #dfc4ce;
-  border-radius:10px;
-  font-size:15px;
-}
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #dfc4ce;
+      border-radius: 10px;
+      font-size: 15px;
+    }
 
-button{
-  border:none;
-  border-radius:10px;
-  background:#a94366;
-  color:white;
-  font-weight:bold;
-  cursor:pointer;
-  padding:13px 16px;
-}
+    button {
+      border: none;
+      border-radius: 10px;
+      background: #a94366;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      padding: 13px 16px;
+    }
 
-.login-button{
-  width:100%;
-  margin-top:22px;
-}
+    button:hover {
+      background: #913653;
+    }
 
-button:hover{
-  background:#913653;
-}
+    .login-button {
+      width: 100%;
+      margin-top: 22px;
+    }
 
-.notice{
-  margin-top:25px;
-  background:#fff0f4;
-  border-radius:12px;
-  padding:17px;
-  font-size:13px;
-  line-height:1.6;
-}
+    .notice {
+      margin-top: 25px;
+      background: #fff0f4;
+      border-radius: 12px;
+      padding: 17px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
 
-.error{
-  color:#a32645;
-  margin-top:15px;
-  text-align:center;
-  font-size:14px;
-}
+    .error {
+      color: #a32645;
+      margin-top: 15px;
+      text-align: center;
+      font-size: 14px;
+    }
 
-.success{
-  color:#25734b;
-}
+    .hidden {
+      display: none !important;
+    }
 
-.hidden{
-  display:none !important;
-}
+    .dashboard-header {
+      margin-bottom: 28px;
+    }
 
-.dashboard-header{
-  margin-bottom:28px;
-}
+    .dashboard-header h1 {
+      color: #963c5c;
+    }
 
-.dashboard-header h1{
-  color:#963c5c;
-}
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 25px 0;
+    }
 
-.stats{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-  gap:16px;
-  margin:25px 0;
-}
+    .stat-title {
+      color: #87606e;
+      font-size: 13px;
+    }
 
-.stat-title{
-  color:#87606e;
-  font-size:13px;
-}
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #963c5c;
+      margin-top: 7px;
+    }
 
-.stat-value{
-  font-size:28px;
-  font-weight:bold;
-  color:#963c5c;
-  margin-top:7px;
-}
+    .section-title {
+      margin: 32px 0 15px;
+      color: #7c304d;
+    }
 
-.section-title{
-  margin:32px 0 15px;
-  color:#7c304d;
-}
+    .investments {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
 
-.investments{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-  gap:16px;
-}
+    .progress {
+      height: 10px;
+      background: #f3dfe6;
+      border-radius: 20px;
+      overflow: hidden;
+      margin: 13px 0;
+    }
 
-.progress{
-  height:10px;
-  background:#f3dfe6;
-  border-radius:20px;
-  overflow:hidden;
-  margin:13px 0;
-}
+    .progress-bar {
+      height: 100%;
+      background: #b64f73;
+    }
 
-.progress-bar{
-  height:100%;
-  background:#b64f73;
-}
+    .small {
+      font-size: 13px;
+      color: #85616e;
+      line-height: 1.6;
+    }
 
-.small{
-  font-size:13px;
-  color:#85616e;
-  line-height:1.6;
-}
+    .admin-menu {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-top: 25px;
+    }
 
-.admin-menu{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
-  gap:14px;
-  margin-top:25px;
-}
+    .admin-item {
+      text-align: center;
+      padding: 25px 15px;
+      background: white;
+      border: 1px solid #efd6df;
+      border-radius: 15px;
+      font-weight: bold;
+      color: #8d3857;
+      min-height: 108px;
+    }
 
-.admin-item{
-  text-align:center;
-  padding:25px 15px;
-  background:white;
-  border:1px solid #efd6df;
-  border-radius:15px;
-  font-weight:bold;
-  color:#8d3857;
-}
+    .admin-item:hover {
+      background: #fff0f4;
+      color: #963c5c;
+    }
 
-.loading{
-  text-align:center;
-  padding:70px 20px;
-}
+    #adminSection {
+      margin-top: 25px;
+    }
 
-footer{
-  text-align:center;
-  padding:30px;
-  color:#98717f;
-  font-size:12px;
-}
+    .loading {
+      text-align: center;
+      padding: 70px 20px;
+    }
 
-@media(max-width:600px){
-  .hero h1{font-size:29px;}
-  .brand{font-size:22px;}
-}
-</style>
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: #98717f;
+      font-size: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 {
+        font-size: 29px;
+      }
+
+      .brand {
+        font-size: 22px;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -265,170 +276,192 @@ footer{
 
 <main>
 
-<!-- LOGIN -->
+  <!-- LOGIN -->
+  <section id="loginArea">
 
-<section id="loginArea">
+    <div class="hero">
+      <h1>Invista nos temas que você acredita.</h1>
 
-  <div class="hero">
-    <h1>Invista nos temas que você acredita.</h1>
-    <p>
-      Acompanhe seus investimentos, o progresso das vendas
-      e seu retorno-alvo de forma simples.
-    </p>
-  </div>
-
-  <div class="card login-card">
-
-    <h2>Área do Investidor</h2>
-
-    <label>E-mail</label>
-    <input id="email" type="email" placeholder="Digite seu e-mail">
-
-    <label>Senha</label>
-    <input id="password" type="password" placeholder="Digite sua senha">
-
-    <button
-      class="login-button"
-      onclick="login()">
-      Entrar
-    </button>
-
-    <div id="loginMessage" class="error"></div>
-
-    <div class="notice">
-      <strong>Importante:</strong><br>
-      Os investimentos possuem retorno-alvo de 15%.
-      O prazo depende das vendas relacionadas ao tema e
-      não existe garantia de retorno imediato.
+      <p>
+        Acompanhe seus investimentos, o progresso das vendas
+        e seu retorno-alvo de forma simples.
+      </p>
     </div>
 
-  </div>
+    <div class="card login-card">
 
-</section>
+      <h2>Área do Investidor</h2>
+
+      <label for="email">E-mail</label>
+      <input
+        id="email"
+        type="email"
+        placeholder="Digite seu e-mail">
+
+      <label for="password">Senha</label>
+      <input
+        id="password"
+        type="password"
+        placeholder="Digite sua senha">
+
+      <button
+        class="login-button"
+        onclick="login()">
+        Entrar
+      </button>
+
+      <div id="loginMessage" class="error"></div>
+
+      <div class="notice">
+        <strong>Importante:</strong><br><br>
+        Os investimentos possuem retorno-alvo de 15%.
+        O prazo depende das vendas relacionadas ao tema e
+        não existe garantia de retorno imediato.
+      </div>
+
+    </div>
+
+  </section>
 
 
-<!-- CARREGANDO -->
+  <!-- CARREGANDO -->
+  <section id="loadingArea" class="hidden loading">
+    <h2>Carregando CATinvestimentos...</h2>
+  </section>
 
-<section id="loadingArea" class="hidden loading">
-  <h2>Carregando CATinvestimentos...</h2>
-</section>
+
+  <!-- INVESTIDOR -->
+  <section id="investorArea" class="hidden">
+
+    <div class="dashboard-header">
+      <h1 id="investorWelcome">Olá!</h1>
+      <p>Acompanhe seus investimentos.</p>
+    </div>
+
+    <div class="stats">
+
+      <div class="card">
+        <div class="stat-title">Saldo disponível</div>
+        <div id="investorBalance" class="stat-value">
+          R$ 0,00
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="stat-title">Retorno-alvo</div>
+        <div class="stat-value">15%</div>
+      </div>
+
+      <div class="card">
+        <div class="stat-title">Depósito mínimo</div>
+        <div class="stat-value">R$ 40</div>
+      </div>
+
+    </div>
+
+    <h2 class="section-title">
+      Meus investimentos
+    </h2>
+
+    <div id="investmentsList" class="investments"></div>
+
+    <h2 class="section-title">
+      Notificações
+    </h2>
+
+    <div id="notificationsList"></div>
+
+  </section>
 
 
-<!-- INVESTIDOR -->
+  <!-- ADMIN -->
+  <section id="adminArea" class="hidden">
 
-<section id="investorArea" class="hidden">
+    <div class="dashboard-header">
+      <h1>Painel Administrativo</h1>
+      <p>CATinvestimentos • Cat Encantus</p>
+    </div>
 
-  <div class="dashboard-header">
-    <h1 id="investorWelcome">Olá!</h1>
-    <p>Acompanhe seus investimentos.</p>
-  </div>
-
-  <div class="stats">
-
-    <div class="card">
-      <div class="stat-title">Saldo disponível</div>
-      <div id="investorBalance" class="stat-value">
-        R$ 0,00
+    <div class="stats">
+      <div class="card">
+        <div class="stat-title">Administrador</div>
+        <div class="stat-value">Ativo</div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="stat-title">Retorno-alvo</div>
-      <div class="stat-value">15%</div>
+    <div class="admin-menu">
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('investors')">
+        👥<br><br>
+        Investidores
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('themes')">
+        🎨<br><br>
+        Temas
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('investments')">
+        💰<br><br>
+        Investimentos
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('sales')">
+        🧾<br><br>
+        Registrar Venda
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('cashboxes')">
+        📦<br><br>
+        Caixinhas
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('queues')">
+        🔄<br><br>
+        Filas
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('deposits')">
+        ➕<br><br>
+        Depósitos
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('withdrawals')">
+        💸<br><br>
+        Saques
+      </button>
+
+      <button
+        class="admin-item"
+        onclick="openAdminSection('settings')">
+        ⚙️<br><br>
+        Configurações
+      </button>
+
     </div>
 
-    <div class="card">
-      <div class="stat-title">Depósito mínimo</div>
-      <div class="stat-value">R$ 40</div>
+    <div
+      id="adminSection"
+      class="card hidden">
     </div>
 
-  </div>
-
-  <h2 class="section-title">
-    Meus investimentos
-  </h2>
-
-  <div id="investmentsList" class="investments"></div>
-
-  <h2 class="section-title">
-    Notificações
-  </h2>
-
-  <div id="notificationsList"></div>
-
-</section>
-
-
-<!-- ADMIN -->
-
-<section id="adminArea" class="hidden">
-
-  <div class="dashboard-header">
-    <h1>Painel Administrativo</h1>
-    <p>CATinvestimentos • Cat Encantus</p>
-  </div>
-
-  <div class="stats">
-
-    <div class="card">
-      <div class="stat-title">Administrador</div>
-      <div class="stat-value">Ativo</div>
-    </div>
-
-  </div>
-
-<div class="admin-menu">
-
-  <button class="admin-item" onclick="openAdminSection('investors')">
-    👥<br><br>
-    Investidores
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('themes')">
-    🎨<br><br>
-    Temas
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('investments')">
-    💰<br><br>
-    Investimentos
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('sales')">
-    🧾<br><br>
-    Registrar Venda
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('cashboxes')">
-    📦<br><br>
-    Caixinhas
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('queues')">
-    🔄<br><br>
-    Filas
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('deposits')">
-    ➕<br><br>
-    Depósitos
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('withdrawals')">
-    💸<br><br>
-    Saques
-  </button>
-
-  <button class="admin-item" onclick="openAdminSection('settings')">
-    ⚙️<br><br>
-    Configurações
-  </button>
-
-</div>
-
-<div id="adminSection" class="card hidden" style="margin-top:25px;"></div>
-
-</section>
+  </section>
 
 </main>
 
@@ -439,25 +472,11 @@ footer{
 
 <script>
 
-/* =========================================
-   CONEXÃO SUPABASE
-========================================= */
-
 const SUPABASE_URL =
-"https://gjjzddsuqphahfjjgkda.supabase.co";
-
-/*
-IMPORTANTE:
-
-Substitua o texto abaixo pela sua chave
-sb_publishable_...
-
-NÃO USE A sb_secret_
-*/
+  "https://gjjzddsuqphahfjjgkda.supabase.co";
 
 const SUPABASE_KEY =
-"sb_publishable_VuPY2hFbsEcftj37cVnXbQ__wM0Ulfc";
-
+  "sb_publishable_VuPY2hFbsEcftj37cVnXbQ__wM0Ulfc";
 
 const supabaseClient =
   supabase.createClient(
@@ -466,28 +485,18 @@ const supabaseClient =
   );
 
 
-/* =========================================
-   FORMATAR DINHEIRO
-========================================= */
-
-function money(value){
-
+function money(value) {
   return new Intl.NumberFormat(
     "pt-BR",
     {
-      style:"currency",
-      currency:"BRL"
+      style: "currency",
+      currency: "BRL"
     }
   ).format(Number(value || 0));
-
 }
 
 
-/* =========================================
-   LOGIN
-========================================= */
-
-async function login(){
+async function login() {
 
   const email =
     document.getElementById("email").value.trim();
@@ -498,15 +507,22 @@ async function login(){
   const message =
     document.getElementById("loginMessage");
 
+  if (!email || !password) {
+    message.textContent =
+      "Digite seu e-mail e sua senha.";
+    return;
+  }
+
   message.textContent = "Entrando...";
 
-  const {data,error} =
+  const { error } =
     await supabaseClient.auth.signInWithPassword({
-      email,
-      password
+      email: email,
+      password: password
     });
 
-  if(error){
+  if (error) {
+    console.error(error);
 
     message.textContent =
       "E-mail ou senha incorretos.";
@@ -517,15 +533,78 @@ async function login(){
   message.textContent = "";
 
   await loadUser();
-
-}
 }
 
-function openAdminSection(section){
 
-  const box = document.getElementById("adminSection");
+async function loadUser() {
 
-  box.classList.remove("hidden");
+  showLoading();
+
+  const {
+    data: { user },
+    error: userError
+  } =
+    await supabaseClient.auth.getUser();
+
+  if (userError) {
+    console.error(userError);
+  }
+
+  if (!user) {
+    showLogin();
+    return;
+  }
+
+  const {
+    data: profile,
+    error: profileError
+  } =
+    await supabaseClient
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+  if (profileError) {
+    console.error(
+      "Erro ao carregar perfil:",
+      profileError
+    );
+
+    alert(
+      "Não foi possível carregar o perfil. Erro: " +
+      profileError.message
+    );
+
+    await logout();
+    return;
+  }
+
+  if (!profile) {
+    alert(
+      "Seu usuário existe, mas o perfil não foi encontrado."
+    );
+
+    await logout();
+    return;
+  }
+
+  document
+    .getElementById("logoutButton")
+    .classList.remove("hidden");
+
+  if (profile.role === "admin") {
+    showAdmin();
+  } else {
+    await showInvestor(profile);
+  }
+}
+
+
+function openAdminSection(section) {
+
+  const box =
+    document.getElementById("adminSection");
 
   const titles = {
     investors: "Investidores",
@@ -539,89 +618,31 @@ function openAdminSection(section){
     settings: "Configurações"
   };
 
+  box.classList.remove("hidden");
+
   box.innerHTML = `
-    <h2 style="color:#963c5c; margin-bottom:12px;">
+    <h2 style="
+      color:#963c5c;
+      margin-bottom:15px;
+    ">
       ${titles[section]}
     </h2>
 
     <p class="small">
-      Esta seção já está aberta e agora vamos conectar os dados reais do Supabase.
+      Seção aberta corretamente.
+      Agora vamos conectar esta área
+      aos dados reais do CATinvestimentos.
     </p>
   `;
+
+  box.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
 }
 
 
-/* =========================================
-   CARREGAR USUÁRIO
-========================================= */
-
-
-async function loadUser(){
-
-  showLoading();
-
-  const {
-    data:{user}
-  } =
-  await supabaseClient.auth.getUser();
-
-
-  if(!user){
-
-    showLogin();
-
-    return;
-
-  }
-
-
-  const {
-    data:profile,
-    error
-  } =
-  await supabaseClient
-    .from("profiles")
-    .select("*")
-    .eq("id",user.id)
-    .single();
-
-
-  if(error || !profile){
-
-    alert(
-      "Seu usuário existe, mas o perfil não foi encontrado."
-    );
-
-    await logout();
-
-    return;
-
-  }
-
-
-  document
-    .getElementById("logoutButton")
-    .classList.remove("hidden");
-
-
-  if(profile.role === "admin"){
-
-    showAdmin();
-
-  }else{
-
-    await showInvestor(profile);
-
-  }
-
-}
-
-
-/* =========================================
-   INVESTIDOR
-========================================= */
-
-async function showInvestor(profile){
+async function showInvestor(profile) {
 
   hideAll();
 
@@ -629,37 +650,32 @@ async function showInvestor(profile){
     .getElementById("investorArea")
     .classList.remove("hidden");
 
-
   document.getElementById(
     "investorWelcome"
   ).textContent =
     "Olá, " + profile.name + "!";
-
 
   document.getElementById(
     "investorBalance"
   ).textContent =
     money(profile.balance);
 
-
   await loadInvestments();
-
   await loadNotifications();
-
 }
 
 
-/* =========================================
-   INVESTIMENTOS
-========================================= */
-
-async function loadInvestments(){
+async function loadInvestments() {
 
   const container =
-    document.getElementById("investmentsList");
+    document.getElementById(
+      "investmentsList"
+    );
 
-
-  const {data,error} =
+  const {
+    data,
+    error
+  } =
     await supabaseClient
       .from("investments")
       .select(`
@@ -673,35 +689,31 @@ async function loadInvestments(){
           name
         )
       `)
-      .order("created_at",{
-        ascending:false
-      });
+      .order(
+        "created_at",
+        { ascending: false }
+      );
 
-
-  if(error){
+  if (error) {
+    console.error(error);
 
     container.innerHTML =
       "<div class='card'>Não foi possível carregar os investimentos.</div>";
 
     return;
-
   }
 
-
-  if(!data || data.length === 0){
+  if (!data || data.length === 0) {
 
     container.innerHTML =
       "<div class='card'>Você ainda não possui investimentos.</div>";
 
     return;
-
   }
-
 
   container.innerHTML = "";
 
-
-  data.forEach(item=>{
+  data.forEach(item => {
 
     const percentage =
       Math.min(
@@ -713,7 +725,6 @@ async function loadInvestments(){
         ) * 100
       );
 
-
     const remaining =
       Math.max(
         0,
@@ -722,16 +733,12 @@ async function loadInvestments(){
         Number(item.sold_amount)
       );
 
-
     const card =
       document.createElement("div");
 
-
     card.className = "card";
 
-
     card.innerHTML = `
-
       <h3>
         ${item.themes?.name || "Tema"}
       </h3>
@@ -798,75 +805,62 @@ async function loadInvestments(){
         </strong>
 
       </div>
-
     `;
-
 
     container.appendChild(card);
 
   });
-
 }
 
 
-/* =========================================
-   NOTIFICAÇÕES
-========================================= */
-
-async function loadNotifications(){
+async function loadNotifications() {
 
   const container =
     document.getElementById(
       "notificationsList"
     );
 
-
-  const {data,error} =
+  const {
+    data,
+    error
+  } =
     await supabaseClient
       .from("notifications")
       .select("*")
       .order(
         "created_at",
-        {ascending:false}
+        { ascending: false }
       )
       .limit(10);
 
-
-  if(error){
+  if (error) {
+    console.error(error);
 
     container.innerHTML =
       "<div class='card'>Não foi possível carregar as notificações.</div>";
 
     return;
-
   }
 
-
-  if(!data || data.length === 0){
+  if (!data || data.length === 0) {
 
     container.innerHTML =
       "<div class='card'>Nenhuma notificação.</div>";
 
     return;
-
   }
-
 
   container.innerHTML = "";
 
-
-  data.forEach(notification=>{
+  data.forEach(notification => {
 
     const div =
       document.createElement("div");
 
     div.className = "card";
-
     div.style.marginBottom = "12px";
 
-
     div.innerHTML = `
-
       <strong>
         ${notification.title}
       </strong>
@@ -876,37 +870,25 @@ async function loadNotifications(){
       <div class="small">
         ${notification.message}
       </div>
-
     `;
-
 
     container.appendChild(div);
 
   });
-
 }
 
 
-/* =========================================
-   ADMIN
-========================================= */
-
-function showAdmin(){
+function showAdmin() {
 
   hideAll();
 
   document
     .getElementById("adminArea")
     .classList.remove("hidden");
-
 }
 
 
-/* =========================================
-   LOGOUT
-========================================= */
-
-async function logout(){
+async function logout() {
 
   await supabaseClient.auth.signOut();
 
@@ -915,15 +897,10 @@ async function logout(){
     .classList.add("hidden");
 
   showLogin();
-
 }
 
 
-/* =========================================
-   INTERFACE
-========================================= */
-
-function hideAll(){
+function hideAll() {
 
   document
     .getElementById("loginArea")
@@ -940,35 +917,28 @@ function hideAll(){
   document
     .getElementById("adminArea")
     .classList.add("hidden");
-
 }
 
 
-function showLoading(){
+function showLoading() {
 
   hideAll();
 
   document
     .getElementById("loadingArea")
     .classList.remove("hidden");
-
 }
 
 
-function showLogin(){
+function showLogin() {
 
   hideAll();
 
   document
     .getElementById("loginArea")
     .classList.remove("hidden");
-
 }
 
-
-/* =========================================
-   INICIAR
-========================================= */
 
 loadUser();
 
