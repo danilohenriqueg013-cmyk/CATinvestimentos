@@ -62,6 +62,7 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
     <label>Senha</label><input id="password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') login()">
     <button class="btn" style="width:100%;margin-top:18px" onclick="login()">Entrar</button>
     <button class="btn secondary" style="width:100%;margin-top:10px" onclick="openSignup()">Criar minha conta</button>
+    <button id="forgotPasswordBtn" class="btn secondary hidden" style="width:100%;margin-top:10px" onclick="openForgotPassword()">Esqueceu a senha?</button>
     <div id="loginMsg" class="msg"></div>
     <div class="notice"><b>Importante:</b> retorno-alvo não significa retorno imediato. O prazo depende das vendas elegíveis da categoria e do tema escolhidos e pode variar.</div>
   </div>
@@ -251,6 +252,132 @@ async function signupInvestor(){
 }
 
 
+
+function passwordRecoveryRedirectUrl(){
+  return window.location.origin + window.location.pathname;
+}
+
+function openForgotPassword(){
+  const currentEmail=document.getElementById("email")?.value.trim()||"";
+
+  openModal(`
+    <div class="title-row">
+      <h2>Recuperar senha</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <div class="muted">
+      Informe o e-mail usado no CATinvestimentos. Você receberá um link para criar uma nova senha.
+    </div>
+
+    <label>E-mail</label>
+    <input id="recoveryEmail" type="email" autocomplete="email" value="${esc(currentEmail)}" placeholder="seuemail@exemplo.com">
+
+    <button class="btn" style="width:100%;margin-top:16px" onclick="sendPasswordRecoveryEmail()">
+      Enviar link para redefinir senha
+    </button>
+
+    <div id="recoveryMsg" class="msg"></div>
+  `);
+}
+
+async function sendPasswordRecoveryEmail(){
+  const email=document.getElementById("recoveryEmail").value.trim();
+  const msg=document.getElementById("recoveryMsg");
+
+  if(!email){
+    msg.className="msg error";
+    msg.textContent="Digite seu e-mail.";
+    return;
+  }
+
+  msg.className="msg";
+  msg.textContent="Enviando e-mail...";
+
+  const {error}=await sb.auth.resetPasswordForEmail(email,{
+    redirectTo:passwordRecoveryRedirectUrl()
+  });
+
+  if(error){
+    msg.className="msg error";
+
+    if(String(error.message||"").toLowerCase().includes("rate")){
+      msg.textContent="Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.";
+    }else{
+      msg.textContent="Não foi possível enviar o e-mail agora. Tente novamente em alguns instantes.";
+    }
+    return;
+  }
+
+  msg.className="msg ok";
+  msg.innerHTML="Pronto! Se este e-mail estiver cadastrado, você receberá uma mensagem com o link para criar uma nova senha. Confira também a caixa de spam.";
+}
+
+function openNewPasswordModal(){
+  openModal(`
+    <div class="title-row">
+      <h2>Criar nova senha</h2>
+    </div>
+
+    <div class="notice">
+      Crie uma nova senha para sua conta do CATinvestimentos.
+    </div>
+
+    <label>Nova senha</label>
+    <input id="newRecoveryPassword" type="password" minlength="6" autocomplete="new-password">
+
+    <label>Confirmar nova senha</label>
+    <input id="newRecoveryPassword2" type="password" minlength="6" autocomplete="new-password">
+
+    <button class="btn" style="width:100%;margin-top:16px" onclick="saveRecoveredPassword()">
+      Salvar nova senha
+    </button>
+
+    <div id="newPasswordMsg" class="msg"></div>
+  `);
+}
+
+async function saveRecoveredPassword(){
+  const password=document.getElementById("newRecoveryPassword").value;
+  const password2=document.getElementById("newRecoveryPassword2").value;
+  const msg=document.getElementById("newPasswordMsg");
+
+  if(password.length<6){
+    msg.className="msg error";
+    msg.textContent="A nova senha precisa ter pelo menos 6 caracteres.";
+    return;
+  }
+
+  if(password!==password2){
+    msg.className="msg error";
+    msg.textContent="As senhas não coincidem.";
+    return;
+  }
+
+  msg.className="msg";
+  msg.textContent="Salvando nova senha...";
+
+  const {error}=await sb.auth.updateUser({password});
+
+  if(error){
+    msg.className="msg error";
+    msg.textContent="Não foi possível alterar a senha: "+error.message;
+    return;
+  }
+
+  msg.className="msg ok";
+  msg.textContent="Senha alterada com sucesso!";
+
+  try{
+    history.replaceState({},document.title,window.location.pathname);
+  }catch(e){}
+
+  setTimeout(async()=>{
+    closeModal();
+    await loadUser();
+  },900);
+}
+
 async function loadSettings(){
   const {data}=await sb.from("platform_settings").select("*").order("id").limit(1).maybeSingle();
   if(data){settings=data;document.documentElement.style.setProperty("--primary",data.primary_color||"#a94366");document.documentElement.style.setProperty("--secondary",data.secondary_color||"#f7dfe6");document.getElementById("brandName").textContent=data.platform_name||"CATinvestimentos";document.getElementById("storeName").textContent=(data.store_name||"Cat Encantus")+" • Produtos Personalizados";if(data.logo_url)document.getElementById("brandLogo").src=data.logo_url}
@@ -258,10 +385,18 @@ async function loadSettings(){
 async function login(){
   const msg=document.getElementById("loginMsg"),email=document.getElementById("email").value.trim(),password=document.getElementById("password").value;
   if(!email||!password){msg.className="msg error";msg.textContent="Digite e-mail e senha.";return}
+  msg.className="msg";
   msg.textContent="Entrando...";
   const {error}=await sb.auth.signInWithPassword({email,password});
-  if(error){msg.className="msg error";msg.textContent="E-mail ou senha incorretos.";return}
-  msg.textContent="";await loadUser();
+  if(error){
+    msg.className="msg error";
+    msg.textContent="E-mail ou senha incorretos.";
+    document.getElementById("forgotPasswordBtn")?.classList.remove("hidden");
+    return
+  }
+  document.getElementById("forgotPasswordBtn")?.classList.add("hidden");
+  msg.textContent="";
+  await loadUser();
 }
 async function logout(){await sb.auth.signOut();currentProfile=null;document.getElementById("logoutBtn").classList.add("hidden");show("loginArea")}
 async function loadUser(){
@@ -1226,6 +1361,21 @@ if("serviceWorker" in navigator){
       console.warn("Service Worker não registrado:",err);
     });
   });
+}
+
+
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==="PASSWORD_RECOVERY"){
+    setTimeout(()=>openNewPasswordModal(),50);
+  }
+});
+
+// Fallback para alguns navegadores móveis.
+if(
+  window.location.hash.includes("type=recovery") ||
+  window.location.search.includes("type=recovery")
+){
+  setTimeout(()=>openNewPasswordModal(),350);
 }
 
 (async()=>{await loadSettings();await loadUser()})();

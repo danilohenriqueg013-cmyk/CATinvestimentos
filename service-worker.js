@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v12-final-1";
+const CACHE_NAME="catinvestimentos-v13-password-recovery-1";
 const APP_SHELL=[
   "./",
   "./index.html",
