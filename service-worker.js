@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v16-filtros-retorno-live-1";
+const CACHE_NAME="catinvestimentos-v17-filtros-high-low-cards-1";
 const APP_SHELL=[
   "./",
   "./index.html",

@@ -434,7 +434,7 @@ async function loadAvailableThemes(){
       <div class="title-row">
         <div>
           <h3>Escolha a categoria e/ou o tema</h3>
-          <div class="muted">Defina pelo menos um filtro para ver as opções relacionadas. Enquanto nenhum filtro estiver escolhido, mostramos apenas 2 sugestões.</div>
+          <div class="muted">Sem filtros mostramos só 2 destaques. Ao escolher apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Com os dois filtros, mostramos a combinação específica.</div>
         </div>
         <button class="btn secondary smallbtn" onclick="clearInvestmentFilters()">Limpar filtros</button>
       </div>
@@ -469,7 +469,7 @@ function clearInvestmentFilters(){
   renderAvailableInvestmentOptions();
 }
 
-function pickDefaultInvestmentSuggestions(list){
+function pickHighLowSuggestions(list){
   if(!list.length)return [];
   if(list.length===1)return [list[0]];
 
@@ -477,8 +477,8 @@ function pickDefaultInvestmentSuggestions(list){
   const maxRate=Math.max(...rates);
   const minRate=Math.min(...rates);
 
-  // Se todas as opções ainda estiverem com a mesma porcentagem,
-  // escolhe duas sugestões diferentes aleatoriamente.
+  // Se todas as opções filtradas tiverem a mesma porcentagem,
+  // exibe apenas duas opções diferentes aleatórias.
   if(maxRate===minRate){
     const shuffled=[...list].sort(()=>Math.random()-0.5);
     return shuffled.slice(0,2);
@@ -494,7 +494,9 @@ function pickDefaultInvestmentSuggestions(list){
     low=list.find(o=>Number(o.id)!==Number(high.id))||low;
   }
 
-  return [high,low];
+  return [high,low].filter((o,index,arr)=>
+    arr.findIndex(x=>Number(x.id)===Number(o.id))===index
+  ).slice(0,2);
 }
 
 function renderAvailableInvestmentOptions(){
@@ -505,54 +507,77 @@ function renderAvailableInvestmentOptions(){
   if(!grid)return;
 
   let filtered=[];
-  let recommendationMode=false;
+  let helperText="";
 
   if(!category && !theme){
-    recommendationMode=true;
-    filtered=pickDefaultInvestmentSuggestions(list);
+    // Sem filtro: maior e menor retorno de toda a plataforma.
+    filtered=pickHighLowSuggestions(list);
+    helperText="Destaques: uma opção entre os maiores retornos e uma entre os menores retornos disponíveis.";
+  }else if(category && !theme){
+    // Apenas categoria: somente opções daquela categoria,
+    // incluindo a combinação da categoria com Todos os temas.
+    const candidates=list.filter(o=>String(o.category_id)===category);
+    filtered=pickHighLowSuggestions(candidates);
+    helperText="Destaques desta categoria: maior e menor retorno disponível.";
+  }else if(!category && theme){
+    // Apenas tema: somente opções daquele tema,
+    // incluindo a combinação do tema com Todas as categorias.
+    const candidates=list.filter(o=>String(o.theme_id)===theme);
+    filtered=pickHighLowSuggestions(candidates);
+    helperText="Destaques deste tema: maior e menor retorno disponível.";
   }else{
-    filtered=list.filter(o=>{
-      const optionTheme=o.theme_id===null?"all":String(o.theme_id);
-      const optionCategory=o.category_id===null?"all":String(o.category_id);
-      return (!category||optionCategory===category) && (!theme||optionTheme===theme);
-    });
+    // Categoria + tema: resultado específico.
+    filtered=list.filter(o=>
+      String(o.category_id)===category &&
+      String(o.theme_id)===theme
+    );
+    helperText="Resultado específico para a categoria e o tema selecionados.";
   }
 
   if(!filtered.length){
-    grid.innerHTML=`<div class="card muted">Nenhuma combinação disponível com esses filtros.</div>`;
+    grid.innerHTML=`<div class="card muted">Nenhuma opção disponível para essa seleção.</div>`;
     return;
   }
 
-  const recommendationTitle=recommendationMode
-    ? `<div style="grid-column:1/-1" class="muted"><b>Sugestões para você:</b> uma opção entre os maiores retornos e uma entre os menores retornos disponíveis.</div>`
-    : "";
+  grid.innerHTML=`
+    <div style="grid-column:1/-1" class="muted">${helperText}</div>
+    ${filtered.map(o=>{
+      const label=`${o.category_name} • ${o.theme_name}`;
+      const rate=Number(o.return_rate||0);
+      const models=(o.theme_id!==null && o.theme_description)
+        ? `<div class="notice" style="margin-top:12px"><b>Modelos deste tema:</b><br>${esc(o.theme_description)}</div>`
+        : "";
 
-  grid.innerHTML=recommendationTitle+filtered.map(o=>{
-    const label=`${o.category_name} • ${o.theme_name}`;
-    const rate=Number(o.return_rate||0);
-    const models=(o.theme_id!==null && o.theme_description)
-      ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(o.theme_description)}</div>`
-      : "";
+      return `<div class="card item">
+        <div class="title-row" style="align-items:flex-start">
+          <div style="min-width:0">
+            <div class="muted" style="font-size:12px;margin-bottom:2px">Categoria</div>
+            <h3 style="margin:0;font-size:19px">${esc(o.category_name)}</h3>
 
-    return `<div class="card item">
-      <div class="title-row">
-        <h3>${esc(o.category_name)}</h3>
-        <span class="badge green" style="font-size:22px;padding:9px 13px;line-height:1;font-weight:800">
-          ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
-        </span>
-      </div>
-      <div class="muted"><b>Tema:</b> ${esc(o.theme_name)}</div>
-      <div class="notice" style="margin-top:12px">
-        Retorno-alvo desta combinação:
-        <b style="font-size:18px">${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
-      </div>
-      ${models}
-      <div class="actions" style="margin-top:14px">
-        <button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
-        <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ver catálogo</a>
-      </div>
-    </div>`;
-  }).join("");
+            <div class="muted" style="font-size:12px;margin-top:12px;margin-bottom:2px">Tema</div>
+            <h3 style="margin:0;font-size:19px">${esc(o.theme_name)}</h3>
+          </div>
+
+          <span class="badge green" style="
+            font-size:28px;
+            padding:10px 15px;
+            line-height:1;
+            font-weight:900;
+            white-space:nowrap;
+          ">
+            ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
+          </span>
+        </div>
+
+        ${models}
+
+        <div class="actions" style="margin-top:14px">
+          <button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
+          <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ver catálogo</a>
+        </div>
+      </div>`;
+    }).join("")}
+  `;
 }
 
 function updateInvestmentReturn(returnRate){
