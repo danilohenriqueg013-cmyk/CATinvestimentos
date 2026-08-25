@@ -601,7 +601,7 @@ async function loadUser() {
 }
 
 
-function openAdminSection(section) {
+async function openAdminSection(section) {
 
   const box =
     document.getElementById("adminSection");
@@ -621,26 +621,156 @@ function openAdminSection(section) {
   box.classList.remove("hidden");
 
   box.innerHTML = `
-    <h2 style="
-      color:#963c5c;
-      margin-bottom:15px;
-    ">
+    <h2 style="color:#963c5c; margin-bottom:15px;">
       ${titles[section]}
     </h2>
 
     <p class="small">
-      Seção aberta corretamente.
-      Agora vamos conectar esta área
-      aos dados reais do CATinvestimentos.
+      Carregando...
     </p>
   `;
+
+  if (section === "themes") {
+    await loadAdminThemes();
+  } else {
+    box.innerHTML = `
+      <h2 style="color:#963c5c; margin-bottom:15px;">
+        ${titles[section]}
+      </h2>
+
+      <p class="small">
+        Essa seção será configurada em seguida.
+      </p>
+    `;
+  }
 
   box.scrollIntoView({
     behavior: "smooth",
     block: "start"
   });
 }
+async function loadAdminThemes() {
 
+  const box =
+    document.getElementById("adminSection");
+
+  const {
+    data,
+    error
+  } =
+    await supabaseClient
+      .from("themes")
+      .select(`
+        id,
+        name,
+        description,
+        active,
+        investor_limit,
+        investment_amount_limit,
+        created_at
+      `)
+      .order("name", {
+        ascending: true
+      });
+
+  if (error) {
+
+    console.error(error);
+
+    box.innerHTML = `
+      <h2 style="color:#963c5c;">
+        Temas
+      </h2>
+
+      <p class="error">
+        Erro ao carregar os temas:
+        ${error.message}
+      </p>
+    `;
+
+    return;
+  }
+
+  let html = `
+    <h2 style="color:#963c5c; margin-bottom:20px;">
+      Temas
+    </h2>
+  `;
+
+  if (!data || data.length === 0) {
+
+    html += `
+      <p class="small">
+        Nenhum tema cadastrado.
+      </p>
+    `;
+
+    box.innerHTML = html;
+
+    return;
+  }
+
+  data.forEach(theme => {
+
+    html += `
+      <div
+        style="
+          border:1px solid #efd6df;
+          border-radius:14px;
+          padding:18px;
+          margin-bottom:12px;
+          background:#fffafb;
+        "
+      >
+
+        <div style="
+          display:flex;
+          justify-content:space-between;
+          gap:15px;
+          align-items:center;
+          flex-wrap:wrap;
+        ">
+
+          <div>
+
+            <h3 style="color:#8d3857;">
+              ${theme.name}
+            </h3>
+
+            <p class="small" style="margin-top:6px;">
+              ${theme.description || "Sem descrição"}
+            </p>
+
+          </div>
+
+          <strong
+            style="
+              color:${theme.active ? "#25734b" : "#a32645"};
+            "
+          >
+            ${theme.active ? "ATIVO" : "INATIVO"}
+          </strong>
+
+        </div>
+
+        <div class="small" style="margin-top:15px;">
+
+          Limite de investidores:
+          <strong>${theme.investor_limit}</strong>
+
+          <br>
+
+          Limite de investimento no tema:
+          <strong>${money(theme.investment_amount_limit)}</strong>
+
+        </div>
+
+      </div>
+    `;
+  });
+
+  box.innerHTML = html;
+}
 
 async function showInvestor(profile) {
 
