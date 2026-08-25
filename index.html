@@ -441,14 +441,14 @@ async function loadAvailableThemes(){
         <div>
           <label>Categoria</label>
           <select id="optionCategoryFilter" onchange="renderAvailableInvestmentOptions()">
-            <option value="">Todas as opções de categoria</option>
+            <option value="">Ver todas as categorias</option>
             ${categories.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
         <div>
           <label>Tema</label>
           <select id="optionThemeFilter" onchange="renderAvailableInvestmentOptions()">
-            <option value="">Todas as opções de tema</option>
+            <option value="">Ver todos os temas</option>
             ${themes.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
@@ -481,6 +481,9 @@ function renderAvailableInvestmentOptions(){
   grid.innerHTML=filtered.map(o=>{
     const label=`${o.category_name} • ${o.theme_name}`;
     const rate=Number(o.return_rate||0);
+    const models=(o.theme_id!==null && o.theme_description)
+      ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(o.theme_description)}</div>`
+      : "";
     return `<div class="card item">
       <div class="title-row">
         <h3>${esc(o.category_name)}</h3>
@@ -488,6 +491,7 @@ function renderAvailableInvestmentOptions(){
       </div>
       <div class="muted"><b>Tema:</b> ${esc(o.theme_name)}</div>
       <div class="notice" style="margin-top:12px">Retorno-alvo desta combinação: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b></div>
+      ${models}
       <div class="actions" style="margin-top:14px">
         <button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
         <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ver catálogo</a>
@@ -498,12 +502,18 @@ function renderAvailableInvestmentOptions(){
 
 function openInvestmentOption(id,label,returnRate){
   const rate=Number(returnRate||0);
+  const option=(window._availableInvestmentOptions||[]).find(o=>Number(o.id)===Number(id));
+  const models=(option?.theme_id!==null && option?.theme_description)
+    ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(option.theme_description)}</div>`
+    : "";
+
   openModal(`<div class="title-row"><h2>${esc(label)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
   <label>Valor do investimento</label><input id="investmentAmount" type="number" min="${settings.minimum_investment||10}" max="${settings.maximum_investment||100}" step="0.01">
   <div class="notice">
     Mínimo: ${money(settings.minimum_investment||10)} • Máximo por investimento: ${money(settings.maximum_investment||100)}<br>
     Retorno-alvo desta combinação: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
   </div>
+  ${models}
   <div class="actions" style="margin-top:15px">
     <button class="btn" style="flex:1" onclick="makeInvestment(${id})">Confirmar investimento</button>
     <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none;flex:1;text-align:center">Ver catálogo</a>
@@ -807,7 +817,8 @@ async function loadAdminOptions(){
     <div class="notice">
       <b>Padrão automático: 10%.</b><br>
       Ao criar um tema ou uma categoria, o sistema monta sozinho:
-      Categoria + cada tema, Categoria + Todos os temas e Tema + Todas as categorias.
+      Categoria + cada tema, Categoria + Todos os temas, Tema + Todas as categorias
+      e também Todas as categorias + Todos os temas.
       A fila continua sendo cronológica entre todos os investimentos compatíveis com a venda.
     </div>
 
