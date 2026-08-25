@@ -434,7 +434,7 @@ async function loadAvailableThemes(){
       <div class="title-row">
         <div>
           <h3>Escolha a categoria e/ou o tema</h3>
-          <div class="muted">Sem filtros mostramos só 2 destaques. Ao escolher apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Com os dois filtros, mostramos a combinação específica.</div>
+          <div class="muted">Sem filtros mostramos só 2 destaques. Com apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Você também pode escolher “Todas as categorias” e/ou “Todos os temas”. Com os dois filtros escolhidos, mostramos a combinação específica.</div>
         </div>
         <button class="btn secondary smallbtn" onclick="clearInvestmentFilters()">Limpar filtros</button>
       </div>
@@ -443,6 +443,7 @@ async function loadAvailableThemes(){
           <label>Categoria</label>
           <select id="optionCategoryFilter" onchange="renderAvailableInvestmentOptions()">
             <option value="">Selecione uma categoria (opcional)</option>
+            <option value="all">Todas as categorias</option>
             ${categories.filter(([id])=>id!=="all").map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
@@ -450,6 +451,7 @@ async function loadAvailableThemes(){
           <label>Tema</label>
           <select id="optionThemeFilter" onchange="renderAvailableInvestmentOptions()">
             <option value="">Selecione um tema (opcional)</option>
+            <option value="all">Todos os temas</option>
             ${themes.filter(([id])=>id!=="all").map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
@@ -506,32 +508,56 @@ function renderAvailableInvestmentOptions(){
   const grid=document.getElementById("availableOptionsGrid");
   if(!grid)return;
 
+  const categorySelected=category!=="";
+  const themeSelected=theme!=="";
+  const categoryIsAll=category==="all";
+  const themeIsAll=theme==="all";
+
   let filtered=[];
   let helperText="";
 
-  if(!category && !theme){
-    // Sem filtro: maior e menor retorno de toda a plataforma.
+  if(!categorySelected && !themeSelected){
+    // Nenhum filtro: maior e menor de toda a plataforma.
     filtered=pickHighLowSuggestions(list);
-    helperText="Destaques: uma opção entre os maiores retornos e uma entre os menores retornos disponíveis.";
-  }else if(category && !theme){
-    // Apenas categoria: somente opções daquela categoria,
-    // incluindo a combinação da categoria com Todos os temas.
-    const candidates=list.filter(o=>String(o.category_id)===category);
-    filtered=pickHighLowSuggestions(candidates);
-    helperText="Destaques desta categoria: maior e menor retorno disponível.";
-  }else if(!category && theme){
-    // Apenas tema: somente opções daquele tema,
-    // incluindo a combinação do tema com Todas as categorias.
-    const candidates=list.filter(o=>String(o.theme_id)===theme);
-    filtered=pickHighLowSuggestions(candidates);
-    helperText="Destaques deste tema: maior e menor retorno disponível.";
+    helperText="Destaques: maior e menor retorno disponíveis.";
+  }else if(categorySelected && !themeSelected){
+    if(categoryIsAll){
+      // "Todas as categorias" sozinho:
+      // maior/menor entre as opções "Todas as categorias + tema".
+      const candidates=list.filter(o=>o.category_id===null && o.theme_id!==null);
+      filtered=pickHighLowSuggestions(candidates);
+      helperText="Destaques de Todas as categorias: maior e menor retorno.";
+    }else{
+      // Categoria específica sozinha: maior/menor dentro dela.
+      const candidates=list.filter(o=>String(o.category_id)===category);
+      filtered=pickHighLowSuggestions(candidates);
+      helperText="Destaques desta categoria: maior e menor retorno.";
+    }
+  }else if(!categorySelected && themeSelected){
+    if(themeIsAll){
+      // "Todos os temas" sozinho:
+      // maior/menor entre as opções "categoria + Todos os temas".
+      const candidates=list.filter(o=>o.theme_id===null && o.category_id!==null);
+      filtered=pickHighLowSuggestions(candidates);
+      helperText="Destaques de Todos os temas: maior e menor retorno.";
+    }else{
+      // Tema específico sozinho: maior/menor dentro dele.
+      const candidates=list.filter(o=>String(o.theme_id)===theme);
+      filtered=pickHighLowSuggestions(candidates);
+      helperText="Destaques deste tema: maior e menor retorno.";
+    }
   }else{
-    // Categoria + tema: resultado específico.
-    filtered=list.filter(o=>
-      String(o.category_id)===category &&
-      String(o.theme_id)===theme
-    );
-    helperText="Resultado específico para a categoria e o tema selecionados.";
+    // Os dois filtros foram escolhidos: mostra a combinação EXATA.
+    filtered=list.filter(o=>{
+      const optionCategory=o.category_id===null?"all":String(o.category_id);
+      const optionTheme=o.theme_id===null?"all":String(o.theme_id);
+      return optionCategory===category && optionTheme===theme;
+    });
+
+    helperText=
+      categoryIsAll && themeIsAll
+        ? "Opção geral: Todas as categorias • Todos os temas."
+        : "Resultado específico para a categoria e o tema selecionados.";
   }
 
   if(!filtered.length){
@@ -545,29 +571,38 @@ function renderAvailableInvestmentOptions(){
       const label=`${o.category_name} • ${o.theme_name}`;
       const rate=Number(o.return_rate||0);
       const models=(o.theme_id!==null && o.theme_description)
-        ? `<div class="notice" style="margin-top:12px"><b>Modelos deste tema:</b><br>${esc(o.theme_description)}</div>`
+        ? `<div class="notice" style="
+              margin-top:14px;
+              padding:16px;
+              font-size:14px;
+              line-height:1.55;
+            ">
+            <b style="font-size:14px">Modelos deste tema:</b><br>
+            ${esc(o.theme_description)}
+          </div>`
         : "";
 
-      return `<div class="card item">
-        <div class="title-row" style="align-items:flex-start">
-          <div style="min-width:0">
-            <div class="muted" style="font-size:12px;margin-bottom:2px">Categoria</div>
-            <h3 style="margin:0;font-size:19px">${esc(o.category_name)}</h3>
+      return `<div class="card item" style="position:relative">
+        <div style="padding-right:92px">
+          <div class="muted" style="font-size:12px;margin-bottom:2px">Categoria</div>
+          <h3 style="margin:0;font-size:19px">${esc(o.category_name)}</h3>
 
-            <div class="muted" style="font-size:12px;margin-top:12px;margin-bottom:2px">Tema</div>
-            <h3 style="margin:0;font-size:19px">${esc(o.theme_name)}</h3>
-          </div>
-
-          <span class="badge green" style="
-            font-size:28px;
-            padding:10px 15px;
-            line-height:1;
-            font-weight:900;
-            white-space:nowrap;
-          ">
-            ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
-          </span>
+          <div class="muted" style="font-size:12px;margin-top:12px;margin-bottom:2px">Tema</div>
+          <h3 style="margin:0;font-size:19px">${esc(o.theme_name)}</h3>
         </div>
+
+        <span class="badge green" style="
+          position:absolute;
+          top:16px;
+          right:16px;
+          font-size:24px;
+          padding:9px 13px;
+          line-height:1;
+          font-weight:900;
+          white-space:nowrap;
+        ">
+          ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
+        </span>
 
         ${models}
 
