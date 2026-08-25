@@ -1322,11 +1322,19 @@ async function deleteCategory(id){
   await loadAdminCategories();
 }
 
+
+window._adminOptionFilterState=window._adminOptionFilterState||{category:"",theme:""};
+window._adminSelectedOptionIds=window._adminSelectedOptionIds||new Set();
+
 async function loadAdminOptions(){
   const box=document.getElementById("adminContent");
 
-  // Usa uma função administrativa SECURITY DEFINER.
-  // Isso evita que o RLS esconda as opções da conta admin.
+  // Preserva o ponto onde o administrador estava antes de recarregar.
+  const oldCategory=document.getElementById("adminOptionCategoryFilter");
+  const oldTheme=document.getElementById("adminOptionThemeFilter");
+  if(oldCategory)window._adminOptionFilterState.category=oldCategory.value;
+  if(oldTheme)window._adminOptionFilterState.theme=oldTheme.value;
+
   const {data:options,error}=await sb.rpc("admin_get_investment_options");
 
   if(error){
@@ -1335,6 +1343,12 @@ async function loadAdminOptions(){
   }
 
   window._adminInvestmentOptions=options||[];
+
+  // Remove da seleção IDs que já não existem mais.
+  const validIds=new Set((options||[]).map(o=>Number(o.id)));
+  window._adminSelectedOptionIds=new Set(
+    [...window._adminSelectedOptionIds].filter(id=>validIds.has(Number(id)))
+  );
 
   const categoryMap=new Map();
   const themeMap=new Map();
@@ -1353,7 +1367,7 @@ async function loadAdminOptions(){
         <div>
           <h2>Opções de investimento</h2>
           <div class="muted">
-            As combinações são criadas automaticamente. Aqui você só escolhe a opção e altera a porcentagem.
+            As combinações são criadas automaticamente. Você pode alterar uma opção por vez ou várias de uma vez.
           </div>
         </div>
         <button class="btn secondary" onclick="loadAdminOptions()">Atualizar lista</button>
@@ -1361,13 +1375,13 @@ async function loadAdminOptions(){
 
       <div class="notice">
         <b>Padrão automático para opções novas: 10%.</b><br>
-        Ao criar uma nova categoria ou tema, as combinações são geradas automaticamente.
+        Alterar a porcentagem afeta novos investimentos feitos depois da mudança. Investimentos já existentes mantêm o valor-alvo original.
       </div>
 
       <div class="row" style="margin-top:14px">
         <div>
           <label>Filtrar por categoria</label>
-          <select id="adminOptionCategoryFilter" onchange="renderAdminInvestmentOptions()">
+          <select id="adminOptionCategoryFilter" onchange="adminOptionFilterChanged()">
             <option value="">Todas as opções de categoria</option>
             <option value="all">Todas as categorias</option>
             ${categories.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
@@ -1376,7 +1390,7 @@ async function loadAdminOptions(){
 
         <div>
           <label>Filtrar por tema</label>
-          <select id="adminOptionThemeFilter" onchange="renderAdminInvestmentOptions()">
+          <select id="adminOptionThemeFilter" onchange="adminOptionFilterChanged()">
             <option value="">Todas as opções de tema</option>
             <option value="all">Todos os temas</option>
             ${themes.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
@@ -1386,31 +1400,90 @@ async function loadAdminOptions(){
 
       <div class="actions">
         <button class="btn secondary smallbtn" onclick="clearAdminOptionFilters()">Limpar filtros</button>
+        <button class="btn secondary smallbtn" onclick="selectAllVisibleAdminOptions()">Selecionar visíveis</button>
+        <button class="btn secondary smallbtn" onclick="clearAdminOptionSelection()">Limpar seleção</button>
+      </div>
+
+      <div style="
+        margin-top:14px;
+        padding:14px;
+        border:1px solid var(--border);
+        border-radius:14px;
+        background:#fff8fa;
+      ">
+        <div class="title-row" style="margin-bottom:0">
+          <div>
+            <b>Alteração em lote</b>
+            <div class="muted">
+              <span id="adminSelectedOptionsCount">0 opção(ões) selecionada(s)</span>
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:0;align-items:end">
+            <div style="min-width:170px">
+              <label style="margin-top:0">Nova porcentagem (%)</label>
+              <input
+                id="adminBatchReturnRate"
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                placeholder="Ex.: 12"
+              >
+            </div>
+            <button class="btn" onclick="applyAdminBatchRate()">Aplicar nas selecionadas</button>
+          </div>
+        </div>
       </div>
 
       <div id="adminInvestmentOptionsGrid" class="grid" style="margin-top:14px"></div>
     </div>
   `;
 
+  // Restaura os filtros depois de salvar/recarregar.
+  const categorySelect=document.getElementById("adminOptionCategoryFilter");
+  const themeSelect=document.getElementById("adminOptionThemeFilter");
+
+  if(categorySelect && [...categorySelect.options].some(o=>o.value===window._adminOptionFilterState.category)){
+    categorySelect.value=window._adminOptionFilterState.category;
+  }else{
+    window._adminOptionFilterState.category="";
+  }
+
+  if(themeSelect && [...themeSelect.options].some(o=>o.value===window._adminOptionFilterState.theme)){
+    themeSelect.value=window._adminOptionFilterState.theme;
+  }else{
+    window._adminOptionFilterState.theme="";
+  }
+
+  renderAdminInvestmentOptions();
+}
+
+function adminOptionFilterChanged(){
+  window._adminOptionFilterState.category=
+    document.getElementById("adminOptionCategoryFilter")?.value||"";
+  window._adminOptionFilterState.theme=
+    document.getElementById("adminOptionThemeFilter")?.value||"";
   renderAdminInvestmentOptions();
 }
 
 function clearAdminOptionFilters(){
+  window._adminOptionFilterState={category:"",theme:""};
+
   const c=document.getElementById("adminOptionCategoryFilter");
   const t=document.getElementById("adminOptionThemeFilter");
   if(c)c.value="";
   if(t)t.value="";
+
   renderAdminInvestmentOptions();
 }
 
-function renderAdminInvestmentOptions(){
+function getFilteredAdminInvestmentOptions(){
   const list=window._adminInvestmentOptions||[];
   const category=document.getElementById("adminOptionCategoryFilter")?.value||"";
   const theme=document.getElementById("adminOptionThemeFilter")?.value||"";
-  const grid=document.getElementById("adminInvestmentOptionsGrid");
-  if(!grid)return;
 
-  const filtered=list.filter(o=>{
+  return list.filter(o=>{
     const optionCategory=o.category_id===null?"all":String(o.category_id);
     const optionTheme=o.theme_id===null?"all":String(o.theme_id);
 
@@ -1419,6 +1492,47 @@ function renderAdminInvestmentOptions(){
 
     return categoryMatches && themeMatches;
   });
+}
+
+function toggleAdminOptionSelection(id,checked){
+  const numericId=Number(id);
+  if(checked){
+    window._adminSelectedOptionIds.add(numericId);
+  }else{
+    window._adminSelectedOptionIds.delete(numericId);
+  }
+  updateAdminOptionSelectionUI();
+}
+
+function selectAllVisibleAdminOptions(){
+  const visible=getFilteredAdminInvestmentOptions();
+
+  visible.forEach(o=>window._adminSelectedOptionIds.add(Number(o.id)));
+  renderAdminInvestmentOptions();
+}
+
+function clearAdminOptionSelection(){
+  window._adminSelectedOptionIds.clear();
+  renderAdminInvestmentOptions();
+}
+
+function updateAdminOptionSelectionUI(){
+  const count=window._adminSelectedOptionIds.size;
+  const counter=document.getElementById("adminSelectedOptionsCount");
+  if(counter){
+    counter.textContent=`${count} opção(ões) selecionada(s)`;
+  }
+
+  document.querySelectorAll("[data-admin-option-checkbox]").forEach(cb=>{
+    cb.checked=window._adminSelectedOptionIds.has(Number(cb.value));
+  });
+}
+
+function renderAdminInvestmentOptions(){
+  const grid=document.getElementById("adminInvestmentOptionsGrid");
+  if(!grid)return;
+
+  const filtered=getFilteredAdminInvestmentOptions();
 
   if(!filtered.length){
     grid.innerHTML=`
@@ -1426,6 +1540,7 @@ function renderAdminInvestmentOptions(){
         Nenhuma opção corresponde a esses filtros.
       </div>
     `;
+    updateAdminOptionSelectionUI();
     return;
   }
 
@@ -1445,21 +1560,52 @@ function renderAdminInvestmentOptions(){
       o.category_active!==false &&
       o.theme_active!==false;
 
+    const checked=window._adminSelectedOptionIds.has(Number(o.id));
+
     return `
-      <div class="item">
-        <div class="title-row">
+      <div class="item" style="position:relative">
+        <label style="
+          position:absolute;
+          top:12px;
+          right:12px;
+          display:flex;
+          align-items:center;
+          gap:6px;
+          margin:0;
+          cursor:pointer;
+          padding:6px 8px;
+          background:#fff;
+          border:1px solid var(--border);
+          border-radius:10px;
+          z-index:2;
+        ">
+          <input
+            data-admin-option-checkbox
+            type="checkbox"
+            value="${o.id}"
+            ${checked?"checked":""}
+            onchange="toggleAdminOptionSelection(${o.id},this.checked)"
+            style="width:18px;height:18px;margin:0"
+          >
+          <span style="font-size:12px;font-weight:700">Selecionar</span>
+        </label>
+
+        <div class="title-row" style="padding-right:105px">
           <div>
             <div class="muted" style="font-size:12px">Categoria</div>
             <h3 style="margin:2px 0 0">${esc(categoryName)}</h3>
           </div>
-          <span class="badge ${available?"green":"red"}">
-            ${available?"DISPONÍVEL":"INATIVA"}
-          </span>
         </div>
 
         <div style="margin-top:10px">
           <div class="muted" style="font-size:12px">Tema</div>
           <h3 style="margin:2px 0 0">${esc(themeName)}</h3>
+        </div>
+
+        <div style="margin-top:10px">
+          <span class="badge ${available?"green":"red"}">
+            ${available?"DISPONÍVEL":"INATIVA"}
+          </span>
         </div>
 
         <div style="
@@ -1485,6 +1631,8 @@ function renderAdminInvestmentOptions(){
       </div>
     `;
   }).join("");
+
+  updateAdminOptionSelectionUI();
 }
 
 function openOptionRateForm(id,label,currentRate){
@@ -1521,6 +1669,19 @@ function openOptionRateForm(id,label,currentRate){
 async function saveOptionRate(id){
   const rate=Number(document.getElementById("optionReturnRate").value);
 
+  if(!rate || rate<=0 || rate>100){
+    toast("Informe uma porcentagem válida entre 0,01% e 100%.");
+    return;
+  }
+
+  // Salva o filtro atual antes de atualizar a lista.
+  window._adminOptionFilterState.category=
+    document.getElementById("adminOptionCategoryFilter")?.value||
+    window._adminOptionFilterState.category||"";
+  window._adminOptionFilterState.theme=
+    document.getElementById("adminOptionThemeFilter")?.value||
+    window._adminOptionFilterState.theme||"";
+
   const {error}=await sb.rpc("admin_update_investment_option_rate",{
     p_option_id:id,
     p_return_rate:rate
@@ -1533,6 +1694,46 @@ async function saveOptionRate(id){
 
   closeModal();
   toast("Porcentagem atualizada.");
+  await loadAdminOptions();
+}
+
+async function applyAdminBatchRate(){
+  const ids=[...window._adminSelectedOptionIds].map(Number);
+  const rate=Number(document.getElementById("adminBatchReturnRate")?.value);
+
+  if(!ids.length){
+    toast("Selecione pelo menos uma opção.");
+    return;
+  }
+
+  if(!rate || rate<=0 || rate>100){
+    toast("Informe uma porcentagem válida entre 0,01% e 100%.");
+    return;
+  }
+
+  if(!confirm(`Aplicar ${rate}% em ${ids.length} opção(ões) selecionada(s)?`)){
+    return;
+  }
+
+  window._adminOptionFilterState.category=
+    document.getElementById("adminOptionCategoryFilter")?.value||"";
+  window._adminOptionFilterState.theme=
+    document.getElementById("adminOptionThemeFilter")?.value||"";
+
+  const {data,error}=await sb.rpc("admin_bulk_update_investment_option_rate",{
+    p_option_ids:ids,
+    p_return_rate:rate
+  });
+
+  if(error){
+    toast(error.message);
+    return;
+  }
+
+  // Mantém filtros, mas limpa a seleção depois da alteração para evitar repetição acidental.
+  window._adminSelectedOptionIds.clear();
+
+  toast(`${Number(data||ids.length)} opção(ões) atualizada(s) para ${rate}%.`);
   await loadAdminOptions();
 }
 
