@@ -40,6 +40,177 @@ textarea{min-height:80px;resize:vertical}.msg{margin-top:12px;font-size:13px}.er
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tab{background:white;color:var(--primary);border:1px solid var(--border);border-radius:999px;padding:8px 12px}.tab.active{background:var(--primary);color:white}
 footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
 @media(max-width:700px){.row,.row3{grid-template-columns:1fr}.hero h1{font-size:29px}.brand{font-size:21px}.header{padding:10px 14px}}
+
+/* ===== V19: LOGIN E PAINEL DO INVESTIDOR ===== */
+.login-stage{
+  position:relative;
+  min-height:690px;
+  display:grid;
+  grid-template-columns:minmax(0,1.05fr) minmax(360px,.75fr);
+  gap:42px;
+  align-items:center;
+  padding:54px 42px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:30px;
+  background:
+    radial-gradient(circle at 12% 12%,rgba(255,255,255,.98) 0 8%,transparent 27%),
+    radial-gradient(circle at 88% 84%,rgba(255,226,237,.95) 0 12%,transparent 35%),
+    linear-gradient(135deg,#fffafb 0%,#fff1f6 50%,#fbe1eb 100%);
+  box-shadow:0 22px 60px rgba(120,63,84,.10);
+}
+.login-stage:before,.investor-home-hero:before{
+  content:"";
+  position:absolute;inset:0;
+  background-image:
+    radial-gradient(circle,rgba(169,67,102,.18) 1.3px,transparent 1.4px),
+    radial-gradient(circle,rgba(255,255,255,.9) 1.4px,transparent 1.5px);
+  background-size:34px 34px,52px 52px;
+  background-position:0 0,12px 18px;
+  opacity:.35;
+  pointer-events:none;
+}
+.login-copy{position:relative;z-index:3;padding:24px 14px 24px 26px}
+.login-kicker{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:999px;
+  background:#fff;color:var(--primary);
+  border:1px solid var(--border);
+  font-size:12px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
+  box-shadow:0 8px 20px rgba(120,63,84,.07)
+}
+.login-copy h1{
+  max-width:680px;
+  margin:20px 0 14px;
+  font-size:clamp(42px,5vw,66px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  color:var(--primary);
+}
+.login-copy p{
+  max-width:620px;
+  font-size:18px;
+  line-height:1.65;
+  color:#77505f;
+}
+.login-pills{display:flex;flex-wrap:wrap;gap:9px;margin-top:22px}
+.login-pill{
+  background:rgba(255,255,255,.82);
+  border:1px solid var(--border);
+  border-radius:999px;padding:9px 12px;
+  font-size:12px;font-weight:700;color:var(--primary);
+  backdrop-filter:blur(7px)
+}
+.login-card-v19{
+  position:relative;z-index:5;
+  margin:0 8px 0 auto;
+  width:min(440px,100%);
+  padding:28px;
+  border-radius:24px;
+  box-shadow:0 26px 70px rgba(108,42,66,.16);
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(12px);
+}
+.login-card-v19 h2{font-size:26px;margin-bottom:4px}
+.login-card-sub{text-align:center;margin-bottom:18px}
+.login-card-v19 input{padding:13px 14px;background:#fffafd}
+.login-card-v19 .btn{padding:13px 15px}
+.login-product,.home-product{
+  position:absolute;z-index:2;pointer-events:none;
+  object-fit:contain;
+  filter:drop-shadow(0 14px 15px rgba(105,54,73,.18));
+  transform-origin:center;
+}
+.lp1{width:150px;left:1%;top:5%;transform:rotate(-12deg)}
+.lp2{width:155px;left:4%;bottom:2%;transform:rotate(8deg)}
+.lp3{width:145px;right:34%;top:1%;transform:rotate(8deg)}
+.lp4{width:140px;right:33%;bottom:2%;transform:rotate(-8deg)}
+.lp5{width:95px;left:43%;top:39%;opacity:.72;transform:rotate(11deg)}
+.login-shop-link{
+  display:inline-flex;align-items:center;gap:8px;
+  margin-top:18px;color:var(--primary);font-weight:800;text-decoration:none
+}
+
+.investor-home-hero{
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:26px;
+  min-height:178px;
+  padding:30px 250px 30px 30px;
+  background:
+    radial-gradient(circle at 85% 20%,#ffe4ee 0,transparent 28%),
+    linear-gradient(135deg,#fff 0%,#fff3f7 60%,#f8dfe8 100%);
+  box-shadow:0 12px 35px rgba(120,63,84,.08);
+}
+.investor-home-hero .home-copy{position:relative;z-index:3}
+.investor-home-hero h1{font-size:34px;margin:0 0 7px;color:var(--primary)}
+.investor-home-hero p{max-width:640px;margin:0;color:var(--muted);line-height:1.6}
+.hp1{width:125px;right:112px;top:10px;transform:rotate(-8deg)}
+.hp2{width:100px;right:20px;bottom:4px;transform:rotate(10deg)}
+.hp3{width:78px;right:212px;bottom:2px;transform:rotate(8deg);opacity:.88}
+
+.investor-menu{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(130px,1fr));
+  gap:12px;
+  margin:20px 0;
+}
+.investor-item{
+  min-height:92px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;
+  background:#fff;
+  color:var(--primary);
+  border:1px solid var(--border);
+  border-radius:16px;
+  font-weight:800;
+  box-shadow:0 8px 22px rgba(120,63,84,.05);
+  transition:.15s ease;
+}
+.investor-item:hover,.investor-item.active{
+  transform:translateY(-2px);
+  background:#fff0f4;
+  border-color:#deb8c6;
+  box-shadow:0 12px 26px rgba(120,63,84,.10);
+}
+.investor-item .nav-icon{font-size:22px}
+.investor-content-empty{
+  text-align:center;padding:36px 20px;
+  border:1px dashed #e4c4cf;border-radius:18px;
+  background:rgba(255,255,255,.55)
+}
+.stats-v19 .card{position:relative;overflow:hidden}
+.stats-v19 .card:after{
+  content:"";position:absolute;width:80px;height:80px;
+  right:-22px;bottom:-28px;border-radius:50%;
+  background:#fff0f4
+}
+
+@media(max-width:980px){
+  .login-stage{grid-template-columns:1fr;padding:36px 22px}
+  .login-copy{text-align:center;padding:10px 30px}
+  .login-copy p{margin-left:auto;margin-right:auto}
+  .login-pills{justify-content:center}
+  .login-card-v19{margin:auto}
+  .lp1,.lp2{width:105px}.lp3,.lp4{width:100px}
+  .lp5{display:none}
+  .investor-menu{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:700px){
+  .login-stage{padding:26px 14px;min-height:0}
+  .login-copy{padding:10px 8px}
+  .login-copy h1{font-size:38px}
+  .login-copy p{font-size:15px}
+  .login-product{opacity:.22}
+  .login-card-v19{padding:21px}
+  .investor-home-hero{padding:24px 115px 24px 20px;min-height:155px}
+  .investor-home-hero h1{font-size:27px}
+  .hp1{width:90px;right:34px;top:18px}.hp2{width:70px;right:10px;bottom:4px}.hp3{display:none}
+  .investor-menu{grid-template-columns:repeat(2,1fr)}
+  .investor-item{min-height:82px;font-size:13px}
+}
+
 </style>
 </head>
 <body>
@@ -55,48 +226,116 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
 
 <main>
 <section id="loginArea">
-  <div class="hero"><h1>Invista nas combinações que você acredita.</h1><p class="muted">Acompanhe saldo, investimentos, vendas atribuídas e retorno-alvo em um só lugar.</p></div>
-  <div class="card login">
-    <h2>Área do Investidor</h2>
-    <label>E-mail</label><input id="email" type="email" autocomplete="email">
-    <label>Senha</label><input id="password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') login()">
-    <button class="btn" style="width:100%;margin-top:18px" onclick="login()">Entrar</button>
-    <button class="btn secondary" style="width:100%;margin-top:10px" onclick="openSignup()">Criar minha conta</button>
-    <button id="forgotPasswordBtn" class="btn secondary hidden" style="width:100%;margin-top:10px" onclick="openForgotPassword()">Esqueceu a senha?</button>
-    <div id="loginMsg" class="msg"></div>
-    <div class="notice"><b>Importante:</b> retorno-alvo não significa retorno imediato. O prazo depende das vendas elegíveis da categoria e do tema escolhidos e pode variar.</div>
+  <div class="login-stage">
+    <img src="produto-luva.png" class="login-product lp1" alt="" aria-hidden="true">
+    <img src="produto-sonic.png" class="login-product lp2" alt="" aria-hidden="true">
+    <img src="produto-kitty.png" class="login-product lp3" alt="" aria-hidden="true">
+    <img src="produto-livro.png" class="login-product lp4" alt="" aria-hidden="true">
+    <img src="produto-coracoes.png" class="login-product lp5" alt="" aria-hidden="true">
+
+    <div class="login-copy">
+      <span class="login-kicker">✦ Cat Encantus • feito à mão</span>
+      <h1>Invista nas ideias que podem virar os próximos encantos.</h1>
+      <p>
+        Escolha categorias e temas da Cat Encantus, acompanhe seus investimentos
+        e veja cada venda elegível aproximar você do valor-alvo.
+      </p>
+      <div class="login-pills">
+        <span class="login-pill">♡ Produtos personalizados</span>
+        <span class="login-pill">✦ Investimento por tema e categoria</span>
+        <span class="login-pill">⌁ Acompanhamento em um só lugar</span>
+      </div>
+      <a class="login-shop-link" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer">
+        🛍️ Conhecer o catálogo da Cat Encantus →
+      </a>
+    </div>
+
+    <div class="card login login-card-v19">
+      <h2>Área do Investidor</h2>
+      <div class="muted login-card-sub">Entre para acompanhar sua conta.</div>
+
+      <label>E-mail</label>
+      <input id="email" type="email" autocomplete="email" placeholder="seuemail@exemplo.com">
+
+      <label>Senha</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Sua senha" onkeydown="if(event.key==='Enter') login()">
+
+      <button class="btn" style="width:100%;margin-top:18px" onclick="login()">Entrar</button>
+      <button class="btn secondary" style="width:100%;margin-top:10px" onclick="openSignup()">Criar minha conta</button>
+      <button id="forgotPasswordBtn" class="btn secondary hidden" style="width:100%;margin-top:10px" onclick="openForgotPassword()">Esqueceu a senha?</button>
+
+      <div id="loginMsg" class="msg"></div>
+
+      <div class="notice">
+        <b>Importante:</b> o retorno é um valor-alvo e o prazo depende das vendas
+        elegíveis da categoria e do tema escolhidos.
+      </div>
+    </div>
   </div>
 </section>
 
 <section id="loadingArea" class="hidden" style="text-align:center;padding:70px"><h2>Carregando CATinvestimentos...</h2></section>
 
 <section id="investorArea" class="hidden">
-  <div class="title-row">
-    <div><h1 id="helloInvestor">Olá!</h1><div class="muted">Sua área no CATinvestimentos</div></div>
-    <div class="actions" style="margin-top:0">
-      <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">🛍️ Catálogo da loja</a>
-      <button class="btn secondary" onclick="installCATApp()">📱 Instalar no celular</button>
+  <div class="investor-home-hero">
+    <div class="home-copy">
+      <div class="muted" style="font-weight:800;letter-spacing:.08em;text-transform:uppercase">Sua conta Cat Encantus</div>
+      <h1 id="helloInvestor">Olá!</h1>
+      <p>
+        Acompanhe seu patrimônio dentro da plataforma e escolha abaixo a área
+        que deseja acessar.
+      </p>
+    </div>
+    <img src="produto-foxy.png" class="home-product hp1" alt="" aria-hidden="true">
+    <img src="produto-arcoiris.png" class="home-product hp2" alt="" aria-hidden="true">
+    <img src="produto-brincos-rosa.png" class="home-product hp3" alt="" aria-hidden="true">
+  </div>
+
+  <div class="stats stats-v19">
+    <div class="card">
+      <div class="muted">Saldo total</div>
+      <div id="investorTotalBalance" class="stat-value">R$ 0,00</div>
+    </div>
+    <div class="card">
+      <div class="muted">Investimentos</div>
+      <div id="investorAppliedTotal" class="stat-value">R$ 0,00</div>
+    </div>
+    <div class="card">
+      <div class="muted">Lucro</div>
+      <div id="investorProfitTotal" class="stat-value">R$ 0,00</div>
     </div>
   </div>
-  <div class="stats">
-    <div class="card"><div class="muted">Saldo disponível</div><div id="investorBalance" class="stat-value">R$ 0,00</div></div>
-    <div class="card"><div class="muted">Retorno-alvo</div><div id="returnRate" class="stat-value">Por opção</div></div>
-    <div class="card"><div class="muted">Depósito mínimo</div><div id="minimumDeposit" class="stat-value">R$ 40,00</div></div>
+
+  <div class="investor-menu">
+    <button class="investor-item" data-investor-section="invest" onclick="investorSection('invest',this)">
+      <span class="nav-icon">💗</span><span>Investir</span>
+    </button>
+    <button class="investor-item" data-investor-section="investments" onclick="investorSection('investments',this)">
+      <span class="nav-icon">💰</span><span>Meus investimentos</span>
+    </button>
+    <button class="investor-item" data-investor-section="transactions" onclick="investorSection('transactions',this)">
+      <span class="nav-icon">↔️</span><span>Movimentações</span>
+    </button>
+    <button class="investor-item" data-investor-section="notifications" onclick="investorSection('notifications',this)">
+      <span class="nav-icon">🔔</span><span>Notificações</span>
+    </button>
+    <button class="investor-item" onclick="window.open('https://catencantus.kicatalogo.com','_blank','noopener')">
+      <span class="nav-icon">🛍️</span><span>Catálogo da Loja</span>
+    </button>
+    <button class="investor-item" onclick="installCATApp()">
+      <span class="nav-icon">📱</span><span>Baixar App</span>
+    </button>
   </div>
-  <div class="title-row"><h2>Opções de investimento</h2></div>
-  <div id="availableThemes" class="grid"></div>
-  <div class="title-row" style="margin-top:28px"><h2>Meus investimentos</h2></div>
-  <div id="myInvestments" class="grid"></div>
-  <div class="title-row" style="margin-top:28px">
-  <h2>Movimentações, depósitos e saques</h2>
-  <div class="actions" style="margin-top:0">
-    <button class="btn" onclick="openDepositRequest()">Adicionar saldo</button>
-    <button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button>
+
+  <div id="investorContent" class="section">
+    <div class="investor-content-empty">
+      <div style="font-size:26px;margin-bottom:8px">✨</div>
+      <b>Escolha uma opção acima</b>
+      <div class="muted" style="margin-top:6px">
+        Você pode investir, acompanhar seus investimentos, movimentações ou notificações.
+      </div>
+    </div>
   </div>
-</div>
-  <div id="myTransactions" class="card table-wrap"></div>
-  <div class="title-row" style="margin-top:28px"><h2>Notificações</h2></div>
-  <div id="myNotifications"></div>
 </section>
 
 <section id="adminArea" class="hidden">
@@ -411,10 +650,128 @@ async function loadUser(){
 }
 async function loadInvestorDashboard(){
   document.getElementById("helloInvestor").textContent="Olá, "+currentProfile.name+"!";
-  document.getElementById("investorBalance").textContent=money(currentProfile.balance);
-  document.getElementById("returnRate").textContent="Por opção";
-  document.getElementById("minimumDeposit").textContent=money(settings.minimum_deposit||40);
-  await Promise.all([loadAvailableThemes(),loadMyInvestments(),loadMyTransactions(),loadMyNotifications()]);
+
+  const {data:investments,error}=await sb
+    .from("investments")
+    .select("invested_amount,target_amount,status");
+
+  if(error){
+    console.warn("Não foi possível carregar o resumo financeiro:",error);
+  }
+
+  const rows=investments||[];
+
+  // Valor atualmente aplicado apenas nos investimentos em andamento.
+  const appliedTotal=rows
+    .filter(i=>i.status==="active")
+    .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
+
+  // Lucro histórico já realizado: somente a parte de lucro dos investimentos concluídos.
+  const profitTotal=rows
+    .filter(i=>i.status==="completed")
+    .reduce((sum,i)=>sum+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+
+  // Saldo total = dinheiro disponível + principal atualmente aplicado.
+  const totalBalance=Number(currentProfile.balance||0)+appliedTotal;
+
+  document.getElementById("investorTotalBalance").textContent=money(totalBalance);
+  document.getElementById("investorAppliedTotal").textContent=money(appliedTotal);
+  document.getElementById("investorProfitTotal").textContent=money(profitTotal);
+
+  window._investorActiveSection=null;
+  document.querySelectorAll(".investor-item[data-investor-section]").forEach(b=>b.classList.remove("active"));
+
+  const content=document.getElementById("investorContent");
+  if(content){
+    content.innerHTML=`
+      <div class="investor-content-empty">
+        <div style="font-size:26px;margin-bottom:8px">✨</div>
+        <b>Escolha uma opção acima</b>
+        <div class="muted" style="margin-top:6px">
+          Você pode investir, acompanhar seus investimentos, movimentações ou notificações.
+        </div>
+      </div>
+    `;
+  }
+}
+
+async function refreshInvestorSummary(){
+  await refreshProfile();
+
+  const {data:investments}=await sb
+    .from("investments")
+    .select("invested_amount,target_amount,status");
+
+  const rows=investments||[];
+  const appliedTotal=rows
+    .filter(i=>i.status==="active")
+    .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
+  const profitTotal=rows
+    .filter(i=>i.status==="completed")
+    .reduce((sum,i)=>sum+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+  const totalBalance=Number(currentProfile.balance||0)+appliedTotal;
+
+  const totalEl=document.getElementById("investorTotalBalance");
+  const appliedEl=document.getElementById("investorAppliedTotal");
+  const profitEl=document.getElementById("investorProfitTotal");
+
+  if(totalEl)totalEl.textContent=money(totalBalance);
+  if(appliedEl)appliedEl.textContent=money(appliedTotal);
+  if(profitEl)profitEl.textContent=money(profitTotal);
+}
+
+async function investorSection(section,button=null){
+  window._investorActiveSection=section;
+
+  document.querySelectorAll(".investor-item[data-investor-section]").forEach(b=>{
+    b.classList.toggle("active",b.dataset.investorSection===section);
+  });
+
+  const box=document.getElementById("investorContent");
+  if(!box)return;
+
+  box.innerHTML=`<div class="card">Carregando...</div>`;
+
+  if(section==="invest"){
+    box.innerHTML=`
+      <div class="title-row"><h2>Investir</h2></div>
+      <div id="availableThemes" class="grid"></div>
+    `;
+    return loadAvailableThemes();
+  }
+
+  if(section==="investments"){
+    box.innerHTML=`
+      <div class="title-row"><h2>Meus investimentos</h2></div>
+      <div id="myInvestments" class="grid"></div>
+    `;
+    return loadMyInvestments();
+  }
+
+  if(section==="transactions"){
+    box.innerHTML=`
+      <div class="title-row">
+        <div>
+          <h2>Movimentações</h2>
+          <div class="muted">Depósitos, saques e histórico da sua conta.</div>
+        </div>
+        <div class="actions" style="margin-top:0">
+          <button class="btn" onclick="openDepositRequest()">Adicionar saldo</button>
+          <button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button>
+        </div>
+      </div>
+      <div id="myTransactions" class="card table-wrap"></div>
+    `;
+    return loadMyTransactions();
+  }
+
+  if(section==="notifications"){
+    box.innerHTML=`
+      <div class="title-row"><h2>Notificações</h2></div>
+      <div id="myNotifications"></div>
+    `;
+    return loadMyNotifications();
+  }
 }
 async function refreshProfile(){const {data}=await sb.from("profiles").select("*").eq("id",currentProfile.id).single();if(data)currentProfile=data}
 
@@ -733,8 +1090,8 @@ async function makeInvestment(optionId){
 
   closeModal();
   toast("Investimento registrado!");
-  await refreshProfile();
-  await loadInvestorDashboard();
+  await refreshInvestorSummary();
+  await investorSection("investments");
 }
 
 async function loadMyInvestments(){
@@ -848,7 +1205,7 @@ async function requestDeposit(){
 }
 
 function openWithdrawal(){openModal(`<div class="title-row"><h2>Solicitar saque</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="muted">Saldo disponível: <b>${money(currentProfile.balance)}</b></div><label>Valor</label><input id="withdrawAmount" type="number" min="0.01" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="requestWithdrawal()">Solicitar</button>`)}
-async function requestWithdrawal(){const amount=Number(document.getElementById("withdrawAmount").value);const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saque solicitado.");await refreshProfile();await loadInvestorDashboard()}
+async function requestWithdrawal(){const amount=Number(document.getElementById("withdrawAmount").value);const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saque solicitado.");await refreshInvestorSummary();await investorSection("transactions")}
 
 async function adminSection(section){
   const box=document.getElementById("adminContent");box.innerHTML=`<div class="card">Carregando...</div>`;

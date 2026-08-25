@@ -1,11 +1,21 @@
-const CACHE_NAME="catinvestimentos-v18-curingas-badge-modelos-1";
+const CACHE_NAME="catinvestimentos-v19-painel-visual-1";
 const APP_SHELL=[
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./logo.png",
   "./icon-192.png",
-  "./icon-512.png"
+  "./icon-512.png",
+  "./produto-luva.png",
+  "./produto-sonic.png",
+  "./produto-kitty.png",
+  "./produto-ghostface.png",
+  "./produto-foxy.png",
+  "./produto-chaves.png",
+  "./produto-coracoes.png",
+  "./produto-livro.png",
+  "./produto-arcoiris.png",
+  "./produto-brincos-rosa.png"
 ];
 
 self.addEventListener("install",(event)=>{
