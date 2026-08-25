@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v19-painel-visual-1";
+const CACHE_NAME="catinvestimentos-v20-produtos-posicoes-1";
 const APP_SHELL=[
   "./",
   "./index.html",
