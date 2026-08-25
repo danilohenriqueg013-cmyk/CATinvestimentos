@@ -67,7 +67,7 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
   <div class="title-row"><div><h1 id="helloInvestor">Olá!</h1><div class="muted">Sua área no CATinvestimentos</div></div></div>
   <div class="stats">
     <div class="card"><div class="muted">Saldo disponível</div><div id="investorBalance" class="stat-value">R$ 0,00</div></div>
-    <div class="card"><div class="muted">Retorno-alvo</div><div id="returnRate" class="stat-value">15%</div></div>
+    <div class="card"><div class="muted">Retorno-alvo</div><div id="returnRate" class="stat-value">Por tema</div></div>
     <div class="card"><div class="muted">Depósito mínimo</div><div id="minimumDeposit" class="stat-value">R$ 40,00</div></div>
   </div>
   <div class="title-row"><h2>Temas disponíveis</h2></div>
@@ -263,7 +263,7 @@ async function loadUser(){
 async function loadInvestorDashboard(){
   document.getElementById("helloInvestor").textContent="Olá, "+currentProfile.name+"!";
   document.getElementById("investorBalance").textContent=money(currentProfile.balance);
-  document.getElementById("returnRate").textContent=(settings.target_return_rate||15)+"%";
+  document.getElementById("returnRate").textContent="Por tema";
   document.getElementById("minimumDeposit").textContent=money(settings.minimum_deposit||40);
   await Promise.all([loadAvailableThemes(),loadMyInvestments(),loadMyTransactions(),loadMyNotifications()]);
 }
@@ -274,12 +274,21 @@ async function loadAvailableThemes(){
   const {data,error}=await sb.rpc("get_available_themes");
   if(error){box.innerHTML=`<div class="card error">Erro: ${esc(error.message)}</div>`;return}
   if(!data?.length){box.innerHTML=`<div class="card muted">Nenhum tema disponível no momento.</div>`;return}
-  box.innerHTML=data.map(t=>`<div class="card item"><h3>${esc(t.name)}</h3><div class="muted">${esc(t.description||"Sem descrição")}</div><button class="btn" style="margin-top:14px" onclick="openInvestment(${t.id},'${esc(t.name).replace(/'/g,"&#39;")}')">Investir</button></div>`).join("");
+  box.innerHTML=data.map(t=>`<div class="card item">
+    <h3>${esc(t.name)}</h3>
+    <div class="muted">${esc(t.description||"Sem descrição")}</div>
+    <div class="notice" style="margin-top:12px">Retorno-alvo deste tema: <b>${Number(t.return_rate||0).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b></div>
+    <button class="btn" style="margin-top:14px" onclick="openInvestment(${t.id},'${esc(t.name).replace(/'/g,"&#39;")}',${Number(t.return_rate||0)})">Investir</button>
+  </div>`).join("");
 }
-function openInvestment(id,name){
+function openInvestment(id,name,returnRate){
+  const rate=Number(returnRate||0);
   openModal(`<div class="title-row"><h2>Investir em ${name}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
   <label>Valor do investimento</label><input id="investmentAmount" type="number" min="${settings.minimum_investment||10}" max="${settings.maximum_investment||100}" step="0.01">
-  <div class="notice">Mínimo: ${money(settings.minimum_investment||10)} • Máximo: ${money(settings.maximum_investment||100)} • Retorno-alvo: ${settings.target_return_rate||15}%</div>
+  <div class="notice">
+    Mínimo: ${money(settings.minimum_investment||10)} • Máximo: ${money(settings.maximum_investment||100)}<br>
+    Retorno-alvo deste tema: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
+  </div>
   <button class="btn" style="width:100%;margin-top:15px" onclick="makeInvestment(${id})">Confirmar investimento</button>`);
 }
 async function makeInvestment(themeId){
@@ -449,12 +458,44 @@ async function loadAdminThemes(){
   const box=document.getElementById("adminContent");
   const {data,error}=await sb.from("themes").select("*").order("name");
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><h2>Temas</h2><button class="btn" onclick="openThemeForm()">+ Novo tema</button></div><div class="grid">${(data||[]).map(t=>`<div class="item"><div class="title-row"><h3>${esc(t.name)}</h3><span class="badge ${t.active?"green":"red"}">${t.active?"ATIVO":"INATIVO"}</span></div><div class="muted">${esc(t.description||"Sem descrição")}</div><div class="muted" style="margin-top:10px">Limite: ${t.investor_limit} investidor(es) ou ${money(t.investment_amount_limit)}</div><div class="actions"><button class="btn smallbtn" onclick='openThemeForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteTheme(${t.id})">Excluir</button></div></div>`).join("")||`<div class="muted">Nenhum tema cadastrado.</div>`}</div></div>`;
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Temas</h2><button class="btn" onclick="openThemeForm()">+ Novo tema</button></div><div class="grid">${(data||[]).map(t=>`<div class="item">
+    <div class="title-row"><h3>${esc(t.name)}</h3><span class="badge ${t.active?"green":"red"}">${t.active?"ATIVO":"INATIVO"}</span></div>
+    <div class="muted">${esc(t.description||"Sem descrição")}</div>
+    <div class="muted" style="margin-top:10px">Retorno-alvo: <b>${Number(t.return_rate||settings.target_return_rate||15).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b></div>
+    <div class="muted">Limite: ${t.investor_limit} investidor(es) ou ${money(t.investment_amount_limit)}</div>
+    <div class="actions"><button class="btn smallbtn" onclick='openThemeForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteTheme(${t.id})">Excluir</button></div>
+  </div>`).join("")||`<div class="muted">Nenhum tema cadastrado.</div>`}</div></div>`;
 }
 function openThemeForm(t=null){
-  openModal(`<div class="title-row"><h2>${t?"Editar":"Novo"} tema</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Nome</label><input id="themeName" value="${esc(t?.name||"")}"><label>Descrição</label><textarea id="themeDescription">${esc(t?.description||"")}</textarea><label>URL da imagem (opcional)</label><input id="themeImage" value="${esc(t?.image_url||"")}"><div class="row"><div><label>Máximo de investidores</label><input id="themeInvestors" type="number" min="1" value="${t?.investor_limit||settings.maximum_investors_per_theme||3}"></div><div><label>Limite financeiro</label><input id="themeLimit" type="number" min="10" step="0.01" value="${t?.investment_amount_limit||100}"></div></div><label>Status</label><select id="themeActive"><option value="true" ${!t||t.active?"selected":""}>Ativo</option><option value="false" ${t&&!t.active?"selected":""}>Inativo</option></select><button class="btn" style="width:100%;margin-top:15px" onclick="saveTheme(${t?.id??"null"})">Salvar tema</button>`);
+  openModal(`<div class="title-row"><h2>${t?"Editar":"Novo"} tema</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome</label><input id="themeName" value="${esc(t?.name||"")}">
+    <label>Descrição</label><textarea id="themeDescription">${esc(t?.description||"")}</textarea>
+    <label>URL da imagem (opcional)</label><input id="themeImage" value="${esc(t?.image_url||"")}">
+    <div class="row">
+      <div><label>Retorno-alvo / lucro (%)</label><input id="themeReturnRate" type="number" min="0.01" max="100" step="0.01" value="${t?.return_rate??settings.target_return_rate??15}"></div>
+      <div><label>Máximo de investidores</label><input id="themeInvestors" type="number" min="1" value="${t?.investor_limit||settings.maximum_investors_per_theme||3}"></div>
+    </div>
+    <label>Limite financeiro total do tema</label><input id="themeLimit" type="number" min="10" step="0.01" value="${t?.investment_amount_limit||100}">
+    <div class="notice">A porcentagem escolhida aqui vale para <b>novos investimentos</b> neste tema. Investimentos que já existem mantêm o valor-alvo que tinham quando foram feitos.</div>
+    <label>Status</label><select id="themeActive"><option value="true" ${!t||t.active?"selected":""}>Ativo</option><option value="false" ${t&&!t.active?"selected":""}>Inativo</option></select>
+    <button class="btn" style="width:100%;margin-top:15px" onclick="saveTheme(${t?.id??"null"})">Salvar tema</button>`);
 }
-async function saveTheme(id){const {error}=await sb.rpc("admin_save_theme",{p_id:id,p_name:document.getElementById("themeName").value,p_description:document.getElementById("themeDescription").value,p_image_url:document.getElementById("themeImage").value,p_active:document.getElementById("themeActive").value==="true",p_investor_limit:Number(document.getElementById("themeInvestors").value),p_amount_limit:Number(document.getElementById("themeLimit").value)});if(error){toast(error.message);return}closeModal();await loadAdminThemes()}
+async function saveTheme(id){
+  const {error}=await sb.rpc("admin_save_theme",{
+    p_id:id,
+    p_name:document.getElementById("themeName").value,
+    p_description:document.getElementById("themeDescription").value,
+    p_image_url:document.getElementById("themeImage").value,
+    p_active:document.getElementById("themeActive").value==="true",
+    p_investor_limit:Number(document.getElementById("themeInvestors").value),
+    p_amount_limit:Number(document.getElementById("themeLimit").value),
+    p_return_rate:Number(document.getElementById("themeReturnRate").value)
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Tema salvo.");
+  await loadAdminThemes();
+}
 async function deleteTheme(id){if(!confirm("Excluir este tema? Se já houver histórico, o sistema pedirá para desativá-lo."))return;const {error}=await sb.rpc("admin_delete_theme",{p_id:id});if(error){toast(error.message);return}await loadAdminThemes()}
 
 async function loadAdminInvestments(){
@@ -675,7 +716,7 @@ async function loadAdminSettings(){
       </div>
 
       <div class="row3">
-        <div><label>Retorno-alvo (%)</label><input id="setReturn" type="number" step="0.01" value="${settings.target_return_rate||15}"></div>
+        <div><label>Retorno padrão para novos temas (%)</label><input id="setReturn" type="number" min="0.01" max="100" step="0.01" value="${settings.target_return_rate||15}"></div>
         <div><label>Depósito mínimo</label><input id="setMinDeposit" type="number" step="0.01" value="${settings.minimum_deposit||40}"></div>
         <div><label>Investimento mínimo</label><input id="setMinInvest" type="number" step="0.01" value="${settings.minimum_investment||10}"></div>
       </div>
