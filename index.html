@@ -433,23 +433,24 @@ async function loadAvailableThemes(){
     <div class="card" style="margin-bottom:14px">
       <div class="title-row">
         <div>
-          <h3>Escolha a categoria e o tema</h3>
-          <div class="muted">Cada combinação pode ter uma porcentagem de retorno diferente.</div>
+          <h3>Escolha a categoria e/ou o tema</h3>
+          <div class="muted">Defina pelo menos um filtro para ver as opções relacionadas. Enquanto nenhum filtro estiver escolhido, mostramos apenas 2 sugestões.</div>
         </div>
+        <button class="btn secondary smallbtn" onclick="clearInvestmentFilters()">Limpar filtros</button>
       </div>
       <div class="row">
         <div>
           <label>Categoria</label>
           <select id="optionCategoryFilter" onchange="renderAvailableInvestmentOptions()">
-            <option value="">Ver todas as categorias</option>
-            ${categories.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+            <option value="">Selecione uma categoria (opcional)</option>
+            ${categories.filter(([id])=>id!=="all").map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
         <div>
           <label>Tema</label>
           <select id="optionThemeFilter" onchange="renderAvailableInvestmentOptions()">
-            <option value="">Ver todos os temas</option>
-            ${themes.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+            <option value="">Selecione um tema (opcional)</option>
+            ${themes.filter(([id])=>id!=="all").map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -460,6 +461,42 @@ async function loadAvailableThemes(){
   renderAvailableInvestmentOptions();
 }
 
+function clearInvestmentFilters(){
+  const category=document.getElementById("optionCategoryFilter");
+  const theme=document.getElementById("optionThemeFilter");
+  if(category)category.value="";
+  if(theme)theme.value="";
+  renderAvailableInvestmentOptions();
+}
+
+function pickDefaultInvestmentSuggestions(list){
+  if(!list.length)return [];
+  if(list.length===1)return [list[0]];
+
+  const rates=list.map(o=>Number(o.return_rate||0));
+  const maxRate=Math.max(...rates);
+  const minRate=Math.min(...rates);
+
+  // Se todas as opções ainda estiverem com a mesma porcentagem,
+  // escolhe duas sugestões diferentes aleatoriamente.
+  if(maxRate===minRate){
+    const shuffled=[...list].sort(()=>Math.random()-0.5);
+    return shuffled.slice(0,2);
+  }
+
+  const highest=list.filter(o=>Number(o.return_rate||0)===maxRate);
+  const lowest=list.filter(o=>Number(o.return_rate||0)===minRate);
+
+  const high=highest[Math.floor(Math.random()*highest.length)];
+  let low=lowest[Math.floor(Math.random()*lowest.length)];
+
+  if(Number(low.id)===Number(high.id)){
+    low=list.find(o=>Number(o.id)!==Number(high.id))||low;
+  }
+
+  return [high,low];
+}
+
 function renderAvailableInvestmentOptions(){
   const list=window._availableInvestmentOptions||[];
   const category=document.getElementById("optionCategoryFilter")?.value||"";
@@ -467,30 +504,48 @@ function renderAvailableInvestmentOptions(){
   const grid=document.getElementById("availableOptionsGrid");
   if(!grid)return;
 
-  const filtered=list.filter(o=>{
-    const optionTheme=o.theme_id===null?"all":String(o.theme_id);
-    const optionCategory=o.category_id===null?"all":String(o.category_id);
-    return (!category||optionCategory===category) && (!theme||optionTheme===theme);
-  });
+  let filtered=[];
+  let recommendationMode=false;
+
+  if(!category && !theme){
+    recommendationMode=true;
+    filtered=pickDefaultInvestmentSuggestions(list);
+  }else{
+    filtered=list.filter(o=>{
+      const optionTheme=o.theme_id===null?"all":String(o.theme_id);
+      const optionCategory=o.category_id===null?"all":String(o.category_id);
+      return (!category||optionCategory===category) && (!theme||optionTheme===theme);
+    });
+  }
 
   if(!filtered.length){
     grid.innerHTML=`<div class="card muted">Nenhuma combinação disponível com esses filtros.</div>`;
     return;
   }
 
-  grid.innerHTML=filtered.map(o=>{
+  const recommendationTitle=recommendationMode
+    ? `<div style="grid-column:1/-1" class="muted"><b>Sugestões para você:</b> uma opção entre os maiores retornos e uma entre os menores retornos disponíveis.</div>`
+    : "";
+
+  grid.innerHTML=recommendationTitle+filtered.map(o=>{
     const label=`${o.category_name} • ${o.theme_name}`;
     const rate=Number(o.return_rate||0);
     const models=(o.theme_id!==null && o.theme_description)
       ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(o.theme_description)}</div>`
       : "";
+
     return `<div class="card item">
       <div class="title-row">
         <h3>${esc(o.category_name)}</h3>
-        <span class="badge green">${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</span>
+        <span class="badge green" style="font-size:22px;padding:9px 13px;line-height:1;font-weight:800">
+          ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
+        </span>
       </div>
       <div class="muted"><b>Tema:</b> ${esc(o.theme_name)}</div>
-      <div class="notice" style="margin-top:12px">Retorno-alvo desta combinação: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b></div>
+      <div class="notice" style="margin-top:12px">
+        Retorno-alvo desta combinação:
+        <b style="font-size:18px">${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
+      </div>
       ${models}
       <div class="actions" style="margin-top:14px">
         <button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
@@ -500,6 +555,28 @@ function renderAvailableInvestmentOptions(){
   }).join("");
 }
 
+function updateInvestmentReturn(returnRate){
+  const input=document.getElementById("investmentAmount");
+  const totalEl=document.getElementById("liveInvestmentTotal");
+  const profitEl=document.getElementById("liveInvestmentProfit");
+  if(!input||!totalEl||!profitEl)return;
+
+  const amount=Number(input.value||0);
+  const rate=Number(returnRate||0);
+
+  if(!amount || amount<=0){
+    totalEl.textContent=money(0);
+    profitEl.textContent=money(0);
+    return;
+  }
+
+  const profit=amount*(rate/100);
+  const total=amount+profit;
+
+  profitEl.textContent=money(profit);
+  totalEl.textContent=money(total);
+}
+
 function openInvestmentOption(id,label,returnRate){
   const rate=Number(returnRate||0);
   const option=(window._availableInvestmentOptions||[]).find(o=>Number(o.id)===Number(id));
@@ -507,17 +584,55 @@ function openInvestmentOption(id,label,returnRate){
     ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(option.theme_description)}</div>`
     : "";
 
-  openModal(`<div class="title-row"><h2>${esc(label)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
-  <label>Valor do investimento</label><input id="investmentAmount" type="number" min="${settings.minimum_investment||10}" max="${settings.maximum_investment||100}" step="0.01">
-  <div class="notice">
-    Mínimo: ${money(settings.minimum_investment||10)} • Máximo por investimento: ${money(settings.maximum_investment||100)}<br>
-    Retorno-alvo desta combinação: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
-  </div>
-  ${models}
-  <div class="actions" style="margin-top:15px">
-    <button class="btn" style="flex:1" onclick="makeInvestment(${id})">Confirmar investimento</button>
-    <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none;flex:1;text-align:center">Ver catálogo</a>
-  </div>`);
+  openModal(`
+    <div class="title-row">
+      <h2>${esc(label)}</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <label>Valor do investimento</label>
+    <input
+      id="investmentAmount"
+      type="number"
+      min="${settings.minimum_investment||10}"
+      max="${settings.maximum_investment||100}"
+      step="0.01"
+      inputmode="decimal"
+      placeholder="Digite quanto deseja investir"
+      oninput="updateInvestmentReturn(${rate})"
+    >
+
+    <div class="notice">
+      Mínimo: ${money(settings.minimum_investment||10)} •
+      Máximo por investimento: ${money(settings.maximum_investment||100)}<br>
+      Retorno-alvo desta combinação:
+      <b style="font-size:18px">${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
+    </div>
+
+    <div style="
+      margin-top:14px;
+      padding:18px;
+      border-radius:16px;
+      background:#fff0f5;
+      border:2px solid #e7b8c8;
+      text-align:center;
+    ">
+      <div class="muted" style="font-size:14px">Quando este investimento for concluído, o valor total será:</div>
+      <div id="liveInvestmentTotal" style="font-size:32px;font-weight:800;color:#96264d;margin-top:5px">
+        ${money(0)}
+      </div>
+      <div class="muted" style="margin-top:6px">
+        Lucro incluído: <b id="liveInvestmentProfit">${money(0)}</b>
+      </div>
+    </div>
+
+    ${models}
+
+    <div class="actions" style="margin-top:15px">
+      <button class="btn" style="flex:1" onclick="makeInvestment(${id})">Confirmar investimento</button>
+      <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none;flex:1;text-align:center">Ver catálogo</a>
+    </div>
+  `);
 }
 
 async function makeInvestment(optionId){
