@@ -1,211 +1,945 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>CATinvestimentos | Cat Encantus</title>
+<title>CATinvestimentos | Cat Encantus</title>
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    body {
-      font-family: Arial, sans-serif;
-      background: #fff8fa;
-      color: #5f3545;
-      min-height: 100vh;
-    }
+<style>
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
 
-    header {
-      background: #f7dfe6;
-      padding: 22px;
-      text-align: center;
-      border-bottom: 1px solid #eccbd5;
-    }
+body{
+  font-family:Arial,sans-serif;
+  background:#fff8fa;
+  color:#5f3545;
+  min-height:100vh;
+}
 
-    .brand {
-      font-size: 30px;
-      font-weight: bold;
-      color: #a44365;
-    }
+header{
+  background:#f7dfe6;
+  padding:18px 25px;
+  border-bottom:1px solid #eccbd5;
+}
 
-    .store-name {
-      margin-top: 5px;
-      font-size: 14px;
-      color: #815262;
-    }
+.header-content{
+  max-width:1150px;
+  margin:auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
 
-    main {
-      width: min(1100px, 92%);
-      margin: 50px auto;
-    }
+.brand{
+  font-size:28px;
+  font-weight:bold;
+  color:#a44365;
+}
 
-    .hero {
-      text-align: center;
-      margin-bottom: 45px;
-    }
+.store-name{
+  font-size:13px;
+  color:#815262;
+  margin-top:3px;
+}
 
-    .hero h1 {
-      font-size: 38px;
-      color: #963c5c;
-      margin-bottom: 12px;
-    }
+.logout{
+  width:auto;
+  margin:0;
+  padding:10px 18px;
+}
 
-    .hero p {
-      max-width: 650px;
-      margin: auto;
-      line-height: 1.6;
-      color: #76515e;
-    }
+main{
+  width:min(1150px,92%);
+  margin:45px auto;
+}
 
-    .login-card {
-      background: white;
-      max-width: 430px;
-      margin: 0 auto;
-      padding: 30px;
-      border-radius: 20px;
-      box-shadow: 0 8px 30px rgba(120, 63, 84, 0.12);
-      border: 1px solid #f1dce3;
-    }
+.hero{
+  text-align:center;
+  margin-bottom:40px;
+}
 
-    .login-card h2 {
-      text-align: center;
-      color: #963c5c;
-      margin-bottom: 25px;
-    }
+.hero h1{
+  font-size:38px;
+  color:#963c5c;
+  margin-bottom:10px;
+}
 
-    label {
-      display: block;
-      margin: 15px 0 7px;
-      font-weight: bold;
-      font-size: 14px;
-    }
+.hero p{
+  color:#76515e;
+  line-height:1.6;
+}
 
-    input {
-      width: 100%;
-      padding: 13px;
-      border: 1px solid #dfc4ce;
-      border-radius: 10px;
-      font-size: 15px;
-      outline: none;
-    }
+.card{
+  background:white;
+  border-radius:18px;
+  border:1px solid #f0d8e0;
+  box-shadow:0 8px 25px rgba(120,63,84,.10);
+  padding:25px;
+}
 
-    input:focus {
-      border-color: #b95d7c;
-    }
+.login-card{
+  max-width:430px;
+  margin:auto;
+}
 
-    button {
-      width: 100%;
-      margin-top: 22px;
-      padding: 14px;
-      border: none;
-      border-radius: 10px;
-      background: #a94366;
-      color: white;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-    }
+.login-card h2{
+  text-align:center;
+  color:#963c5c;
+  margin-bottom:24px;
+}
 
-    button:hover {
-      background: #913653;
-    }
+label{
+  display:block;
+  margin:14px 0 7px;
+  font-weight:bold;
+  font-size:14px;
+}
 
-    .notice {
-      margin-top: 30px;
-      padding: 18px;
-      background: #fff1f5;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.6;
-      color: #76515e;
-    }
+input{
+  width:100%;
+  padding:13px;
+  border:1px solid #dfc4ce;
+  border-radius:10px;
+  font-size:15px;
+}
 
-    footer {
-      text-align: center;
-      margin: 55px 20px 25px;
-      color: #98717f;
-      font-size: 12px;
-    }
+button{
+  border:none;
+  border-radius:10px;
+  background:#a94366;
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  padding:13px 16px;
+}
 
-    @media (max-width: 600px) {
-      .hero h1 {
-        font-size: 30px;
-      }
+.login-button{
+  width:100%;
+  margin-top:22px;
+}
 
-      main {
-        margin-top: 30px;
-      }
+button:hover{
+  background:#913653;
+}
 
-      .login-card {
-        padding: 22px;
-      }
-    }
-  </style>
+.notice{
+  margin-top:25px;
+  background:#fff0f4;
+  border-radius:12px;
+  padding:17px;
+  font-size:13px;
+  line-height:1.6;
+}
+
+.error{
+  color:#a32645;
+  margin-top:15px;
+  text-align:center;
+  font-size:14px;
+}
+
+.success{
+  color:#25734b;
+}
+
+.hidden{
+  display:none !important;
+}
+
+.dashboard-header{
+  margin-bottom:28px;
+}
+
+.dashboard-header h1{
+  color:#963c5c;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:16px;
+  margin:25px 0;
+}
+
+.stat-title{
+  color:#87606e;
+  font-size:13px;
+}
+
+.stat-value{
+  font-size:28px;
+  font-weight:bold;
+  color:#963c5c;
+  margin-top:7px;
+}
+
+.section-title{
+  margin:32px 0 15px;
+  color:#7c304d;
+}
+
+.investments{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:16px;
+}
+
+.progress{
+  height:10px;
+  background:#f3dfe6;
+  border-radius:20px;
+  overflow:hidden;
+  margin:13px 0;
+}
+
+.progress-bar{
+  height:100%;
+  background:#b64f73;
+}
+
+.small{
+  font-size:13px;
+  color:#85616e;
+  line-height:1.6;
+}
+
+.admin-menu{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:14px;
+  margin-top:25px;
+}
+
+.admin-item{
+  text-align:center;
+  padding:25px 15px;
+  background:white;
+  border:1px solid #efd6df;
+  border-radius:15px;
+  font-weight:bold;
+  color:#8d3857;
+}
+
+.loading{
+  text-align:center;
+  padding:70px 20px;
+}
+
+footer{
+  text-align:center;
+  padding:30px;
+  color:#98717f;
+  font-size:12px;
+}
+
+@media(max-width:600px){
+  .hero h1{font-size:29px;}
+  .brand{font-size:22px;}
+}
+</style>
 </head>
 
 <body>
 
-  <header>
-    <div class="brand">CATinvestimentos</div>
-    <div class="store-name">Cat Encantus • Produtos Personalizados</div>
-  </header>
+<header>
+  <div class="header-content">
+    <div>
+      <div class="brand">CATinvestimentos</div>
+      <div class="store-name">Cat Encantus • Produtos Personalizados</div>
+    </div>
 
-  <main>
+    <button
+      id="logoutButton"
+      class="logout hidden"
+      onclick="logout()">
+      Sair
+    </button>
+  </div>
+</header>
 
-    <section class="hero">
-      <h1>Invista nos temas que você acredita.</h1>
+<main>
 
-      <p>
-        Acompanhe seus investimentos, o progresso das vendas
-        e seu retorno-alvo de forma simples e transparente.
-      </p>
-    </section>
+<!-- LOGIN -->
 
-    <section class="login-card">
+<section id="loginArea">
 
-      <h2>Área do Investidor</h2>
+  <div class="hero">
+    <h1>Invista nos temas que você acredita.</h1>
+    <p>
+      Acompanhe seus investimentos, o progresso das vendas
+      e seu retorno-alvo de forma simples.
+    </p>
+  </div>
 
-      <form>
+  <div class="card login-card">
 
-        <label for="email">E-mail</label>
-        <input
-          type="email"
-          id="email"
-          placeholder="Digite seu e-mail"
-        >
+    <h2>Área do Investidor</h2>
 
-        <label for="password">Senha</label>
-        <input
-          type="password"
-          id="password"
-          placeholder="Digite sua senha"
-        >
+    <label>E-mail</label>
+    <input id="email" type="email" placeholder="Digite seu e-mail">
 
-        <button type="button">
-          Entrar
-        </button>
+    <label>Senha</label>
+    <input id="password" type="password" placeholder="Digite sua senha">
 
-      </form>
+    <button
+      class="login-button"
+      onclick="login()">
+      Entrar
+    </button>
 
-      <div class="notice">
-        <strong>Importante:</strong>
-        os valores aplicados estão vinculados ao desempenho das vendas
-        dos respectivos temas. O prazo de retorno pode variar e não há
-        garantia de retorno imediato.
+    <div id="loginMessage" class="error"></div>
+
+    <div class="notice">
+      <strong>Importante:</strong><br>
+      Os investimentos possuem retorno-alvo de 15%.
+      O prazo depende das vendas relacionadas ao tema e
+      não existe garantia de retorno imediato.
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- CARREGANDO -->
+
+<section id="loadingArea" class="hidden loading">
+  <h2>Carregando CATinvestimentos...</h2>
+</section>
+
+
+<!-- INVESTIDOR -->
+
+<section id="investorArea" class="hidden">
+
+  <div class="dashboard-header">
+    <h1 id="investorWelcome">Olá!</h1>
+    <p>Acompanhe seus investimentos.</p>
+  </div>
+
+  <div class="stats">
+
+    <div class="card">
+      <div class="stat-title">Saldo disponível</div>
+      <div id="investorBalance" class="stat-value">
+        R$ 0,00
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stat-title">Retorno-alvo</div>
+      <div class="stat-value">15%</div>
+    </div>
+
+    <div class="card">
+      <div class="stat-title">Depósito mínimo</div>
+      <div class="stat-value">R$ 40</div>
+    </div>
+
+  </div>
+
+  <h2 class="section-title">
+    Meus investimentos
+  </h2>
+
+  <div id="investmentsList" class="investments"></div>
+
+  <h2 class="section-title">
+    Notificações
+  </h2>
+
+  <div id="notificationsList"></div>
+
+</section>
+
+
+<!-- ADMIN -->
+
+<section id="adminArea" class="hidden">
+
+  <div class="dashboard-header">
+    <h1>Painel Administrativo</h1>
+    <p>CATinvestimentos • Cat Encantus</p>
+  </div>
+
+  <div class="stats">
+
+    <div class="card">
+      <div class="stat-title">Administrador</div>
+      <div class="stat-value">Ativo</div>
+    </div>
+
+  </div>
+
+  <div class="admin-menu">
+
+    <div class="admin-item">
+      👥<br><br>
+      Investidores
+    </div>
+
+    <div class="admin-item">
+      🎨<br><br>
+      Temas
+    </div>
+
+    <div class="admin-item">
+      💰<br><br>
+      Investimentos
+    </div>
+
+    <div class="admin-item">
+      🧾<br><br>
+      Registrar Venda
+    </div>
+
+    <div class="admin-item">
+      📦<br><br>
+      Caixinhas
+    </div>
+
+    <div class="admin-item">
+      🔄<br><br>
+      Filas
+    </div>
+
+    <div class="admin-item">
+      ➕<br><br>
+      Depósitos
+    </div>
+
+    <div class="admin-item">
+      💸<br><br>
+      Saques
+    </div>
+
+    <div class="admin-item">
+      ⚙️<br><br>
+      Configurações
+    </div>
+
+  </div>
+
+</section>
+
+</main>
+
+<footer>
+  CATinvestimentos • Cat Encantus
+</footer>
+
+
+<script>
+
+/* =========================================
+   CONEXÃO SUPABASE
+========================================= */
+
+const SUPABASE_URL =
+"https://gjjzddsuqphahfjjgkda.supabase.co";
+
+/*
+IMPORTANTE:
+
+Substitua o texto abaixo pela sua chave
+sb_publishable_...
+
+NÃO USE A sb_secret_
+*/
+
+const SUPABASE_KEY =
+"sb_publishable_VuPY2hFbsEcftj37cVnXbQ__wM0Ulfc";
+
+
+const supabaseClient =
+  supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+
+/* =========================================
+   FORMATAR DINHEIRO
+========================================= */
+
+function money(value){
+
+  return new Intl.NumberFormat(
+    "pt-BR",
+    {
+      style:"currency",
+      currency:"BRL"
+    }
+  ).format(Number(value || 0));
+
+}
+
+
+/* =========================================
+   LOGIN
+========================================= */
+
+async function login(){
+
+  const email =
+    document.getElementById("email").value.trim();
+
+  const password =
+    document.getElementById("password").value;
+
+  const message =
+    document.getElementById("loginMessage");
+
+  message.textContent = "Entrando...";
+
+  const {data,error} =
+    await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+  if(error){
+
+    message.textContent =
+      "E-mail ou senha incorretos.";
+
+    return;
+  }
+
+  message.textContent = "";
+
+  await loadUser();
+
+}
+
+
+/* =========================================
+   CARREGAR USUÁRIO
+========================================= */
+
+async function loadUser(){
+
+  showLoading();
+
+  const {
+    data:{user}
+  } =
+  await supabaseClient.auth.getUser();
+
+
+  if(!user){
+
+    showLogin();
+
+    return;
+
+  }
+
+
+  const {
+    data:profile,
+    error
+  } =
+  await supabaseClient
+    .from("profiles")
+    .select("*")
+    .eq("id",user.id)
+    .single();
+
+
+  if(error || !profile){
+
+    alert(
+      "Seu usuário existe, mas o perfil não foi encontrado."
+    );
+
+    await logout();
+
+    return;
+
+  }
+
+
+  document
+    .getElementById("logoutButton")
+    .classList.remove("hidden");
+
+
+  if(profile.role === "admin"){
+
+    showAdmin();
+
+  }else{
+
+    await showInvestor(profile);
+
+  }
+
+}
+
+
+/* =========================================
+   INVESTIDOR
+========================================= */
+
+async function showInvestor(profile){
+
+  hideAll();
+
+  document
+    .getElementById("investorArea")
+    .classList.remove("hidden");
+
+
+  document.getElementById(
+    "investorWelcome"
+  ).textContent =
+    "Olá, " + profile.name + "!";
+
+
+  document.getElementById(
+    "investorBalance"
+  ).textContent =
+    money(profile.balance);
+
+
+  await loadInvestments();
+
+  await loadNotifications();
+
+}
+
+
+/* =========================================
+   INVESTIMENTOS
+========================================= */
+
+async function loadInvestments(){
+
+  const container =
+    document.getElementById("investmentsList");
+
+
+  const {data,error} =
+    await supabaseClient
+      .from("investments")
+      .select(`
+        id,
+        invested_amount,
+        target_amount,
+        sold_amount,
+        status,
+        created_at,
+        themes (
+          name
+        )
+      `)
+      .order("created_at",{
+        ascending:false
+      });
+
+
+  if(error){
+
+    container.innerHTML =
+      "<div class='card'>Não foi possível carregar os investimentos.</div>";
+
+    return;
+
+  }
+
+
+  if(!data || data.length === 0){
+
+    container.innerHTML =
+      "<div class='card'>Você ainda não possui investimentos.</div>";
+
+    return;
+
+  }
+
+
+  container.innerHTML = "";
+
+
+  data.forEach(item=>{
+
+    const percentage =
+      Math.min(
+        100,
+        (
+          Number(item.sold_amount)
+          /
+          Number(item.target_amount)
+        ) * 100
+      );
+
+
+    const remaining =
+      Math.max(
+        0,
+        Number(item.target_amount)
+        -
+        Number(item.sold_amount)
+      );
+
+
+    const card =
+      document.createElement("div");
+
+
+    card.className = "card";
+
+
+    card.innerHTML = `
+
+      <h3>
+        ${item.themes?.name || "Tema"}
+      </h3>
+
+      <br>
+
+      <div class="small">
+
+        Valor investido:
+        <strong>
+          ${money(item.invested_amount)}
+        </strong>
+
+        <br>
+
+        Retorno-alvo:
+        <strong>
+          ${money(
+            Number(item.target_amount)
+            -
+            Number(item.invested_amount)
+          )}
+        </strong>
+
+        <br>
+
+        Valor final:
+        <strong>
+          ${money(item.target_amount)}
+        </strong>
+
       </div>
 
-    </section>
+      <div class="progress">
+        <div
+          class="progress-bar"
+          style="width:${percentage}%">
+        </div>
+      </div>
 
-  </main>
+      <div class="small">
 
-  <footer>
-    CATinvestimentos • Cat Encantus
-  </footer>
+        Vendido:
+        <strong>
+          ${money(item.sold_amount)}
+        </strong>
+
+        <br>
+
+        Falta:
+        <strong>
+          ${money(remaining)}
+        </strong>
+
+        <br><br>
+
+        Status:
+        <strong>
+          ${
+            item.status === "completed"
+            ? "Concluído"
+            : "Em andamento"
+          }
+        </strong>
+
+      </div>
+
+    `;
+
+
+    container.appendChild(card);
+
+  });
+
+}
+
+
+/* =========================================
+   NOTIFICAÇÕES
+========================================= */
+
+async function loadNotifications(){
+
+  const container =
+    document.getElementById(
+      "notificationsList"
+    );
+
+
+  const {data,error} =
+    await supabaseClient
+      .from("notifications")
+      .select("*")
+      .order(
+        "created_at",
+        {ascending:false}
+      )
+      .limit(10);
+
+
+  if(error){
+
+    container.innerHTML =
+      "<div class='card'>Não foi possível carregar as notificações.</div>";
+
+    return;
+
+  }
+
+
+  if(!data || data.length === 0){
+
+    container.innerHTML =
+      "<div class='card'>Nenhuma notificação.</div>";
+
+    return;
+
+  }
+
+
+  container.innerHTML = "";
+
+
+  data.forEach(notification=>{
+
+    const div =
+      document.createElement("div");
+
+    div.className = "card";
+
+    div.style.marginBottom = "12px";
+
+
+    div.innerHTML = `
+
+      <strong>
+        ${notification.title}
+      </strong>
+
+      <br><br>
+
+      <div class="small">
+        ${notification.message}
+      </div>
+
+    `;
+
+
+    container.appendChild(div);
+
+  });
+
+}
+
+
+/* =========================================
+   ADMIN
+========================================= */
+
+function showAdmin(){
+
+  hideAll();
+
+  document
+    .getElementById("adminArea")
+    .classList.remove("hidden");
+
+}
+
+
+/* =========================================
+   LOGOUT
+========================================= */
+
+async function logout(){
+
+  await supabaseClient.auth.signOut();
+
+  document
+    .getElementById("logoutButton")
+    .classList.add("hidden");
+
+  showLogin();
+
+}
+
+
+/* =========================================
+   INTERFACE
+========================================= */
+
+function hideAll(){
+
+  document
+    .getElementById("loginArea")
+    .classList.add("hidden");
+
+  document
+    .getElementById("loadingArea")
+    .classList.add("hidden");
+
+  document
+    .getElementById("investorArea")
+    .classList.add("hidden");
+
+  document
+    .getElementById("adminArea")
+    .classList.add("hidden");
+
+}
+
+
+function showLoading(){
+
+  hideAll();
+
+  document
+    .getElementById("loadingArea")
+    .classList.remove("hidden");
+
+}
+
+
+function showLogin(){
+
+  hideAll();
+
+  document
+    .getElementById("loginArea")
+    .classList.remove("hidden");
+
+}
+
+
+/* =========================================
+   INICIAR
+========================================= */
+
+loadUser();
+
+</script>
 
 </body>
 </html>
