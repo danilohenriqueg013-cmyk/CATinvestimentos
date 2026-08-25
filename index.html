@@ -55,6 +55,7 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
     <label>E-mail</label><input id="email" type="email" autocomplete="email">
     <label>Senha</label><input id="password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') login()">
     <button class="btn" style="width:100%;margin-top:18px" onclick="login()">Entrar</button>
+    <button class="btn secondary" style="width:100%;margin-top:10px" onclick="openSignup()">Criar minha conta</button>
     <div id="loginMsg" class="msg"></div>
     <div class="notice"><b>Importante:</b> retorno-alvo não significa retorno imediato. O prazo depende das vendas elegíveis do tema e pode variar.</div>
   </div>
@@ -112,6 +113,123 @@ function show(id){hideAll();document.getElementById(id).classList.remove("hidden
 function openModal(html){const m=document.getElementById("modal");m.innerHTML=`<div class="modal-card">${html}</div>`;m.classList.remove("hidden")}
 function closeModal(){document.getElementById("modal").classList.add("hidden");document.getElementById("modal").innerHTML=""}
 function toast(msg){alert(msg)}
+
+function openSignup(){
+  openModal(`
+    <div class="title-row">
+      <h2>Criar conta de investidor</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <label>Nome completo</label>
+    <input id="signupName" autocomplete="name">
+
+    <label>E-mail</label>
+    <input id="signupEmail" type="email" autocomplete="email">
+
+    <label>Telefone</label>
+    <input id="signupPhone" type="tel" placeholder="(31) 99999-9999">
+
+    <label>Chave PIX</label>
+    <input id="signupPix" placeholder="CPF, e-mail, telefone ou chave aleatória">
+
+    <div class="row">
+      <div>
+        <label>Senha</label>
+        <input id="signupPassword" type="password" minlength="6" autocomplete="new-password">
+      </div>
+      <div>
+        <label>Confirmar senha</label>
+        <input id="signupPassword2" type="password" minlength="6" autocomplete="new-password">
+      </div>
+    </div>
+
+    <label style="display:flex;gap:9px;align-items:flex-start;font-weight:400;margin-top:16px">
+      <input id="signupTerms" type="checkbox" style="width:auto;margin-top:3px">
+      <span class="muted">
+        Li e entendi que o retorno-alvo não é imediato nem garantido,
+        que o prazo depende das vendas do tema e que valores investidos
+        só ficam disponíveis novamente após a conclusão do investimento.
+      </span>
+    </label>
+
+    <button class="btn" style="width:100%;margin-top:16px" onclick="signupInvestor()">
+      Criar conta
+    </button>
+
+    <div id="signupMsg" class="msg"></div>
+  `);
+}
+
+async function signupInvestor(){
+  const name=document.getElementById("signupName").value.trim();
+  const email=document.getElementById("signupEmail").value.trim();
+  const phone=document.getElementById("signupPhone").value.trim();
+  const pix=document.getElementById("signupPix").value.trim();
+  const password=document.getElementById("signupPassword").value;
+  const password2=document.getElementById("signupPassword2").value;
+  const accepted=document.getElementById("signupTerms").checked;
+  const msg=document.getElementById("signupMsg");
+
+  if(!name||!email||!phone||!pix||!password||!password2){
+    msg.className="msg error";
+    msg.textContent="Preencha todos os campos.";
+    return;
+  }
+
+  if(password.length<6){
+    msg.className="msg error";
+    msg.textContent="A senha precisa ter pelo menos 6 caracteres.";
+    return;
+  }
+
+  if(password!==password2){
+    msg.className="msg error";
+    msg.textContent="As senhas não coincidem.";
+    return;
+  }
+
+  if(!accepted){
+    msg.className="msg error";
+    msg.textContent="Você precisa confirmar que leu e entendeu as regras.";
+    return;
+  }
+
+  msg.className="msg";
+  msg.textContent="Criando conta...";
+
+  const redirectUrl=window.location.origin+window.location.pathname;
+
+  const {data,error}=await sb.auth.signUp({
+    email,
+    password,
+    options:{
+      emailRedirectTo:redirectUrl,
+      data:{
+        name,
+        phone,
+        pix,
+        accepted_terms:true
+      }
+    }
+  });
+
+  if(error){
+    msg.className="msg error";
+    msg.textContent=error.message;
+    return;
+  }
+
+  if(data.session){
+    closeModal();
+    await loadUser();
+  }else{
+    msg.className="msg ok";
+    msg.innerHTML="Conta criada! Verifique seu e-mail para confirmar o cadastro. Depois volte a esta página e faça login.";
+  }
+}
+
+
 async function loadSettings(){
   const {data}=await sb.from("platform_settings").select("*").order("id").limit(1).maybeSingle();
   if(data){settings=data;document.documentElement.style.setProperty("--primary",data.primary_color||"#a94366");document.documentElement.style.setProperty("--secondary",data.secondary_color||"#f7dfe6");document.getElementById("brandName").textContent=data.platform_name||"CATinvestimentos";document.getElementById("storeName").textContent=(data.store_name||"Cat Encantus")+" • Produtos Personalizados";if(data.logo_url)document.getElementById("brandLogo").src=data.logo_url}
