@@ -1324,56 +1324,167 @@ async function deleteCategory(id){
 
 async function loadAdminOptions(){
   const box=document.getElementById("adminContent");
-  const {data:options,error}=await sb
-    .from("investment_options")
-    .select("*,category:categories(name,active),theme:themes(name,active)")
-    .order("created_at",{ascending:true});
 
-  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  // Usa uma função administrativa SECURITY DEFINER.
+  // Isso evita que o RLS esconda as opções da conta admin.
+  const {data:options,error}=await sb.rpc("admin_get_investment_options");
 
-  const sorted=(options||[]).slice().sort((a,b)=>{
-    const ca=a.category?.name||"Todas as categorias";
-    const cb=b.category?.name||"Todas as categorias";
-    const ta=a.theme?.name||"Todos os temas";
-    const tb=b.theme?.name||"Todos os temas";
+  if(error){
+    box.innerHTML=`<div class="card error">Erro ao carregar opções: ${esc(error.message)}</div>`;
+    return;
+  }
+
+  window._adminInvestmentOptions=options||[];
+
+  const categoryMap=new Map();
+  const themeMap=new Map();
+
+  (options||[]).forEach(o=>{
+    if(o.category_id!==null)categoryMap.set(String(o.category_id),o.category_name);
+    if(o.theme_id!==null)themeMap.set(String(o.theme_id),o.theme_name);
+  });
+
+  const categories=[...categoryMap.entries()].sort((a,b)=>a[1].localeCompare(b[1],"pt-BR"));
+  const themes=[...themeMap.entries()].sort((a,b)=>a[1].localeCompare(b[1],"pt-BR"));
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div>
+          <h2>Opções de investimento</h2>
+          <div class="muted">
+            As combinações são criadas automaticamente. Aqui você só escolhe a opção e altera a porcentagem.
+          </div>
+        </div>
+        <button class="btn secondary" onclick="loadAdminOptions()">Atualizar lista</button>
+      </div>
+
+      <div class="notice">
+        <b>Padrão automático para opções novas: 10%.</b><br>
+        Ao criar uma nova categoria ou tema, as combinações são geradas automaticamente.
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <div>
+          <label>Filtrar por categoria</label>
+          <select id="adminOptionCategoryFilter" onchange="renderAdminInvestmentOptions()">
+            <option value="">Todas as opções de categoria</option>
+            <option value="all">Todas as categorias</option>
+            ${categories.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div>
+          <label>Filtrar por tema</label>
+          <select id="adminOptionThemeFilter" onchange="renderAdminInvestmentOptions()">
+            <option value="">Todas as opções de tema</option>
+            <option value="all">Todos os temas</option>
+            ${themes.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary smallbtn" onclick="clearAdminOptionFilters()">Limpar filtros</button>
+      </div>
+
+      <div id="adminInvestmentOptionsGrid" class="grid" style="margin-top:14px"></div>
+    </div>
+  `;
+
+  renderAdminInvestmentOptions();
+}
+
+function clearAdminOptionFilters(){
+  const c=document.getElementById("adminOptionCategoryFilter");
+  const t=document.getElementById("adminOptionThemeFilter");
+  if(c)c.value="";
+  if(t)t.value="";
+  renderAdminInvestmentOptions();
+}
+
+function renderAdminInvestmentOptions(){
+  const list=window._adminInvestmentOptions||[];
+  const category=document.getElementById("adminOptionCategoryFilter")?.value||"";
+  const theme=document.getElementById("adminOptionThemeFilter")?.value||"";
+  const grid=document.getElementById("adminInvestmentOptionsGrid");
+  if(!grid)return;
+
+  const filtered=list.filter(o=>{
+    const optionCategory=o.category_id===null?"all":String(o.category_id);
+    const optionTheme=o.theme_id===null?"all":String(o.theme_id);
+
+    const categoryMatches=!category || optionCategory===category;
+    const themeMatches=!theme || optionTheme===theme;
+
+    return categoryMatches && themeMatches;
+  });
+
+  if(!filtered.length){
+    grid.innerHTML=`
+      <div class="muted" style="grid-column:1/-1;padding:18px 0">
+        Nenhuma opção corresponde a esses filtros.
+      </div>
+    `;
+    return;
+  }
+
+  const sorted=filtered.slice().sort((a,b)=>{
+    const ca=a.category_name||"Todas as categorias";
+    const cb=b.category_name||"Todas as categorias";
+    const ta=a.theme_name||"Todos os temas";
+    const tb=b.theme_name||"Todos os temas";
     return ca.localeCompare(cb,"pt-BR") || ta.localeCompare(tb,"pt-BR");
   });
 
-  box.innerHTML=`<div class="card">
-    <div class="title-row">
-      <div>
-        <h2>Opções de investimento</h2>
-        <div class="muted">As opções são criadas automaticamente. Você só precisa ajustar a porcentagem de retorno quando quiser.</div>
-      </div>
-      <button class="btn secondary" onclick="loadAdminOptions()">Atualizar lista</button>
-    </div>
+  grid.innerHTML=sorted.map(o=>{
+    const categoryName=o.category_name||"Todas as categorias";
+    const themeName=o.theme_name||"Todos os temas";
+    const rate=Number(o.return_rate||10);
+    const available=o.option_active!==false &&
+      o.category_active!==false &&
+      o.theme_active!==false;
 
-    <div class="notice">
-      <b>Padrão automático: 10%.</b><br>
-      Ao criar um tema ou uma categoria, o sistema monta sozinho:
-      Categoria + cada tema, Categoria + Todos os temas, Tema + Todas as categorias
-      e também Todas as categorias + Todos os temas.
-      A fila continua sendo cronológica entre todos os investimentos compatíveis com a venda.
-    </div>
-
-    <div class="grid" style="margin-top:14px">${sorted.map(o=>{
-      const categoryName=o.category?.name||"Todas as categorias";
-      const themeName=o.theme?.name||"Todos os temas";
-      const dimensionActive=(o.category_id===null||o.category?.active!==false) && (o.theme_id===null||o.theme?.active!==false);
-      return `<div class="item">
+    return `
+      <div class="item">
         <div class="title-row">
-          <h3>${esc(categoryName)}</h3>
-          <span class="badge ${dimensionActive?"green":"red"}">${dimensionActive?"DISPONÍVEL":"DIMENSÃO INATIVA"}</span>
+          <div>
+            <div class="muted" style="font-size:12px">Categoria</div>
+            <h3 style="margin:2px 0 0">${esc(categoryName)}</h3>
+          </div>
+          <span class="badge ${available?"green":"red"}">
+            ${available?"DISPONÍVEL":"INATIVA"}
+          </span>
         </div>
-        <div class="muted"><b>Tema:</b> ${esc(themeName)}</div>
-        <div class="stat-value" style="font-size:24px;margin-top:10px">${Number(o.return_rate||10).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</div>
-        <div class="muted">Retorno-alvo</div>
-        <div class="actions">
-          <button class="btn smallbtn" onclick="openOptionRateForm(${o.id},${JSON.stringify(categoryName+" • "+themeName)},${Number(o.return_rate||10)})">Alterar porcentagem</button>
+
+        <div style="margin-top:10px">
+          <div class="muted" style="font-size:12px">Tema</div>
+          <h3 style="margin:2px 0 0">${esc(themeName)}</h3>
         </div>
-      </div>`;
-    }).join("")||`<div class="muted">Crie pelo menos um tema e uma categoria. As opções serão geradas automaticamente.</div>`}</div>
-  </div>`;
+
+        <div style="
+          margin-top:14px;
+          padding:14px;
+          border-radius:14px;
+          background:#fff0f4;
+          text-align:center
+        ">
+          <div class="muted">Retorno atual</div>
+          <div class="stat-value" style="font-size:30px">
+            ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
+          </div>
+        </div>
+
+        <button
+          class="btn"
+          style="width:100%;margin-top:14px"
+          onclick='openOptionRateForm(${o.id},${JSON.stringify(categoryName+" • "+themeName)},${rate})'
+        >
+          Alterar porcentagem
+        </button>
+      </div>
+    `;
+  }).join("");
 }
 
 function openOptionRateForm(id,label,currentRate){
@@ -1382,20 +1493,44 @@ function openOptionRateForm(id,label,currentRate){
       <h2>Alterar retorno</h2>
       <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
     </div>
-    <div class="notice"><b>${esc(label)}</b></div>
+
+    <div class="notice">
+      <b>${esc(label)}</b>
+    </div>
+
     <label>Retorno-alvo / lucro (%)</label>
-    <input id="optionReturnRate" type="number" min="0.01" max="100" step="0.01" value="${Number(currentRate||10)}">
-    <button class="btn" style="width:100%;margin-top:15px" onclick="saveOptionRate(${id})">Salvar porcentagem</button>
+    <input
+      id="optionReturnRate"
+      type="number"
+      min="0.01"
+      max="100"
+      step="0.01"
+      value="${Number(currentRate||10)}"
+    >
+
+    <button
+      class="btn"
+      style="width:100%;margin-top:15px"
+      onclick="saveOptionRate(${id})"
+    >
+      Salvar porcentagem
+    </button>
   `);
 }
 
 async function saveOptionRate(id){
   const rate=Number(document.getElementById("optionReturnRate").value);
+
   const {error}=await sb.rpc("admin_update_investment_option_rate",{
     p_option_id:id,
     p_return_rate:rate
   });
-  if(error){toast(error.message);return}
+
+  if(error){
+    toast(error.message);
+    return;
+  }
+
   closeModal();
   toast("Porcentagem atualizada.");
   await loadAdminOptions();
