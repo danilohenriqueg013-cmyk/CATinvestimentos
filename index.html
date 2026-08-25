@@ -426,7 +426,7 @@ async function loadAvailableThemes(){
 
   window._availableInvestmentOptions=data||[];
 
-  const categories=[...new Map((data||[]).map(o=>[String(o.category_id),o.category_name])).entries()];
+  const categories=[...new Map((data||[]).map(o=>[o.category_id===null?"all":String(o.category_id),o.category_name])).entries()];
   const themes=[...new Map((data||[]).map(o=>[o.theme_id===null?"all":String(o.theme_id),o.theme_name])).entries()];
 
   box.innerHTML=`
@@ -441,7 +441,7 @@ async function loadAvailableThemes(){
         <div>
           <label>Categoria</label>
           <select id="optionCategoryFilter" onchange="renderAvailableInvestmentOptions()">
-            <option value="">Todas as categorias</option>
+            <option value="">Todas as opções de categoria</option>
             ${categories.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
           </select>
         </div>
@@ -469,7 +469,8 @@ function renderAvailableInvestmentOptions(){
 
   const filtered=list.filter(o=>{
     const optionTheme=o.theme_id===null?"all":String(o.theme_id);
-    return (!category||String(o.category_id)===category) && (!theme||optionTheme===theme);
+    const optionCategory=o.category_id===null?"all":String(o.category_id);
+    return (!category||optionCategory===category) && (!theme||optionTheme===theme);
   });
 
   if(!filtered.length){
@@ -567,7 +568,7 @@ async function loadMyInvestments(){
     const remain=Math.max(0,Number(i.target_amount)-Number(i.sold_amount));
     const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
     const label=i.option
-      ? `${i.option.category?.name||"Categoria"} • ${i.option.theme?.name||"Todos os temas"}`
+      ? `${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`
       : `${i.themes?.name||"Tema"} • investimento antigo`;
 
     return `<div class="card item">
@@ -779,81 +780,79 @@ async function deleteCategory(id){
 
 async function loadAdminOptions(){
   const box=document.getElementById("adminContent");
-  const [{data:options,error},{data:themes},{data:categories}]=await Promise.all([
-    sb.from("investment_options").select("*,category:categories(name),theme:themes(name)").order("created_at",{ascending:false}),
-    sb.from("themes").select("id,name,active").order("name"),
-    sb.from("categories").select("id,name,active").order("name")
-  ]);
+  const {data:options,error}=await sb
+    .from("investment_options")
+    .select("*,category:categories(name,active),theme:themes(name,active)")
+    .order("created_at",{ascending:true});
 
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  window._adminThemes=themes||[];
-  window._adminCategories=categories||[];
+
+  const sorted=(options||[]).slice().sort((a,b)=>{
+    const ca=a.category?.name||"Todas as categorias";
+    const cb=b.category?.name||"Todas as categorias";
+    const ta=a.theme?.name||"Todos os temas";
+    const tb=b.theme?.name||"Todos os temas";
+    return ca.localeCompare(cb,"pt-BR") || ta.localeCompare(tb,"pt-BR");
+  });
 
   box.innerHTML=`<div class="card">
     <div class="title-row">
-      <div><h2>Opções de investimento</h2><div class="muted">Aqui você combina uma categoria com um tema e define a porcentagem daquela combinação.</div></div>
-      <button class="btn" onclick="openOptionForm()">+ Nova opção</button>
+      <div>
+        <h2>Opções de investimento</h2>
+        <div class="muted">As opções são criadas automaticamente. Você só precisa ajustar a porcentagem de retorno quando quiser.</div>
+      </div>
+      <button class="btn secondary" onclick="loadAdminOptions()">Atualizar lista</button>
     </div>
-    <div class="notice"><b>Exemplos:</b> Chaveiros • Todos os temas | Chaveiros • Anime | Brincos • Infantil. A fila é inteligente: uma venda só considera investimentos compatíveis e respeita a ordem de entrada entre eles.</div>
-    <div class="grid" style="margin-top:14px">${(options||[]).map(o=>`<div class="item">
-      <div class="title-row"><h3>${esc(o.category?.name||"Categoria")}</h3><span class="badge ${o.active?"green":"red"}">${o.active?"ATIVA":"INATIVA"}</span></div>
-      <div class="muted"><b>Tema:</b> ${esc(o.theme?.name||"Todos os temas")}</div>
-      <div class="muted" style="margin-top:6px"><b>Retorno-alvo:</b> ${Number(o.return_rate||0).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</div>
-      <div class="muted"><b>Limite:</b> ${o.investor_limit} investidor(es) ou ${money(o.investment_amount_limit)}</div>
-      <div class="actions"><button class="btn smallbtn" onclick='openOptionForm(${JSON.stringify(o).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteOption(${o.id})">Excluir</button></div>
-    </div>`).join("")||`<div class="muted">Nenhuma opção cadastrada. Crie as categorias primeiro e depois monte as combinações.</div>`}</div>
+
+    <div class="notice">
+      <b>Padrão automático: 10%.</b><br>
+      Ao criar um tema ou uma categoria, o sistema monta sozinho:
+      Categoria + cada tema, Categoria + Todos os temas e Tema + Todas as categorias.
+      A fila continua sendo cronológica entre todos os investimentos compatíveis com a venda.
+    </div>
+
+    <div class="grid" style="margin-top:14px">${sorted.map(o=>{
+      const categoryName=o.category?.name||"Todas as categorias";
+      const themeName=o.theme?.name||"Todos os temas";
+      const dimensionActive=(o.category_id===null||o.category?.active!==false) && (o.theme_id===null||o.theme?.active!==false);
+      return `<div class="item">
+        <div class="title-row">
+          <h3>${esc(categoryName)}</h3>
+          <span class="badge ${dimensionActive?"green":"red"}">${dimensionActive?"DISPONÍVEL":"DIMENSÃO INATIVA"}</span>
+        </div>
+        <div class="muted"><b>Tema:</b> ${esc(themeName)}</div>
+        <div class="stat-value" style="font-size:24px;margin-top:10px">${Number(o.return_rate||10).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</div>
+        <div class="muted">Retorno-alvo</div>
+        <div class="actions">
+          <button class="btn smallbtn" onclick="openOptionRateForm(${o.id},${JSON.stringify(categoryName+" • "+themeName)},${Number(o.return_rate||10)})">Alterar porcentagem</button>
+        </div>
+      </div>`;
+    }).join("")||`<div class="muted">Crie pelo menos um tema e uma categoria. As opções serão geradas automaticamente.</div>`}</div>
   </div>`;
 }
 
-function openOptionForm(o=null){
-  const themes=(window._adminThemes||[]).filter(t=>t.active||t.id===o?.theme_id);
-  const categories=(window._adminCategories||[]).filter(c=>c.active||c.id===o?.category_id);
-
-  if(!categories.length){toast("Cadastre pelo menos uma categoria antes de criar uma opção de investimento.");return}
-
-  openModal(`<div class="title-row"><h2>${o?"Editar":"Nova"} opção</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
-    <label>Categoria</label>
-    <select id="optionCategory">${categories.map(c=>`<option value="${c.id}" ${Number(o?.category_id)===Number(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select>
-
-    <label>Tema</label>
-    <select id="optionTheme">
-      <option value="" ${o?.theme_id==null?"selected":""}>Todos os temas</option>
-      ${themes.map(t=>`<option value="${t.id}" ${Number(o?.theme_id)===Number(t.id)?"selected":""}>${esc(t.name)}</option>`).join("")}
-    </select>
-
-    <div class="row">
-      <div><label>Retorno-alvo / lucro (%)</label><input id="optionReturnRate" type="number" min="0.01" max="100" step="0.01" value="${o?.return_rate??settings.target_return_rate??15}"></div>
-      <div><label>Máximo de investidores</label><input id="optionInvestors" type="number" min="1" value="${o?.investor_limit||settings.maximum_investors_per_theme||3}"></div>
+function openOptionRateForm(id,label,currentRate){
+  openModal(`
+    <div class="title-row">
+      <h2>Alterar retorno</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
     </div>
-
-    <label>Limite financeiro total desta combinação</label>
-    <input id="optionAmountLimit" type="number" min="${settings.minimum_investment||10}" step="0.01" value="${o?.investment_amount_limit||100}">
-
-    <label>Status</label><select id="optionActive"><option value="true" ${!o||o.active?"selected":""}>Ativa</option><option value="false" ${o&&!o.active?"selected":""}>Inativa</option></select>
-
-    <div class="notice">Se escolher <b>Todos os temas</b>, vendas desta categoria em Anime, Infantil, Marvel etc. poderão contar para esse investimento. A ordem da fila continuará sendo pela data/hora do investimento.</div>
-    <button class="btn" style="width:100%;margin-top:15px" onclick="saveOption(${o?.id??"null"})">Salvar opção</button>`);
+    <div class="notice"><b>${esc(label)}</b></div>
+    <label>Retorno-alvo / lucro (%)</label>
+    <input id="optionReturnRate" type="number" min="0.01" max="100" step="0.01" value="${Number(currentRate||10)}">
+    <button class="btn" style="width:100%;margin-top:15px" onclick="saveOptionRate(${id})">Salvar porcentagem</button>
+  `);
 }
 
-async function saveOption(id){
-  const themeValue=document.getElementById("optionTheme").value;
-  const {error}=await sb.rpc("admin_save_investment_option",{
-    p_id:id,
-    p_theme_id:themeValue?Number(themeValue):null,
-    p_category_id:Number(document.getElementById("optionCategory").value),
-    p_return_rate:Number(document.getElementById("optionReturnRate").value),
-    p_active:document.getElementById("optionActive").value==="true",
-    p_investor_limit:Number(document.getElementById("optionInvestors").value),
-    p_amount_limit:Number(document.getElementById("optionAmountLimit").value)
+async function saveOptionRate(id){
+  const rate=Number(document.getElementById("optionReturnRate").value);
+  const {error}=await sb.rpc("admin_update_investment_option_rate",{
+    p_option_id:id,
+    p_return_rate:rate
   });
   if(error){toast(error.message);return}
-  closeModal();toast("Opção de investimento salva.");await loadAdminOptions();
-}
-
-async function deleteOption(id){
-  if(!confirm("Excluir esta opção? Se já existir investimento nela, será necessário apenas desativá-la."))return;
-  const {error}=await sb.rpc("admin_delete_investment_option",{p_id:id});
-  if(error){toast(error.message);return}
+  closeModal();
+  toast("Porcentagem atualizada.");
   await loadAdminOptions();
 }
 
@@ -875,11 +874,11 @@ async function loadAdminInvestments(){
       </div>
       ${testMode?`<button class="btn danger" onclick="resetAllTestData()">Limpar TODOS os testes</button>`:""}
     </div>
-    ${testMode?`<div class="notice"><b>Segurança:</b> um investimento individual só pode ser excluído se ainda não recebeu nenhuma venda. Se já recebeu, exclua primeiro as vendas mais recentes relacionadas ou use “Limpar TODOS os testes”.</div>`:""}
+    ${testMode?`<div class="notice"><b>Modo de testes:</b> você pode excluir qualquer investimento de teste. O sistema recalcula automaticamente as filas, vendas atribuídas, retornos e saldos dos registros que permanecerem.</div>`:""}
     <div class="table-wrap"><table class="table"><thead><tr><th>Investidor</th><th>Categoria + Tema</th><th>Investido</th><th>Retorno</th><th>Alvo</th><th>Vendido</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(i=>{
-      const label=i.option?`${i.option.category?.name||"Categoria"} • ${i.option.theme?.name||"Todos os temas"}`:`${i.themes?.name||"Tema"} • legado`;
+      const label=i.option?`${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`:`${i.themes?.name||"Tema"} • legado`;
       const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
-      const canDelete=testMode && Number(i.sold_amount||0)===0 && i.status!=="completed";
+      const canDelete=testMode;
       return `<tr>
         <td>${esc(i.profiles?.name||"-")}<br><span class="muted">${esc(i.profiles?.email||"")}</span></td>
         <td><b>${esc(label)}</b></td>
@@ -889,16 +888,16 @@ async function loadAdminInvestments(){
         <td>${money(i.sold_amount)}</td>
         <td>${i.status}</td>
         <td>${new Date(i.created_at).toLocaleString("pt-BR")}</td>
-        <td>${canDelete?`<button class="btn danger smallbtn" onclick="deleteAdminInvestment(${i.id})">Excluir</button>`:(testMode?`<span class="muted">Exclua vendas antes</span>`:`-`)}</td>
+        <td>${canDelete?`<button class="btn danger smallbtn" onclick="deleteAdminInvestment(${i.id})">Excluir</button>`:"-"}</td>
       </tr>`;
     }).join("")||`<tr><td colspan="9">Nenhum investimento.</td></tr>`}</tbody></table></div></div>`;
 }
 
 async function deleteAdminInvestment(id){
-  if(!confirm("Excluir este investimento de TESTE? O valor investido será devolvido ao saldo do investidor. Esta ação não pode ser desfeita."))return;
+  if(!confirm("Excluir este investimento de TESTE? O sistema vai remover o investimento e recalcular automaticamente as vendas, filas e saldo relacionados. Esta ação não pode ser desfeita."))return;
   const {error}=await sb.rpc("admin_delete_test_investment",{p_investment_id:id});
   if(error){toast(error.message);return}
-  toast("Investimento de teste excluído e valor devolvido ao saldo.");
+  toast("Investimento de teste excluído. Filas, vendas atribuídas e saldos foram recalculados.");
   await loadAdminInvestments();
 }
 
@@ -941,12 +940,12 @@ async function loadAdminSales(){
       <div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div>
       <div><label>Valor da venda</label><input id="saleAmount" type="number" min="0.01" step="0.01"></div>
     </div>
-    <div class="notice"><b>Fila inteligente:</b> o sistema procura o investimento ativo mais antigo que combine com esta categoria e com este tema. Uma opção “Todos os temas” também combina. Investimentos incompatíveis são pulados automaticamente.</div>
+    <div class="notice"><b>Fila inteligente:</b> o sistema procura o investimento ativo mais antigo compatível com a venda. “Todos os temas” aceita qualquer tema e “Todas as categorias” aceita qualquer categoria. Investimentos incompatíveis são pulados automaticamente.</div>
     <button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button>
   </div>
   <div class="card" style="margin-top:14px">
     <div class="title-row">
-      <div><h3>Últimas vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, as vendas devem ser excluídas da mais recente para a mais antiga.":""}</div></div>
+      <div><h3>Últimas vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, qualquer venda pode ser excluída. O sistema recalcula a fila automaticamente.":""}</div></div>
     </div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema</th><th>Categoria</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${(sales||[]).map((s,idx)=>`<tr>
       <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
@@ -954,7 +953,7 @@ async function loadAdminSales(){
       <td>${esc(s.category?.name||"Venda antiga")}</td>
       <td>${esc(s.product_name||"-")}</td>
       <td><b>${money(s.amount)}</b></td>
-      <td>${settings.test_mode!==false?(idx===0?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:`<span class="muted">Exclua as mais novas primeiro</span>`):"-"}</td>
+      <td>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:"-"}</td>
     </tr>`).join("")||`<tr><td colspan="6">Nenhuma venda.</td></tr>`}</tbody></table></div>
   </div>`;
 }
@@ -978,12 +977,12 @@ async function saveSale(){
 }
 
 async function deleteAdminSale(id){
-  if(!confirm("Excluir esta venda de TESTE? O sistema desfará a caixinha e o progresso que esta venda distribuiu. Esta ação não pode ser desfeita."))return;
+  if(!confirm("Excluir esta venda de TESTE? O sistema vai apagar a venda e recalcular automaticamente caixinhas, filas, progresso e retornos. Esta ação não pode ser desfeita."))return;
 
   const {error}=await sb.rpc("admin_delete_test_sale",{p_sale_id:id});
   if(error){toast(error.message);return}
 
-  toast("Venda de teste excluída e efeitos desfeitos.");
+  toast("Venda de teste excluída. Caixinhas, filas, progresso e saldos foram recalculados.");
   await loadAdminSales();
 }
 
@@ -1004,9 +1003,9 @@ async function loadAdminQueues(){
 
   box.innerHTML=`<div class="card">
     <div class="title-row"><div><h2>Fila inteligente</h2><span class="muted">Ordem cronológica geral dos investimentos ativos</span></div></div>
-    <div class="notice">Na hora de registrar uma venda, o sistema começa pelo investimento mais antigo, mas <b>pula automaticamente</b> qualquer um que não combine com a categoria e o tema vendidos. Por isso alguém que entrou depois pode receber antes se os anteriores não forem elegíveis para aquela venda.</div>
+    <div class="notice">Na hora de registrar uma venda, o sistema começa pelo investimento compatível mais antigo. “Todos os temas” combina com qualquer tema e “Todas as categorias” combina com qualquer categoria. Investimentos incompatíveis são pulados automaticamente.</div>
     <div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Ordem</th><th>Horário</th><th>Investidor</th><th>Escopo</th><th>Progresso</th></tr></thead><tbody>${(data||[]).map((i,idx)=>{
-      const label=i.option?`${i.option.category?.name||"Categoria"} • ${i.option.theme?.name||"Todos os temas"}`:`${i.themes?.name||"Tema"} • todas as categorias (legado)`;
+      const label=i.option?`${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`:`${i.themes?.name||"Tema"} • todas as categorias (legado)`;
       return `<tr><td><b>${idx+1}º</b></td><td>${new Date(i.created_at).toLocaleString("pt-BR")}</td><td>${esc(i.profiles?.name||"-")}</td><td>${esc(label)}</td><td>${money(i.sold_amount)} / ${money(i.target_amount)}</td></tr>`;
     }).join("")||`<tr><td colspan="5">Nenhum investimento ativo.</td></tr>`}</tbody></table></div>
   </div>`;
