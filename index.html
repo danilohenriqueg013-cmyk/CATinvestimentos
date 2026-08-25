@@ -1,1078 +1,279 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>CATinvestimentos | Cat Encantus</title>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: Arial, sans-serif;
-      background: #fff8fa;
-      color: #5f3545;
-      min-height: 100vh;
-    }
-
-    header {
-      background: #f7dfe6;
-      padding: 18px 25px;
-      border-bottom: 1px solid #eccbd5;
-    }
-
-    .header-content {
-      max-width: 1150px;
-      margin: auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .brand {
-      font-size: 28px;
-      font-weight: bold;
-      color: #a44365;
-    }
-
-    .store-name {
-      font-size: 13px;
-      color: #815262;
-      margin-top: 3px;
-    }
-
-    .logout {
-      width: auto;
-      margin: 0;
-      padding: 10px 18px;
-    }
-
-    main {
-      width: min(1150px, 92%);
-      margin: 45px auto;
-    }
-
-    .hero {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-
-    .hero h1 {
-      font-size: 38px;
-      color: #963c5c;
-      margin-bottom: 10px;
-    }
-
-    .hero p {
-      color: #76515e;
-      line-height: 1.6;
-    }
-
-    .card {
-      background: white;
-      border-radius: 18px;
-      border: 1px solid #f0d8e0;
-      box-shadow: 0 8px 25px rgba(120,63,84,.10);
-      padding: 25px;
-    }
-
-    .login-card {
-      max-width: 430px;
-      margin: auto;
-    }
-
-    .login-card h2 {
-      text-align: center;
-      color: #963c5c;
-      margin-bottom: 24px;
-    }
-
-    label {
-      display: block;
-      margin: 14px 0 7px;
-      font-weight: bold;
-      font-size: 14px;
-    }
-
-    input {
-      width: 100%;
-      padding: 13px;
-      border: 1px solid #dfc4ce;
-      border-radius: 10px;
-      font-size: 15px;
-    }
-
-    button {
-      border: none;
-      border-radius: 10px;
-      background: #a94366;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      padding: 13px 16px;
-    }
-
-    button:hover {
-      background: #913653;
-    }
-
-    .login-button {
-      width: 100%;
-      margin-top: 22px;
-    }
-
-    .notice {
-      margin-top: 25px;
-      background: #fff0f4;
-      border-radius: 12px;
-      padding: 17px;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .error {
-      color: #a32645;
-      margin-top: 15px;
-      text-align: center;
-      font-size: 14px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .dashboard-header {
-      margin-bottom: 28px;
-    }
-
-    .dashboard-header h1 {
-      color: #963c5c;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin: 25px 0;
-    }
-
-    .stat-title {
-      color: #87606e;
-      font-size: 13px;
-    }
-
-    .stat-value {
-      font-size: 28px;
-      font-weight: bold;
-      color: #963c5c;
-      margin-top: 7px;
-    }
-
-    .section-title {
-      margin: 32px 0 15px;
-      color: #7c304d;
-    }
-
-    .investments {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-    }
-
-    .progress {
-      height: 10px;
-      background: #f3dfe6;
-      border-radius: 20px;
-      overflow: hidden;
-      margin: 13px 0;
-    }
-
-    .progress-bar {
-      height: 100%;
-      background: #b64f73;
-    }
-
-    .small {
-      font-size: 13px;
-      color: #85616e;
-      line-height: 1.6;
-    }
-
-    .admin-menu {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      gap: 14px;
-      margin-top: 25px;
-    }
-
-    .admin-item {
-      text-align: center;
-      padding: 25px 15px;
-      background: white;
-      border: 1px solid #efd6df;
-      border-radius: 15px;
-      font-weight: bold;
-      color: #8d3857;
-      min-height: 108px;
-    }
-
-    .admin-item:hover {
-      background: #fff0f4;
-      color: #963c5c;
-    }
-
-    #adminSection {
-      margin-top: 25px;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 70px 20px;
-    }
-
-    footer {
-      text-align: center;
-      padding: 30px;
-      color: #98717f;
-      font-size: 12px;
-    }
-
-    @media (max-width: 600px) {
-      .hero h1 {
-        font-size: 29px;
-      }
-
-      .brand {
-        font-size: 22px;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CATinvestimentos | Cat Encantus</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--primary:#a94366;--secondary:#f7dfe6;--bg:#fff8fa;--text:#5f3545;--border:#efd6df;--muted:#85616e}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+header{background:var(--secondary);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.header{max-width:1180px;margin:auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand-wrap{display:flex;align-items:center;gap:12px}.logo{width:52px;height:52px;border-radius:50%;object-fit:cover;background:white}
+.brand{font-weight:800;font-size:25px;color:var(--primary)}.store{font-size:12px;color:var(--muted)}
+.btn{border:0;border-radius:11px;padding:11px 15px;background:var(--primary);color:white;font-weight:700}.btn.secondary{background:white;color:var(--primary);border:1px solid var(--border)}
+.btn.danger{background:#a32645}.btn.success{background:#25734b}.btn.smallbtn{padding:8px 11px;font-size:12px}
+main{max-width:1180px;margin:32px auto;padding:0 20px}.card{background:white;border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:0 8px 24px rgba(120,63,84,.07)}
+.hero{text-align:center;margin:40px 0}.hero h1{font-size:38px;color:var(--primary);margin:0 0 10px}.muted{color:var(--muted);font-size:13px;line-height:1.55}
+.login{max-width:430px;margin:auto}.login h2{text-align:center;color:var(--primary)}
+label{display:block;margin:12px 0 6px;font-weight:700;font-size:13px}input,select,textarea{width:100%;border:1px solid #dfc4ce;border-radius:10px;padding:11px;background:white;color:var(--text)}
+textarea{min-height:80px;resize:vertical}.msg{margin-top:12px;font-size:13px}.error{color:#a32645}.ok{color:#25734b}
+.notice{margin-top:18px;background:#fff0f4;border-radius:12px;padding:14px;font-size:12px;line-height:1.6}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}.title-row h1,.title-row h2{margin:0;color:var(--primary)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:20px 0}.stat-value{font-size:27px;font-weight:800;color:var(--primary);margin-top:6px}
+.admin-menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}.admin-item{min-height:100px;background:white;color:var(--primary);border:1px solid var(--border);border-radius:15px;font-weight:800}
+.admin-item:hover{background:#fff0f4}.section{margin-top:22px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.item{border:1px solid var(--border);border-radius:14px;padding:16px;background:#fffafb}.item h3{margin:0 0 7px;color:var(--primary)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.progress{height:10px;background:#f3dfe6;border-radius:20px;overflow:hidden;margin:10px 0}.progress>div{height:100%;background:var(--primary)}
+.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;min-width:720px}.table th,.table td{text-align:left;padding:10px;border-bottom:1px solid #f1e1e6;font-size:13px;vertical-align:top}.table th{color:var(--primary)}
+.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;background:#f4dfe6;color:var(--primary)}.badge.green{background:#e1f4e9;color:#25734b}.badge.red{background:#f8e1e6;color:#a32645}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}.modal-card{background:white;width:min(560px,100%);max-height:90vh;overflow:auto;border-radius:18px;padding:22px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tab{background:white;color:var(--primary);border:1px solid var(--border);border-radius:999px;padding:8px 12px}.tab.active{background:var(--primary);color:white}
+footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
+@media(max-width:700px){.row,.row3{grid-template-columns:1fr}.hero h1{font-size:29px}.brand{font-size:21px}.header{padding:10px 14px}}
+</style>
 </head>
-
 <body>
-
 <header>
-  <div class="header-content">
-    <div>
-      <div class="brand">CATinvestimentos</div>
-      <div class="store-name">Cat Encantus • Produtos Personalizados</div>
+  <div class="header">
+    <div class="brand-wrap">
+      <img id="brandLogo" class="logo" src="logo.png" alt="Cat Encantus" onerror="this.style.display='none'">
+      <div><div id="brandName" class="brand">CATinvestimentos</div><div id="storeName" class="store">Cat Encantus • Produtos Personalizados</div></div>
     </div>
-
-    <button
-      id="logoutButton"
-      class="logout hidden"
-      onclick="logout()">
-      Sair
-    </button>
+    <button id="logoutBtn" class="btn hidden" onclick="logout()">Sair</button>
   </div>
 </header>
 
 <main>
+<section id="loginArea">
+  <div class="hero"><h1>Invista nos temas que você acredita.</h1><p class="muted">Acompanhe saldo, investimentos, vendas atribuídas e retorno-alvo em um só lugar.</p></div>
+  <div class="card login">
+    <h2>Área do Investidor</h2>
+    <label>E-mail</label><input id="email" type="email" autocomplete="email">
+    <label>Senha</label><input id="password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') login()">
+    <button class="btn" style="width:100%;margin-top:18px" onclick="login()">Entrar</button>
+    <div id="loginMsg" class="msg"></div>
+    <div class="notice"><b>Importante:</b> retorno-alvo não significa retorno imediato. O prazo depende das vendas elegíveis do tema e pode variar.</div>
+  </div>
+</section>
 
-  <!-- LOGIN -->
-  <section id="loginArea">
+<section id="loadingArea" class="hidden" style="text-align:center;padding:70px"><h2>Carregando CATinvestimentos...</h2></section>
 
-    <div class="hero">
-      <h1>Invista nos temas que você acredita.</h1>
+<section id="investorArea" class="hidden">
+  <div class="title-row"><div><h1 id="helloInvestor">Olá!</h1><div class="muted">Sua área no CATinvestimentos</div></div></div>
+  <div class="stats">
+    <div class="card"><div class="muted">Saldo disponível</div><div id="investorBalance" class="stat-value">R$ 0,00</div></div>
+    <div class="card"><div class="muted">Retorno-alvo</div><div id="returnRate" class="stat-value">15%</div></div>
+    <div class="card"><div class="muted">Depósito mínimo</div><div id="minimumDeposit" class="stat-value">R$ 40,00</div></div>
+  </div>
+  <div class="title-row"><h2>Temas disponíveis</h2></div>
+  <div id="availableThemes" class="grid"></div>
+  <div class="title-row" style="margin-top:28px"><h2>Meus investimentos</h2></div>
+  <div id="myInvestments" class="grid"></div>
+  <div class="title-row" style="margin-top:28px"><h2>Movimentações e saques</h2><button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button></div>
+  <div id="myTransactions" class="card table-wrap"></div>
+  <div class="title-row" style="margin-top:28px"><h2>Notificações</h2></div>
+  <div id="myNotifications"></div>
+</section>
 
-      <p>
-        Acompanhe seus investimentos, o progresso das vendas
-        e seu retorno-alvo de forma simples.
-      </p>
-    </div>
-
-    <div class="card login-card">
-
-      <h2>Área do Investidor</h2>
-
-      <label for="email">E-mail</label>
-      <input
-        id="email"
-        type="email"
-        placeholder="Digite seu e-mail">
-
-      <label for="password">Senha</label>
-      <input
-        id="password"
-        type="password"
-        placeholder="Digite sua senha">
-
-      <button
-        class="login-button"
-        onclick="login()">
-        Entrar
-      </button>
-
-      <div id="loginMessage" class="error"></div>
-
-      <div class="notice">
-        <strong>Importante:</strong><br><br>
-        Os investimentos possuem retorno-alvo de 15%.
-        O prazo depende das vendas relacionadas ao tema e
-        não existe garantia de retorno imediato.
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- CARREGANDO -->
-  <section id="loadingArea" class="hidden loading">
-    <h2>Carregando CATinvestimentos...</h2>
-  </section>
-
-
-  <!-- INVESTIDOR -->
-  <section id="investorArea" class="hidden">
-
-    <div class="dashboard-header">
-      <h1 id="investorWelcome">Olá!</h1>
-      <p>Acompanhe seus investimentos.</p>
-    </div>
-
-    <div class="stats">
-
-      <div class="card">
-        <div class="stat-title">Saldo disponível</div>
-        <div id="investorBalance" class="stat-value">
-          R$ 0,00
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="stat-title">Retorno-alvo</div>
-        <div class="stat-value">15%</div>
-      </div>
-
-      <div class="card">
-        <div class="stat-title">Depósito mínimo</div>
-        <div class="stat-value">R$ 40</div>
-      </div>
-
-    </div>
-
-    <h2 class="section-title">
-      Meus investimentos
-    </h2>
-
-    <div id="investmentsList" class="investments"></div>
-
-    <h2 class="section-title">
-      Notificações
-    </h2>
-
-    <div id="notificationsList"></div>
-
-  </section>
-
-
-  <!-- ADMIN -->
-  <section id="adminArea" class="hidden">
-
-    <div class="dashboard-header">
-      <h1>Painel Administrativo</h1>
-      <p>CATinvestimentos • Cat Encantus</p>
-    </div>
-
-    <div class="stats">
-      <div class="card">
-        <div class="stat-title">Administrador</div>
-        <div class="stat-value">Ativo</div>
-      </div>
-    </div>
-
-    <div class="admin-menu">
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('investors')">
-        👥<br><br>
-        Investidores
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('themes')">
-        🎨<br><br>
-        Temas
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('investments')">
-        💰<br><br>
-        Investimentos
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('sales')">
-        🧾<br><br>
-        Registrar Venda
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('cashboxes')">
-        📦<br><br>
-        Caixinhas
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('queues')">
-        🔄<br><br>
-        Filas
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('deposits')">
-        ➕<br><br>
-        Depósitos
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('withdrawals')">
-        💸<br><br>
-        Saques
-      </button>
-
-      <button
-        class="admin-item"
-        onclick="openAdminSection('settings')">
-        ⚙️<br><br>
-        Configurações
-      </button>
-
-    </div>
-
-    <div
-      id="adminSection"
-      class="card hidden">
-    </div>
-
-  </section>
-
+<section id="adminArea" class="hidden">
+  <div class="title-row"><div><h1>Painel Administrativo</h1><div class="muted">Cat Encantus • controle exclusivo do administrador</div></div></div>
+  <div class="admin-menu">
+    <button class="admin-item" onclick="adminSection('investors')">👥<br><br>Investidores</button>
+    <button class="admin-item" onclick="adminSection('themes')">🎨<br><br>Temas</button>
+    <button class="admin-item" onclick="adminSection('investments')">💰<br><br>Investimentos</button>
+    <button class="admin-item" onclick="adminSection('sales')">🧾<br><br>Registrar Venda</button>
+    <button class="admin-item" onclick="adminSection('cashboxes')">📦<br><br>Caixinhas</button>
+    <button class="admin-item" onclick="adminSection('queues')">🔄<br><br>Filas</button>
+    <button class="admin-item" onclick="adminSection('deposits')">➕<br><br>Depósitos</button>
+    <button class="admin-item" onclick="adminSection('withdrawals')">💸<br><br>Saques</button>
+    <button class="admin-item" onclick="adminSection('settings')">⚙️<br><br>Configurações</button>
+  </div>
+  <div id="adminContent" class="section"></div>
+</section>
 </main>
 
-<footer>
-  CATinvestimentos • Cat Encantus
-</footer>
-
+<footer>CATinvestimentos • Cat Encantus</footer>
+<div id="modal" class="modal hidden"></div>
 
 <script>
+const SUPABASE_URL="https://gjjzddsuqphahfjjgkda.supabase.co";
+const SUPABASE_KEY="sb_publishable_VuPY2hFbsEcftj37cVnXbQ__wM0Ulfc";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let currentProfile=null, settings={target_return_rate:15,minimum_deposit:40,minimum_investment:10,maximum_investment:100,maximum_investors_per_theme:3};
 
-const SUPABASE_URL =
-  "https://gjjzddsuqphahfjjgkda.supabase.co";
+const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0));
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+function hideAll(){["loginArea","loadingArea","investorArea","adminArea"].forEach(id=>document.getElementById(id).classList.add("hidden"))}
+function show(id){hideAll();document.getElementById(id).classList.remove("hidden")}
+function openModal(html){const m=document.getElementById("modal");m.innerHTML=`<div class="modal-card">${html}</div>`;m.classList.remove("hidden")}
+function closeModal(){document.getElementById("modal").classList.add("hidden");document.getElementById("modal").innerHTML=""}
+function toast(msg){alert(msg)}
+async function loadSettings(){
+  const {data}=await sb.from("platform_settings").select("*").order("id").limit(1).maybeSingle();
+  if(data){settings=data;document.documentElement.style.setProperty("--primary",data.primary_color||"#a94366");document.documentElement.style.setProperty("--secondary",data.secondary_color||"#f7dfe6");document.getElementById("brandName").textContent=data.platform_name||"CATinvestimentos";document.getElementById("storeName").textContent=(data.store_name||"Cat Encantus")+" • Produtos Personalizados";if(data.logo_url)document.getElementById("brandLogo").src=data.logo_url}
+}
+async function login(){
+  const msg=document.getElementById("loginMsg"),email=document.getElementById("email").value.trim(),password=document.getElementById("password").value;
+  if(!email||!password){msg.className="msg error";msg.textContent="Digite e-mail e senha.";return}
+  msg.textContent="Entrando...";
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error){msg.className="msg error";msg.textContent="E-mail ou senha incorretos.";return}
+  msg.textContent="";await loadUser();
+}
+async function logout(){await sb.auth.signOut();currentProfile=null;document.getElementById("logoutBtn").classList.add("hidden");show("loginArea")}
+async function loadUser(){
+  show("loadingArea");
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){show("loginArea");return}
+  const {data:profile,error}=await sb.from("profiles").select("*").eq("id",user.id).single();
+  if(error||!profile){toast("Não foi possível carregar seu perfil: "+(error?.message||"perfil não encontrado"));await logout();return}
+  currentProfile=profile;document.getElementById("logoutBtn").classList.remove("hidden");
+  await loadSettings();
+  if(profile.role==="admin"){show("adminArea");adminSection("themes")}else{show("investorArea");await loadInvestorDashboard()}
+}
+async function loadInvestorDashboard(){
+  document.getElementById("helloInvestor").textContent="Olá, "+currentProfile.name+"!";
+  document.getElementById("investorBalance").textContent=money(currentProfile.balance);
+  document.getElementById("returnRate").textContent=(settings.target_return_rate||15)+"%";
+  document.getElementById("minimumDeposit").textContent=money(settings.minimum_deposit||40);
+  await Promise.all([loadAvailableThemes(),loadMyInvestments(),loadMyTransactions(),loadMyNotifications()]);
+}
+async function refreshProfile(){const {data}=await sb.from("profiles").select("*").eq("id",currentProfile.id).single();if(data)currentProfile=data}
 
-const SUPABASE_KEY =
-  "sb_publishable_VuPY2hFbsEcftj37cVnXbQ__wM0Ulfc";
+async function loadAvailableThemes(){
+  const box=document.getElementById("availableThemes");
+  const {data,error}=await sb.rpc("get_available_themes");
+  if(error){box.innerHTML=`<div class="card error">Erro: ${esc(error.message)}</div>`;return}
+  if(!data?.length){box.innerHTML=`<div class="card muted">Nenhum tema disponível no momento.</div>`;return}
+  box.innerHTML=data.map(t=>`<div class="card item"><h3>${esc(t.name)}</h3><div class="muted">${esc(t.description||"Sem descrição")}</div><button class="btn" style="margin-top:14px" onclick="openInvestment(${t.id},'${esc(t.name).replace(/'/g,"&#39;")}')">Investir</button></div>`).join("");
+}
+function openInvestment(id,name){
+  openModal(`<div class="title-row"><h2>Investir em ${name}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+  <label>Valor do investimento</label><input id="investmentAmount" type="number" min="${settings.minimum_investment||10}" max="${settings.maximum_investment||100}" step="0.01">
+  <div class="notice">Mínimo: ${money(settings.minimum_investment||10)} • Máximo: ${money(settings.maximum_investment||100)} • Retorno-alvo: ${settings.target_return_rate||15}%</div>
+  <button class="btn" style="width:100%;margin-top:15px" onclick="makeInvestment(${id})">Confirmar investimento</button>`);
+}
+async function makeInvestment(themeId){
+  const amount=Number(document.getElementById("investmentAmount").value);
+  const {error}=await sb.rpc("make_investment",{p_theme_id:themeId,p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();toast("Investimento registrado!");await refreshProfile();await loadInvestorDashboard();
+}
+async function loadMyInvestments(){
+  const box=document.getElementById("myInvestments");
+  const {data,error}=await sb.from("investments").select("id,invested_amount,target_amount,sold_amount,status,created_at,themes(name)").order("created_at",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  if(!data?.length){box.innerHTML=`<div class="card muted">Você ainda não possui investimentos.</div>`;return}
+  box.innerHTML=data.map(i=>{const pct=Math.min(100,Number(i.sold_amount)/Number(i.target_amount)*100),remain=Math.max(0,Number(i.target_amount)-Number(i.sold_amount));return `<div class="card item"><div class="title-row"><h3>${esc(i.themes?.name||"Tema")}</h3><span class="badge ${i.status==="completed"?"green":""}">${i.status==="completed"?"CONCLUÍDO":"EM ANDAMENTO"}</span></div><div class="muted">Investido: <b>${money(i.invested_amount)}</b><br>Lucro-alvo: <b>${money(Number(i.target_amount)-Number(i.invested_amount))}</b><br>Valor final: <b>${money(i.target_amount)}</b></div><div class="progress"><div style="width:${pct}%"></div></div><div class="muted">Vendido: <b>${money(i.sold_amount)}</b><br>Falta: <b>${money(remain)}</b></div></div>`}).join("");
+}
+async function loadMyTransactions(){
+  const box=document.getElementById("myTransactions");
+  const {data,error}=await sb.from("transactions").select("*").order("created_at",{ascending:false}).limit(30);
+  if(error){box.innerHTML=`<div class="error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<table class="table"><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>${(data||[]).map(t=>`<tr><td>${new Date(t.created_at).toLocaleString("pt-BR")}</td><td>${esc(t.description||t.type)}</td><td><b>${money(t.amount)}</b></td></tr>`).join("")||`<tr><td colspan="3">Nenhuma movimentação.</td></tr>`}</tbody></table>`;
+}
+async function loadMyNotifications(){
+  const box=document.getElementById("myNotifications");
+  const {data,error}=await sb.from("notifications").select("*").order("created_at",{ascending:false}).limit(20);
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=(data||[]).map(n=>`<div class="card" style="margin-bottom:10px"><b>${esc(n.title)}</b><div class="muted" style="margin-top:5px">${esc(n.message)}</div><div class="muted" style="margin-top:6px">${new Date(n.created_at).toLocaleString("pt-BR")}</div></div>`).join("")||`<div class="card muted">Nenhuma notificação.</div>`;
+}
+function openWithdrawal(){openModal(`<div class="title-row"><h2>Solicitar saque</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="muted">Saldo disponível: <b>${money(currentProfile.balance)}</b></div><label>Valor</label><input id="withdrawAmount" type="number" min="0.01" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="requestWithdrawal()">Solicitar</button>`)}
+async function requestWithdrawal(){const amount=Number(document.getElementById("withdrawAmount").value);const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saque solicitado.");await refreshProfile();await loadInvestorDashboard()}
 
-const supabaseClient =
-  supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
-
-
-function money(value) {
-  return new Intl.NumberFormat(
-    "pt-BR",
-    {
-      style: "currency",
-      currency: "BRL"
-    }
-  ).format(Number(value || 0));
+async function adminSection(section){
+  const box=document.getElementById("adminContent");box.innerHTML=`<div class="card">Carregando...</div>`;
+  if(section==="investors")return loadAdminInvestors();
+  if(section==="themes")return loadAdminThemes();
+  if(section==="investments")return loadAdminInvestments();
+  if(section==="sales")return loadAdminSales();
+  if(section==="cashboxes")return loadAdminCashboxes();
+  if(section==="queues")return loadAdminQueues();
+  if(section==="deposits")return loadAdminDeposits();
+  if(section==="withdrawals")return loadAdminWithdrawals();
+  if(section==="settings")return loadAdminSettings();
 }
 
-
-async function login() {
-
-  const email =
-    document.getElementById("email").value.trim();
-
-  const password =
-    document.getElementById("password").value;
-
-  const message =
-    document.getElementById("loginMessage");
-
-  if (!email || !password) {
-    message.textContent =
-      "Digite seu e-mail e sua senha.";
-    return;
-  }
-
-  message.textContent = "Entrando...";
-
-  const { error } =
-    await supabaseClient.auth.signInWithPassword({
-      email: email,
-      password: password
-    });
-
-  if (error) {
-    console.error(error);
-
-    message.textContent =
-      "E-mail ou senha incorretos.";
-
-    return;
-  }
-
-  message.textContent = "";
-
-  await loadUser();
+async function loadAdminInvestors(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("profiles").select("*").eq("role","investor").order("created_at",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Investidores</h2><span class="muted">Para criar um novo login hoje: Supabase → Authentication → Users. O perfil será criado automaticamente.</span></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Contato</th><th>PIX</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(data||[]).map(p=>`<tr><td><b>${esc(p.name)}</b><br><span class="muted">${esc(p.email)}</span></td><td>${esc(p.phone||"-")}</td><td>${esc(p.pix||"-")}</td><td><b>${money(p.balance)}</b></td><td><span class="badge ${p.status==="active"?"green":"red"}">${p.status==="active"?"ATIVO":"BLOQUEADO"}</span></td><td><div class="actions"><button class="btn smallbtn" onclick='openInvestorEdit(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Editar</button><button class="btn secondary smallbtn" onclick="openDeposit('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Adicionar saldo</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum investidor.</td></tr>`}</tbody></table></div></div>`;
 }
-
-
-async function loadUser() {
-
-  showLoading();
-
-  const {
-    data: { user },
-    error: userError
-  } =
-    await supabaseClient.auth.getUser();
-
-  if (userError) {
-    console.error(userError);
-  }
-
-  if (!user) {
-    showLogin();
-    return;
-  }
-
-  const {
-    data: profile,
-    error: profileError
-  } =
-    await supabaseClient
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-  if (profileError) {
-    console.error(
-      "Erro ao carregar perfil:",
-      profileError
-    );
-
-    alert(
-      "Não foi possível carregar o perfil. Erro: " +
-      profileError.message
-    );
-
-    await logout();
-    return;
-  }
-
-  if (!profile) {
-    alert(
-      "Seu usuário existe, mas o perfil não foi encontrado."
-    );
-
-    await logout();
-    return;
-  }
-
-  document
-    .getElementById("logoutButton")
-    .classList.remove("hidden");
-
-  if (profile.role === "admin") {
-    showAdmin();
-  } else {
-    await showInvestor(profile);
-  }
+function openInvestorEdit(p){
+  openModal(`<div class="title-row"><h2>Editar investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Nome</label><input id="editInvName" value="${esc(p.name)}"><label>Telefone</label><input id="editInvPhone" value="${esc(p.phone||"")}"><label>PIX</label><input id="editInvPix" value="${esc(p.pix||"")}"><label>Status</label><select id="editInvStatus"><option value="active" ${p.status==="active"?"selected":""}>Ativo</option><option value="blocked" ${p.status==="blocked"?"selected":""}>Bloqueado</option></select><button class="btn" style="width:100%;margin-top:15px" onclick="saveInvestor('${p.id}')">Salvar</button>`);
 }
+async function saveInvestor(id){const {error}=await sb.rpc("admin_update_investor",{p_investor_id:id,p_name:document.getElementById("editInvName").value,p_phone:document.getElementById("editInvPhone").value,p_pix:document.getElementById("editInvPix").value,p_status:document.getElementById("editInvStatus").value});if(error){toast(error.message);return}closeModal();await loadAdminInvestors()}
+function openDeposit(id,name){openModal(`<div class="title-row"><h2>Adicionar saldo — ${name}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Valor recebido via PIX</label><input id="depositAmount" type="number" min="${settings.minimum_deposit||40}" step="0.01"><div class="notice">Depósito mínimo: ${money(settings.minimum_deposit||40)}</div><button class="btn" style="width:100%;margin-top:15px" onclick="saveDeposit('${id}')">Confirmar depósito</button>`)}
+async function saveDeposit(id){const amount=Number(document.getElementById("depositAmount").value);const {error}=await sb.rpc("admin_add_deposit",{p_investor_id:id,p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saldo adicionado.");await loadAdminInvestors()}
 
-
-async function openAdminSection(section) {
-
-  const box =
-    document.getElementById("adminSection");
-
-  const titles = {
-    investors: "Investidores",
-    themes: "Temas",
-    investments: "Investimentos",
-    sales: "Registrar Venda",
-    cashboxes: "Caixinhas",
-    queues: "Filas",
-    deposits: "Depósitos",
-    withdrawals: "Saques",
-    settings: "Configurações"
-  };
-
-  box.classList.remove("hidden");
-
-  box.innerHTML = `
-    <h2 style="color:#963c5c; margin-bottom:15px;">
-      ${titles[section]}
-    </h2>
-
-    <p class="small">
-      Carregando...
-    </p>
-  `;
-
-  if (section === "themes") {
-    await loadAdminThemes();
-  } else {
-    box.innerHTML = `
-      <h2 style="color:#963c5c; margin-bottom:15px;">
-        ${titles[section]}
-      </h2>
-
-      <p class="small">
-        Essa seção será configurada em seguida.
-      </p>
-    `;
-  }
-
-  box.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
+async function loadAdminThemes(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("themes").select("*").order("name");
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Temas</h2><button class="btn" onclick="openThemeForm()">+ Novo tema</button></div><div class="grid">${(data||[]).map(t=>`<div class="item"><div class="title-row"><h3>${esc(t.name)}</h3><span class="badge ${t.active?"green":"red"}">${t.active?"ATIVO":"INATIVO"}</span></div><div class="muted">${esc(t.description||"Sem descrição")}</div><div class="muted" style="margin-top:10px">Limite: ${t.investor_limit} investidor(es) ou ${money(t.investment_amount_limit)}</div><div class="actions"><button class="btn smallbtn" onclick='openThemeForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteTheme(${t.id})">Excluir</button></div></div>`).join("")||`<div class="muted">Nenhum tema cadastrado.</div>`}</div></div>`;
 }
-async function loadAdminThemes() {
-
-  const box =
-    document.getElementById("adminSection");
-
-  const {
-    data,
-    error
-  } =
-    await supabaseClient
-      .from("themes")
-      .select(`
-        id,
-        name,
-        description,
-        active,
-        investor_limit,
-        investment_amount_limit,
-        created_at
-      `)
-      .order("name", {
-        ascending: true
-      });
-
-  if (error) {
-
-    console.error(error);
-
-    box.innerHTML = `
-      <h2 style="color:#963c5c;">
-        Temas
-      </h2>
-
-      <p class="error">
-        Erro ao carregar os temas:
-        ${error.message}
-      </p>
-    `;
-
-    return;
-  }
-
-  let html = `
-    <h2 style="color:#963c5c; margin-bottom:20px;">
-      Temas
-    </h2>
-  `;
-
-  if (!data || data.length === 0) {
-
-    html += `
-      <p class="small">
-        Nenhum tema cadastrado.
-      </p>
-    `;
-
-    box.innerHTML = html;
-
-    return;
-  }
-
-  data.forEach(theme => {
-
-    html += `
-      <div
-        style="
-          border:1px solid #efd6df;
-          border-radius:14px;
-          padding:18px;
-          margin-bottom:12px;
-          background:#fffafb;
-        "
-      >
-
-        <div style="
-          display:flex;
-          justify-content:space-between;
-          gap:15px;
-          align-items:center;
-          flex-wrap:wrap;
-        ">
-
-          <div>
-
-            <h3 style="color:#8d3857;">
-              ${theme.name}
-            </h3>
-
-            <p class="small" style="margin-top:6px;">
-              ${theme.description || "Sem descrição"}
-            </p>
-
-          </div>
-
-          <strong
-            style="
-              color:${theme.active ? "#25734b" : "#a32645"};
-            "
-          >
-            ${theme.active ? "ATIVO" : "INATIVO"}
-          </strong>
-
-        </div>
-
-        <div class="small" style="margin-top:15px;">
-
-          Limite de investidores:
-          <strong>${theme.investor_limit}</strong>
-
-          <br>
-
-          Limite de investimento no tema:
-          <strong>${money(theme.investment_amount_limit)}</strong>
-
-        </div>
-
-      </div>
-    `;
-  });
-
-  box.innerHTML = html;
+function openThemeForm(t=null){
+  openModal(`<div class="title-row"><h2>${t?"Editar":"Novo"} tema</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Nome</label><input id="themeName" value="${esc(t?.name||"")}"><label>Descrição</label><textarea id="themeDescription">${esc(t?.description||"")}</textarea><label>URL da imagem (opcional)</label><input id="themeImage" value="${esc(t?.image_url||"")}"><div class="row"><div><label>Máximo de investidores</label><input id="themeInvestors" type="number" min="1" value="${t?.investor_limit||settings.maximum_investors_per_theme||3}"></div><div><label>Limite financeiro</label><input id="themeLimit" type="number" min="10" step="0.01" value="${t?.investment_amount_limit||100}"></div></div><label>Status</label><select id="themeActive"><option value="true" ${!t||t.active?"selected":""}>Ativo</option><option value="false" ${t&&!t.active?"selected":""}>Inativo</option></select><button class="btn" style="width:100%;margin-top:15px" onclick="saveTheme(${t?.id??"null"})">Salvar tema</button>`);
 }
+async function saveTheme(id){const {error}=await sb.rpc("admin_save_theme",{p_id:id,p_name:document.getElementById("themeName").value,p_description:document.getElementById("themeDescription").value,p_image_url:document.getElementById("themeImage").value,p_active:document.getElementById("themeActive").value==="true",p_investor_limit:Number(document.getElementById("themeInvestors").value),p_amount_limit:Number(document.getElementById("themeLimit").value)});if(error){toast(error.message);return}closeModal();await loadAdminThemes()}
+async function deleteTheme(id){if(!confirm("Excluir este tema? Se já houver histórico, o sistema pedirá para desativá-lo."))return;const {error}=await sb.rpc("admin_delete_theme",{p_id:id});if(error){toast(error.message);return}await loadAdminThemes()}
 
-async function showInvestor(profile) {
-
-  hideAll();
-
-  document
-    .getElementById("investorArea")
-    .classList.remove("hidden");
-
-  document.getElementById(
-    "investorWelcome"
-  ).textContent =
-    "Olá, " + profile.name + "!";
-
-  document.getElementById(
-    "investorBalance"
-  ).textContent =
-    money(profile.balance);
-
-  await loadInvestments();
-  await loadNotifications();
+async function loadAdminInvestments(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("investments").select("*,profiles(name,email),themes(name)").order("created_at",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Investimentos</h2></div><div class="table-wrap"><table class="table"><thead><tr><th>Investidor</th><th>Tema</th><th>Investido</th><th>Alvo</th><th>Vendido</th><th>Status</th><th>Data</th></tr></thead><tbody>${(data||[]).map(i=>`<tr><td>${esc(i.profiles?.name||"-")}<br><span class="muted">${esc(i.profiles?.email||"")}</span></td><td>${esc(i.themes?.name||"-")}</td><td>${money(i.invested_amount)}</td><td>${money(i.target_amount)}</td><td>${money(i.sold_amount)}</td><td>${i.status}</td><td>${new Date(i.created_at).toLocaleString("pt-BR")}</td></tr>`).join("")||`<tr><td colspan="7">Nenhum investimento.</td></tr>`}</tbody></table></div></div>`;
 }
-
-
-async function loadInvestments() {
-
-  const container =
-    document.getElementById(
-      "investmentsList"
-    );
-
-  const {
-    data,
-    error
-  } =
-    await supabaseClient
-      .from("investments")
-      .select(`
-        id,
-        invested_amount,
-        target_amount,
-        sold_amount,
-        status,
-        created_at,
-        themes (
-          name
-        )
-      `)
-      .order(
-        "created_at",
-        { ascending: false }
-      );
-
-  if (error) {
-    console.error(error);
-
-    container.innerHTML =
-      "<div class='card'>Não foi possível carregar os investimentos.</div>";
-
-    return;
-  }
-
-  if (!data || data.length === 0) {
-
-    container.innerHTML =
-      "<div class='card'>Você ainda não possui investimentos.</div>";
-
-    return;
-  }
-
-  container.innerHTML = "";
-
-  data.forEach(item => {
-
-    const percentage =
-      Math.min(
-        100,
-        (
-          Number(item.sold_amount)
-          /
-          Number(item.target_amount)
-        ) * 100
-      );
-
-    const remaining =
-      Math.max(
-        0,
-        Number(item.target_amount)
-        -
-        Number(item.sold_amount)
-      );
-
-    const card =
-      document.createElement("div");
-
-    card.className = "card";
-
-    card.innerHTML = `
-      <h3>
-        ${item.themes?.name || "Tema"}
-      </h3>
-
-      <br>
-
-      <div class="small">
-
-        Valor investido:
-        <strong>
-          ${money(item.invested_amount)}
-        </strong>
-
-        <br>
-
-        Retorno-alvo:
-        <strong>
-          ${money(
-            Number(item.target_amount)
-            -
-            Number(item.invested_amount)
-          )}
-        </strong>
-
-        <br>
-
-        Valor final:
-        <strong>
-          ${money(item.target_amount)}
-        </strong>
-
-      </div>
-
-      <div class="progress">
-        <div
-          class="progress-bar"
-          style="width:${percentage}%">
-        </div>
-      </div>
-
-      <div class="small">
-
-        Vendido:
-        <strong>
-          ${money(item.sold_amount)}
-        </strong>
-
-        <br>
-
-        Falta:
-        <strong>
-          ${money(remaining)}
-        </strong>
-
-        <br><br>
-
-        Status:
-        <strong>
-          ${
-            item.status === "completed"
-            ? "Concluído"
-            : "Em andamento"
-          }
-        </strong>
-
-      </div>
-    `;
-
-    container.appendChild(card);
-
-  });
+async function loadAdminSales(){
+  const box=document.getElementById("adminContent");
+  const [{data:themes},{data:sales}]=await Promise.all([sb.from("themes").select("id,name").order("name"),sb.from("sales").select("*,themes(name)").order("sold_at",{ascending:false}).limit(30)]);
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Registrar Venda</h2></div><div class="row3"><div><label>Tema</label><select id="saleTheme">${(themes||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div><div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div><div><label>Valor</label><input id="saleAmount" type="number" min="0.01" step="0.01"></div></div><button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button></div><div class="card" style="margin-top:14px"><h3>Últimas vendas</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema</th><th>Produto</th><th>Valor</th></tr></thead><tbody>${(sales||[]).map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="4">Nenhuma venda.</td></tr>`}</tbody></table></div></div>`;
 }
+async function saveSale(){const theme=Number(document.getElementById("saleTheme").value),amount=Number(document.getElementById("saleAmount").value),product=document.getElementById("saleProduct").value;const {error}=await sb.rpc("register_sale",{p_theme_id:theme,p_amount:amount,p_product_name:product});if(error){toast(error.message);return}toast("Venda registrada e distribuída pela fila.");await loadAdminSales()}
 
-
-async function loadNotifications() {
-
-  const container =
-    document.getElementById(
-      "notificationsList"
-    );
-
-  const {
-    data,
-    error
-  } =
-    await supabaseClient
-      .from("notifications")
-      .select("*")
-      .order(
-        "created_at",
-        { ascending: false }
-      )
-      .limit(10);
-
-  if (error) {
-    console.error(error);
-
-    container.innerHTML =
-      "<div class='card'>Não foi possível carregar as notificações.</div>";
-
-    return;
-  }
-
-  if (!data || data.length === 0) {
-
-    container.innerHTML =
-      "<div class='card'>Nenhuma notificação.</div>";
-
-    return;
-  }
-
-  container.innerHTML = "";
-
-  data.forEach(notification => {
-
-    const div =
-      document.createElement("div");
-
-    div.className = "card";
-    div.style.marginBottom = "12px";
-
-    div.innerHTML = `
-      <strong>
-        ${notification.title}
-      </strong>
-
-      <br><br>
-
-      <div class="small">
-        ${notification.message}
-      </div>
-    `;
-
-    container.appendChild(div);
-
-  });
+async function loadAdminCashboxes(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("theme_cashboxes").select("*,themes(name)").order("balance",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Caixinhas</h2><span class="muted">Visível somente para o administrador</span></div><div class="grid">${(data||[]).map(c=>`<div class="item"><h3>${esc(c.themes?.name||"Tema")}</h3><div class="stat-value">${money(c.balance)}</div><div class="muted">Total de vendas registradas na caixinha</div></div>`).join("")||`<div class="muted">Nenhuma caixinha ainda.</div>`}</div></div>`;
 }
-
-
-function showAdmin() {
-
-  hideAll();
-
-  document
-    .getElementById("adminArea")
-    .classList.remove("hidden");
+async function loadAdminQueues(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("investments").select("*,profiles(name),themes(name)").eq("status","active").order("created_at",{ascending:true});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  const groups={};(data||[]).forEach(i=>{const n=i.themes?.name||"Tema";(groups[n]??=[]).push(i)});
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Filas por tema</h2><span class="muted">Exclusivo do administrador</span></div>${Object.entries(groups).map(([theme,list])=>`<div class="item" style="margin-bottom:12px"><h3>${esc(theme)}</h3>${list.map((i,idx)=>`<div class="muted" style="padding:8px 0;border-bottom:1px solid #f1e1e6"><b>${idx+1}º ${esc(i.profiles?.name||"-")}</b> — ${money(i.sold_amount)} / ${money(i.target_amount)}</div>`).join("")}</div>`).join("")||`<div class="muted">Nenhuma fila ativa.</div>`}</div>`;
 }
-
-
-async function logout() {
-
-  await supabaseClient.auth.signOut();
-
-  document
-    .getElementById("logoutButton")
-    .classList.add("hidden");
-
-  showLogin();
+async function loadAdminDeposits(){
+  const box=document.getElementById("adminContent");
+  const [{data:deps,error},{data:investors}]=await Promise.all([sb.from("deposits").select("*,profiles(name,email)").order("created_at",{ascending:false}).limit(50),sb.from("profiles").select("id,name").eq("role","investor").eq("status","active").order("name")]);
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Depósitos</h2><button class="btn" onclick="openDepositSelector()">+ Confirmar depósito</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Investidor</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(deps||[]).map(d=>`<tr><td>${new Date(d.created_at).toLocaleString("pt-BR")}</td><td>${esc(d.profiles?.name||"-")}</td><td>${money(d.amount)}</td><td>${d.status}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum depósito.</td></tr>`}</tbody></table></div></div>`;window._activeInvestors=investors||[];
 }
+function openDepositSelector(){const inv=window._activeInvestors||[];openModal(`<div class="title-row"><h2>Confirmar depósito</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Investidor</label><select id="depInvestor">${inv.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("")}</select><label>Valor</label><input id="depAmount" type="number" min="${settings.minimum_deposit||40}" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="saveDepositFromSection()">Confirmar</button>`)}
+async function saveDepositFromSection(){const id=document.getElementById("depInvestor").value,amount=Number(document.getElementById("depAmount").value);const {error}=await sb.rpc("admin_add_deposit",{p_investor_id:id,p_amount:amount});if(error){toast(error.message);return}closeModal();await loadAdminDeposits()}
 
-
-function hideAll() {
-
-  document
-    .getElementById("loginArea")
-    .classList.add("hidden");
-
-  document
-    .getElementById("loadingArea")
-    .classList.add("hidden");
-
-  document
-    .getElementById("investorArea")
-    .classList.add("hidden");
-
-  document
-    .getElementById("adminArea")
-    .classList.add("hidden");
+async function loadAdminWithdrawals(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("withdrawals").select("*,profiles(name,email)").order("created_at",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Saques</h2></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Investidor</th><th>PIX</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(w=>`<tr><td>${new Date(w.created_at).toLocaleString("pt-BR")}</td><td>${esc(w.profiles?.name||"-")}</td><td>${esc(w.pix||"-")}</td><td><b>${money(w.amount)}</b></td><td>${w.status}</td><td>${w.status==="pending"?`<div class="actions"><button class="btn success smallbtn" onclick="processWithdrawal(${w.id},'paid')">Pago</button><button class="btn danger smallbtn" onclick="processWithdrawal(${w.id},'rejected')">Rejeitar</button></div>`:"-"}</td></tr>`).join("")||`<tr><td colspan="6">Nenhum saque.</td></tr>`}</tbody></table></div></div>`;
 }
+async function processWithdrawal(id,status){if(!confirm(status==="paid"?"Confirmar que o PIX foi pago?":"Rejeitar e devolver o valor ao saldo?"))return;const {error}=await sb.rpc("admin_process_withdrawal",{p_withdrawal_id:id,p_status:status});if(error){toast(error.message);return}await loadAdminWithdrawals()}
 
-
-function showLoading() {
-
-  hideAll();
-
-  document
-    .getElementById("loadingArea")
-    .classList.remove("hidden");
+async function loadAdminSettings(){
+  const box=document.getElementById("adminContent");
+  await loadSettings();
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Configurações</h2></div><div class="row"><div><label>Nome da plataforma</label><input id="setPlatform" value="${esc(settings.platform_name||"CATinvestimentos")}"></div><div><label>Nome da loja</label><input id="setStore" value="${esc(settings.store_name||"Cat Encantus")}"></div></div><label>URL da logo (opcional; se vazio usa logo.png)</label><input id="setLogo" value="${esc(settings.logo_url||"")}"><div class="row"><div><label>Cor principal</label><input id="setPrimary" type="color" value="${settings.primary_color||"#a94366"}"></div><div><label>Cor secundária</label><input id="setSecondary" type="color" value="${settings.secondary_color||"#f7dfe6"}"></div></div><div class="row3"><div><label>Retorno-alvo (%)</label><input id="setReturn" type="number" step="0.01" value="${settings.target_return_rate||15}"></div><div><label>Depósito mínimo</label><input id="setMinDeposit" type="number" step="0.01" value="${settings.minimum_deposit||40}"></div><div><label>Investimento mínimo</label><input id="setMinInvest" type="number" step="0.01" value="${settings.minimum_investment||10}"></div></div><div class="row"><div><label>Investimento máximo</label><input id="setMaxInvest" type="number" step="0.01" value="${settings.maximum_investment||100}"></div><div><label>Máximo padrão de investidores</label><input id="setMaxPeople" type="number" value="${settings.maximum_investors_per_theme||3}"></div></div><button class="btn" style="margin-top:15px" onclick="saveSettings()">Salvar configurações</button></div>`;
 }
+async function saveSettings(){const args={p_platform_name:document.getElementById("setPlatform").value,p_store_name:document.getElementById("setStore").value,p_logo_url:document.getElementById("setLogo").value,p_primary_color:document.getElementById("setPrimary").value,p_secondary_color:document.getElementById("setSecondary").value,p_return_rate:Number(document.getElementById("setReturn").value),p_minimum_deposit:Number(document.getElementById("setMinDeposit").value),p_minimum_investment:Number(document.getElementById("setMinInvest").value),p_maximum_investment:Number(document.getElementById("setMaxInvest").value),p_maximum_investors:Number(document.getElementById("setMaxPeople").value)};const {error}=await sb.rpc("admin_update_settings",args);if(error){toast(error.message);return}await loadSettings();toast("Configurações salvas.");await loadAdminSettings()}
 
-
-function showLogin() {
-
-  hideAll();
-
-  document
-    .getElementById("loginArea")
-    .classList.remove("hidden");
-}
-
-
-loadUser();
-
+(async()=>{await loadSettings();await loadUser()})();
 </script>
-
 </body>
 </html>
