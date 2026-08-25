@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#a94366">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CATinvestimentos">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>CATinvestimentos | Cat Encantus</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -64,7 +70,13 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
 <section id="loadingArea" class="hidden" style="text-align:center;padding:70px"><h2>Carregando CATinvestimentos...</h2></section>
 
 <section id="investorArea" class="hidden">
-  <div class="title-row"><div><h1 id="helloInvestor">Olá!</h1><div class="muted">Sua área no CATinvestimentos</div></div></div>
+  <div class="title-row">
+    <div><h1 id="helloInvestor">Olá!</h1><div class="muted">Sua área no CATinvestimentos</div></div>
+    <div class="actions" style="margin-top:0">
+      <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">🛍️ Catálogo da loja</a>
+      <button class="btn secondary" onclick="installCATApp()">📱 Instalar no celular</button>
+    </div>
+  </div>
   <div class="stats">
     <div class="card"><div class="muted">Saldo disponível</div><div id="investorBalance" class="stat-value">R$ 0,00</div></div>
     <div class="card"><div class="muted">Retorno-alvo</div><div id="returnRate" class="stat-value">Por opção</div></div>
@@ -340,7 +352,10 @@ function renderAvailableInvestmentOptions(){
       </div>
       <div class="muted"><b>Tema:</b> ${esc(o.theme_name)}</div>
       <div class="notice" style="margin-top:12px">Retorno-alvo desta combinação: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b></div>
-      <button class="btn" style="margin-top:14px" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
+      <div class="actions" style="margin-top:14px">
+        <button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
+        <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ver catálogo</a>
+      </div>
     </div>`;
   }).join("");
 }
@@ -353,7 +368,10 @@ function openInvestmentOption(id,label,returnRate){
     Mínimo: ${money(settings.minimum_investment||10)} • Máximo por investimento: ${money(settings.maximum_investment||100)}<br>
     Retorno-alvo desta combinação: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
   </div>
-  <button class="btn" style="width:100%;margin-top:15px" onclick="makeInvestment(${id})">Confirmar investimento</button>`);
+  <div class="actions" style="margin-top:15px">
+    <button class="btn" style="flex:1" onclick="makeInvestment(${id})">Confirmar investimento</button>
+    <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none;flex:1;text-align:center">Ver catálogo</a>
+  </div>`);
 }
 
 async function makeInvestment(optionId){
@@ -1127,6 +1145,87 @@ async function saveSettings(){
   await loadSettings();
   toast("Configurações salvas.");
   await loadAdminSettings();
+}
+
+
+let deferredInstallPrompt=null;
+
+window.addEventListener("beforeinstallprompt",(event)=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+});
+
+window.addEventListener("appinstalled",()=>{
+  deferredInstallPrompt=null;
+  toast("CATinvestimentos instalado no celular.");
+});
+
+function isStandaloneApp(){
+  return window.matchMedia("(display-mode: standalone)").matches ||
+         window.navigator.standalone===true;
+}
+
+function showInstallInstructions(){
+  const ua=navigator.userAgent||"";
+  const isIOS=/iPad|iPhone|iPod/.test(ua);
+  const isSamsung=/SamsungBrowser/i.test(ua);
+
+  let instructions="";
+  if(isIOS){
+    instructions=`No iPhone/iPad:<br><br>
+      1. Abra este site no <b>Safari</b>.<br>
+      2. Toque em <b>Compartilhar</b>.<br>
+      3. Escolha <b>Adicionar à Tela de Início</b>.<br>
+      4. Confirme em <b>Adicionar</b>.`;
+  }else if(isSamsung){
+    instructions=`No Samsung Internet:<br><br>
+      1. Toque no menu do navegador.<br>
+      2. Procure <b>Adicionar página a</b> ou <b>Instalar aplicativo</b>.<br>
+      3. Escolha <b>Tela inicial</b> e confirme.<br><br>
+      Se aparecer a opção <b>Instalar</b> na barra do navegador, você também pode usá-la.`;
+  }else{
+    instructions=`No Android:<br><br>
+      1. Abra o menu do navegador.<br>
+      2. Procure <b>Instalar app</b>, <b>Adicionar à tela inicial</b> ou opção semelhante.<br>
+      3. Confirme a instalação.<br><br>
+      Se a opção ainda não aparecer, atualize a página e tente novamente.`;
+  }
+
+  openModal(`
+    <div class="title-row">
+      <h2>Instalar CATinvestimentos</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+    <div class="notice">${instructions}</div>
+    <div class="muted" style="margin-top:12px">
+      O aplicativo continua usando internet para login, saldo, investimentos e atualizações.
+    </div>
+  `);
+}
+
+async function installCATApp(){
+  if(isStandaloneApp()){
+    toast("O CATinvestimentos já está instalado neste aparelho.");
+    return;
+  }
+
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    const result=await deferredInstallPrompt.userChoice;
+    if(result.outcome==="accepted") toast("Instalação iniciada.");
+    deferredInstallPrompt=null;
+    return;
+  }
+
+  showInstallInstructions();
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
+      console.warn("Service Worker não registrado:",err);
+    });
+  });
 }
 
 (async()=>{await loadSettings();await loadUser()})();
