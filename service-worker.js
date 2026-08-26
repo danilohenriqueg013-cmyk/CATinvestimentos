@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v22-admin-batch-rates-1";
+const CACHE_NAME="catinvestimentos-v25-admin-action-emails-1";
 const APP_SHELL=[
   "./",
   "./index.html",

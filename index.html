@@ -648,7 +648,23 @@ async function loadUser(){
   if(error||!profile){toast("Não foi possível carregar seu perfil: "+(error?.message||"perfil não encontrado"));await logout();return}
   currentProfile=profile;document.getElementById("logoutBtn").classList.remove("hidden");
   await loadSettings();
-  if(profile.role==="admin"){show("adminArea");adminSection("themes")}else{show("investorArea");await loadInvestorDashboard()}
+  if(profile.role==="admin"){
+    show("adminArea");
+    adminSection("themes");
+  }else{
+    show("investorArea");
+
+    // Avisa o administrador somente no PRIMEIRO acesso confirmado deste investidor.
+    // A função no banco garante que atualizações/reloads futuros não criem avisos duplicados.
+    try{
+      const {error:firstLoginError}=await sb.rpc("notify_admin_first_login");
+      if(firstLoginError)console.warn("Aviso de primeiro acesso não enviado:",firstLoginError.message);
+    }catch(e){
+      console.warn("Aviso de primeiro acesso não enviado:",e);
+    }
+
+    await loadInvestorDashboard();
+  }
 }
 async function loadInvestorDashboard(){
   document.getElementById("helloInvestor").textContent="Olá, "+currentProfile.name+"!";
