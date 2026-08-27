@@ -212,6 +212,30 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
   .investor-item{min-height:82px;font-size:13px}
 }
 
+/* ===== V26: HISTÓRICO 360, CAIXINHAS DETALHADAS E PUSH ===== */
+.modal-card.wide{width:min(1120px,100%)}
+.investor-name-link{background:none;border:0;padding:0;color:var(--primary);font-weight:800;text-align:left;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.investor-name-link:hover{opacity:.75}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+.metric-box{border:1px solid var(--border);background:#fffafb;border-radius:14px;padding:14px}
+.metric-box .metric-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.metric-box .metric-value{font-size:22px;color:var(--primary);font-weight:800;margin-top:5px}
+.history-section{margin-top:22px}.history-section h3{margin:0 0 10px;color:var(--primary)}
+.cashbox-value-btn{background:none;border:0;padding:0;color:var(--primary);font-size:27px;font-weight:800;text-align:left;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+.cashbox-value-btn:hover{opacity:.72}
+.cashbox-breakdown-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #f1e1e6}
+.cashbox-breakdown-row:last-child{border-bottom:0}
+.header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+#pushBtn.push-on{background:#25734b;border-color:#25734b;color:#fff}
+#pushBtn{white-space:nowrap}
+.withdraw-window{margin-top:12px}
+@media(max-width:700px){
+  .modal-card.wide{width:100%;padding:16px}
+  .metric-grid{grid-template-columns:repeat(2,1fr)}
+  #pushBtn{font-size:11px;padding:8px 9px}
+  .header-actions{gap:6px}
+}
+
 </style>
 </head>
 <body>
@@ -221,7 +245,10 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
       <img id="brandLogo" class="logo" src="logo.png" alt="Cat Encantus" onerror="this.style.display='none'">
       <div><div id="brandName" class="brand">CATinvestimentos</div><div id="storeName" class="store">Cat Encantus • Produtos Personalizados</div></div>
     </div>
-    <button id="logoutBtn" class="btn hidden" onclick="logout()">Sair</button>
+    <div class="header-actions">
+      <button id="pushBtn" class="btn secondary hidden" onclick="enablePushNotifications()">🔔 Ativar alertas</button>
+      <button id="logoutBtn" class="btn hidden" onclick="logout()">Sair</button>
+    </div>
   </div>
 </header>
 
@@ -373,9 +400,104 @@ const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 function hideAll(){["loginArea","loadingArea","investorArea","adminArea"].forEach(id=>document.getElementById(id).classList.add("hidden"))}
 function show(id){hideAll();document.getElementById(id).classList.remove("hidden")}
-function openModal(html){const m=document.getElementById("modal");m.innerHTML=`<div class="modal-card">${html}</div>`;m.classList.remove("hidden")}
+function openModal(html,wide=false){const m=document.getElementById("modal");m.innerHTML=`<div class="modal-card${wide?" wide":""}">${html}</div>`;m.classList.remove("hidden")}
 function closeModal(){document.getElementById("modal").classList.add("hidden");document.getElementById("modal").innerHTML=""}
 function toast(msg){alert(msg)}
+
+
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
+async function refreshPushButton(){
+  const btn=document.getElementById("pushBtn");
+  if(!btn||!currentProfile){return}
+  btn.classList.remove("hidden","push-on");
+
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+    btn.textContent="🔕 Alertas não suportados";
+    btn.disabled=true;
+    return;
+  }
+
+  if(!settings.push_vapid_public_key){
+    btn.textContent="🔔 Alertas em configuração";
+    btn.disabled=true;
+    return;
+  }
+
+  if(Notification.permission==="denied"){
+    btn.textContent="🔕 Alertas bloqueados";
+    btn.disabled=false;
+    return;
+  }
+
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(Notification.permission==="granted"&&sub){
+      btn.textContent="🔔 Alertas ativos";
+      btn.classList.add("push-on");
+      btn.disabled=false;
+      return;
+    }
+  }catch(e){console.warn("Status push:",e)}
+
+  btn.textContent="🔔 Ativar alertas";
+  btn.disabled=false;
+}
+
+async function enablePushNotifications(){
+  if(!currentProfile)return;
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+    toast("Este navegador não suporta notificações push.");
+    return;
+  }
+  if(!settings.push_vapid_public_key){
+    toast("As notificações do celular ainda não foram finalizadas pelo administrador.");
+    return;
+  }
+  if(Notification.permission==="denied"){
+    toast("As notificações estão bloqueadas neste navegador. Abra as permissões do site no celular e permita notificações. No iPhone, o CATinvestimentos precisa estar adicionado à Tela de Início.");
+    return;
+  }
+
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){
+      toast("Permissão de notificações não concedida.");
+      await refreshPushButton();
+      return;
+    }
+
+    const reg=await navigator.serviceWorker.ready;
+    let subscription=await reg.pushManager.getSubscription();
+    if(!subscription){
+      subscription=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(settings.push_vapid_public_key)
+      });
+    }
+
+    const json=subscription.toJSON();
+    const {error}=await sb.rpc("save_push_subscription",{
+      p_endpoint:subscription.endpoint,
+      p_p256dh:json.keys?.p256dh||"",
+      p_auth:json.keys?.auth||"",
+      p_user_agent:navigator.userAgent||""
+    });
+    if(error)throw error;
+
+    toast("Notificações ativadas neste aparelho. A partir de agora os avisos também podem aparecer na barra do celular.");
+    await refreshPushButton();
+  }catch(e){
+    console.error("Push subscription error:",e);
+    toast("Não foi possível ativar as notificações: "+(e?.message||e));
+  }
+}
 
 function openSignup(){
   openModal(`
@@ -639,7 +761,7 @@ async function login(){
   msg.textContent="";
   await loadUser();
 }
-async function logout(){await sb.auth.signOut();currentProfile=null;document.getElementById("logoutBtn").classList.add("hidden");show("loginArea")}
+async function logout(){await sb.auth.signOut();currentProfile=null;document.getElementById("logoutBtn").classList.add("hidden");document.getElementById("pushBtn")?.classList.add("hidden");show("loginArea")}
 async function loadUser(){
   show("loadingArea");
   const {data:{user}}=await sb.auth.getUser();
@@ -648,6 +770,7 @@ async function loadUser(){
   if(error||!profile){toast("Não foi possível carregar seu perfil: "+(error?.message||"perfil não encontrado"));await logout();return}
   currentProfile=profile;document.getElementById("logoutBtn").classList.remove("hidden");
   await loadSettings();
+  await refreshPushButton();
   if(profile.role==="admin"){
     show("adminArea");
     adminSection("themes");
@@ -1222,8 +1345,24 @@ async function requestDeposit(){
   await loadMyTransactions();
 }
 
-function openWithdrawal(){openModal(`<div class="title-row"><h2>Solicitar saque</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="muted">Saldo disponível: <b>${money(currentProfile.balance)}</b></div><label>Valor</label><input id="withdrawAmount" type="number" min="0.01" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="requestWithdrawal()">Solicitar</button>`)}
-async function requestWithdrawal(){const amount=Number(document.getElementById("withdrawAmount").value);const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saque solicitado.");await refreshInvestorSummary();await investorSection("transactions")}
+function withdrawalDayBR(){
+  return Number(new Intl.DateTimeFormat("pt-BR",{day:"2-digit",timeZone:"America/Sao_Paulo"}).format(new Date()));
+}
+function openWithdrawal(){
+  const day=withdrawalDayBR();
+  const allowed=day>=1&&day<=5;
+  openModal(`<div class="title-row"><h2>Solicitar saque</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="muted">Saldo disponível para saque: <b>${money(currentProfile.balance)}</b></div>
+    <div class="notice withdraw-window"><b>Janela de saques:</b> as solicitações podem ser feitas somente do dia <b>01 ao dia 05</b> de cada mês.</div>
+    <div class="notice"><b>Importante:</b> somente o dinheiro que está no seu <b>saldo disponível</b> pode ser sacado. Valores que estão em investimentos ativos não podem ser retirados.</div>
+    ${allowed?`<label>Valor</label><input id="withdrawAmount" type="number" min="0.01" max="${Number(currentProfile.balance||0)}" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="requestWithdrawal()">Solicitar saque</button>`:`<div class="msg error" style="margin-top:16px"><b>Solicitações fechadas hoje.</b><br>Volte entre os dias 01 e 05 do próximo mês.</div>`}`)
+}
+async function requestWithdrawal(){
+  const amount=Number(document.getElementById("withdrawAmount")?.value);
+  const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();toast("Saque solicitado.");await refreshInvestorSummary();await investorSection("transactions")
+}
 
 async function adminSection(section){
   const box=document.getElementById("adminContent");box.innerHTML=`<div class="card">Carregando...</div>`;
@@ -1245,7 +1384,108 @@ async function loadAdminInvestors(){
   const box=document.getElementById("adminContent");
   const {data,error}=await sb.from("profiles").select("*").eq("role","investor").order("created_at",{ascending:false});
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><h2>Investidores</h2><span class="muted">Para criar um novo login hoje: Supabase → Authentication → Users. O perfil será criado automaticamente.</span></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Contato</th><th>PIX</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(data||[]).map(p=>`<tr><td><b>${esc(p.name)}</b><br><span class="muted">${esc(p.email)}</span></td><td>${esc(p.phone||"-")}</td><td>${esc(p.pix||"-")}</td><td><b>${money(p.balance)}</b></td><td><span class="badge ${p.status==="active"?"green":"red"}">${p.status==="active"?"ATIVO":"BLOQUEADO"}</span></td><td><div class="actions"><button class="btn smallbtn" onclick='openInvestorEdit(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Editar</button><button class="btn secondary smallbtn" onclick="openDeposit('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Adicionar saldo</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum investidor.</td></tr>`}</tbody></table></div></div>`;
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Investidores</h2><span class="muted">Clique no nome ou em “Ver histórico” para abrir a visão completa da vida do investidor na CATinvestimentos.</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Contato</th><th>PIX</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(data||[]).map(p=>`<tr><td><button class="investor-name-link" onclick="openInvestorHistory('${p.id}')">${esc(p.name)}</button><br><span class="muted">${esc(p.email)}</span></td><td>${esc(p.phone||"-")}</td><td>${esc(p.pix||"-")}</td><td><b>${money(p.balance)}</b></td><td><span class="badge ${p.status==="active"?"green":"red"}">${p.status==="active"?"ATIVO":"BLOQUEADO"}</span></td><td><div class="actions"><button class="btn smallbtn" onclick="openInvestorHistory('${p.id}')">Ver histórico</button><button class="btn secondary smallbtn" onclick='openInvestorEdit(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Editar</button><button class="btn secondary smallbtn" onclick="openDeposit('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Adicionar saldo</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum investidor.</td></tr>`}</tbody></table></div></div>`;
+}
+
+function investorOptionLabel(i){
+  if(i.option)return `${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`;
+  return `${i.themes?.name||"Tema"} • legado`;
+}
+
+async function openInvestorHistory(id){
+  openModal(`<div class="title-row"><h2>Histórico do investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando todas as informações...</div>`,true);
+
+  const [profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes]=await Promise.all([
+    sb.from("profiles").select("*").eq("id",id).single(),
+    sb.from("deposits").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("withdrawals").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("investments").select(`*,themes(name),option:investment_options(id,return_rate,category:categories(name),theme:themes(name))`).eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("transactions").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("notifications").select("*").eq("investor_id",id).order("created_at",{ascending:false})
+  ]);
+
+  const firstError=[profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes].find(r=>r.error)?.error;
+  if(firstError){openModal(`<div class="title-row"><h2>Histórico do investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="msg error">${esc(firstError.message)}</div>`,true);return}
+
+  const p=profileRes.data;
+  const deposits=depositsRes.data||[];
+  const withdrawals=withdrawalsRes.data||[];
+  const investments=investmentsRes.data||[];
+  const transactions=transactionsRes.data||[];
+  const notifications=notificationsRes.data||[];
+
+  let allocations=[];
+  let salesById={};
+  const investmentIds=investments.map(i=>i.id);
+  if(investmentIds.length){
+    const allocRes=await sb.from("sale_allocations").select("*").in("investment_id",investmentIds).order("created_at",{ascending:false});
+    if(!allocRes.error){
+      allocations=allocRes.data||[];
+      const saleIds=[...new Set(allocations.map(a=>a.sale_id))];
+      if(saleIds.length){
+        const salesRes=await sb.from("sales").select("*,themes(name),category:categories(name)").in("id",saleIds);
+        if(!salesRes.error)salesById=Object.fromEntries((salesRes.data||[]).map(s=>[s.id,s]));
+      }
+    }
+  }
+
+  const validInvestments=investments.filter(i=>i.status!=="cancelled");
+  const active=validInvestments.filter(i=>i.status==="active");
+  const completed=validInvestments.filter(i=>i.status==="completed");
+  const totalDeposited=deposits.filter(d=>d.status==="confirmed").reduce((s,d)=>s+Number(d.amount||0),0);
+  const totalInvested=validInvestments.reduce((s,i)=>s+Number(i.invested_amount||0),0);
+  const activeInvested=active.reduce((s,i)=>s+Number(i.invested_amount||0),0);
+  const totalProfit=completed.reduce((s,i)=>s+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+  const totalReturnReleased=completed.reduce((s,i)=>s+Number(i.target_amount||0),0);
+  const totalWithdrawn=withdrawals.filter(w=>w.status==="paid").reduce((s,w)=>s+Number(w.amount||0),0);
+  const pendingWithdrawal=withdrawals.filter(w=>w.status==="pending").reduce((s,w)=>s+Number(w.amount||0),0);
+  const allocatedTotal=allocations.reduce((s,a)=>s+Number(a.amount||0),0);
+
+  const byOption={};
+  validInvestments.forEach(i=>{
+    const label=investorOptionLabel(i);
+    if(!byOption[label])byOption[label]={count:0,invested:0,target:0,credited:0,profit:0};
+    byOption[label].count++;
+    byOption[label].invested+=Number(i.invested_amount||0);
+    byOption[label].target+=Number(i.target_amount||0);
+    byOption[label].credited+=Number(i.sold_amount||0);
+    if(i.status==="completed")byOption[label].profit+=Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0));
+  });
+
+  const statusText=s=>({pending:"Pendente",confirmed:"Confirmado",rejected:"Rejeitado",paid:"Pago",active:"Ativo",completed:"Concluído",cancelled:"Cancelado"}[s]||s||"-");
+  const dt=v=>v?new Date(v).toLocaleString("pt-BR"):"-";
+
+  openModal(`
+    <div class="title-row"><div><h2>${esc(p.name||"Investidor")}</h2><div class="muted">Visão 360° da vida deste investidor na CATinvestimentos</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+
+    <div class="item"><b>Cadastro</b><div class="grid" style="margin-top:10px"><div><span class="muted">E-mail</span><br>${esc(p.email||"-")}</div><div><span class="muted">Telefone</span><br>${esc(p.phone||"-")}</div><div><span class="muted">PIX</span><br>${esc(p.pix||"-")}</div><div><span class="muted">Status</span><br>${statusText(p.status)}</div><div><span class="muted">Cadastro</span><br>${dt(p.created_at)}</div><div><span class="muted">Primeiro acesso registrado</span><br>${dt(p.admin_first_login_notified_at)}</div></div></div>
+
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Saldo disponível hoje</div><div class="metric-value">${money(p.balance)}</div></div>
+      <div class="metric-box"><div class="metric-label">Total depositado confirmado</div><div class="metric-value">${money(totalDeposited)}</div></div>
+      <div class="metric-box"><div class="metric-label">Total investido histórico</div><div class="metric-value">${money(totalInvested)}</div></div>
+      <div class="metric-box"><div class="metric-label">Investido ativo hoje</div><div class="metric-value">${money(activeInvested)}</div></div>
+      <div class="metric-box"><div class="metric-label">Vendas atribuídas</div><div class="metric-value">${money(allocatedTotal)}</div></div>
+      <div class="metric-box"><div class="metric-label">Lucro realizado</div><div class="metric-value">${money(totalProfit)}</div></div>
+      <div class="metric-box"><div class="metric-label">Retorno total liberado</div><div class="metric-value">${money(totalReturnReleased)}</div></div>
+      <div class="metric-box"><div class="metric-label">Total sacado</div><div class="metric-value">${money(totalWithdrawn)}</div></div>
+      <div class="metric-box"><div class="metric-label">Saque pendente</div><div class="metric-value">${money(pendingWithdrawal)}</div></div>
+    </div>
+
+    <div class="history-section"><h3>Quanto investiu em cada opção</h3><div class="table-wrap"><table class="table"><thead><tr><th>Opção</th><th>Aplicações</th><th>Total investido</th><th>Alvos somados</th><th>Vendas atribuídas</th><th>Lucro realizado</th></tr></thead><tbody>${Object.entries(byOption).map(([label,v])=>`<tr><td><b>${esc(label)}</b></td><td>${v.count}</td><td>${money(v.invested)}</td><td>${money(v.target)}</td><td>${money(v.credited)}</td><td>${money(v.profit)}</td></tr>`).join("")||`<tr><td colspan="6">Nenhum investimento.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Histórico de depósitos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Valor</th><th>Status</th><th>Processado</th></tr></thead><tbody>${deposits.map(d=>`<tr><td>${dt(d.created_at)}</td><td><b>${money(d.amount)}</b></td><td>${statusText(d.status)}</td><td>${dt(d.processed_at)}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum depósito.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Histórico de investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Opção</th><th>Investido</th><th>Alvo</th><th>Progresso</th><th>Lucro</th><th>Status</th><th>Conclusão</th></tr></thead><tbody>${investments.map(i=>`<tr><td>${dt(i.created_at)}</td><td><b>${esc(investorOptionLabel(i))}</b></td><td>${money(i.invested_amount)}</td><td>${money(i.target_amount)}</td><td>${money(i.sold_amount)} / ${money(i.target_amount)}</td><td>${i.status==="completed"?money(Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0))):"-"}</td><td>${statusText(i.status)}</td><td>${dt(i.completed_at)}</td></tr>`).join("")||`<tr><td colspan="8">Nenhum investimento.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Vendas atribuídas aos investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema</th><th>Categoria</th><th>Produto</th><th>Valor da venda</th><th>Valor atribuído</th></tr></thead><tbody>${allocations.map(a=>{const s=salesById[a.sale_id]||{};return `<tr><td>${dt(s.sold_at||a.created_at)}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td>${s.amount!=null?money(s.amount):"-"}</td><td><b>${money(a.amount)}</b></td></tr>`}).join("")||`<tr><td colspan="6">Nenhuma venda atribuída.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Histórico de saques</h3><div class="table-wrap"><table class="table"><thead><tr><th>Solicitado</th><th>Valor</th><th>PIX</th><th>Status</th><th>Processado</th></tr></thead><tbody>${withdrawals.map(w=>`<tr><td>${dt(w.created_at)}</td><td><b>${money(w.amount)}</b></td><td>${esc(w.pix||"-")}</td><td>${statusText(w.status)}</td><td>${dt(w.processed_at)}</td></tr>`).join("")||`<tr><td colspan="5">Nenhum saque.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Movimentações financeiras</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>${transactions.map(t=>`<tr><td>${dt(t.created_at)}</td><td>${esc(t.type)}</td><td>${esc(t.description||"-")}</td><td><b>${money(t.amount)}</b></td></tr>`).join("")||`<tr><td colspan="4">Nenhuma movimentação.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Notificações enviadas</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Título</th><th>Mensagem</th><th>Lida</th></tr></thead><tbody>${notifications.map(n=>`<tr><td>${dt(n.created_at)}</td><td><b>${esc(n.title)}</b></td><td>${esc(n.message)}</td><td>${n.read?"Sim":"Não"}</td></tr>`).join("")||`<tr><td colspan="4">Nenhuma notificação.</td></tr>`}</tbody></table></div></div>
+  `,true);
 }
 function openInvestorEdit(p){
   openModal(`<div class="title-row"><h2>Editar investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Nome</label><input id="editInvName" value="${esc(p.name)}"><label>Telefone</label><input id="editInvPhone" value="${esc(p.phone||"")}"><label>PIX</label><input id="editInvPix" value="${esc(p.pix||"")}"><label>Status</label><select id="editInvStatus"><option value="active" ${p.status==="active"?"selected":""}>Ativo</option><option value="blocked" ${p.status==="blocked"?"selected":""}>Bloqueado</option></select><button class="btn" style="width:100%;margin-top:15px" onclick="saveInvestor('${p.id}')">Salvar</button>`);
@@ -1887,7 +2127,28 @@ async function loadAdminCashboxes(){
   const box=document.getElementById("adminContent");
   const {data,error}=await sb.from("theme_cashboxes").select("*,themes(name)").order("balance",{ascending:false});
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Caixinhas</h2><span class="muted">Visível somente para o administrador</span></div></div><div class="notice">As caixinhas continuam somando <b>100% das vendas por tema</b>, independentemente da categoria. A categoria é usada para decidir qual investimento é elegível na fila.</div><div class="grid" style="margin-top:14px">${(data||[]).map(c=>`<div class="item"><h3>${esc(c.themes?.name||"Tema")}</h3><div class="stat-value">${money(c.balance)}</div><div class="muted">Total de vendas registradas neste tema</div></div>`).join("")||`<div class="muted">Nenhuma caixinha ainda.</div>`}</div></div>`;
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Caixinhas</h2><span class="muted">Visível somente para o administrador</span></div></div><div class="notice">As caixinhas somam <b>100% das vendas por tema</b>. Agora você pode clicar no valor de cada caixinha para descobrir quanto foi vendido em cada categoria e ver as vendas que formaram aquele total.</div><div class="grid" style="margin-top:14px">${(data||[]).map(c=>`<div class="item"><h3>${esc(c.themes?.name||"Tema")}</h3><button class="cashbox-value-btn" onclick="openCashboxBreakdown(${c.theme_id},'${esc(c.themes?.name||"Tema").replace(/'/g,"&#39;")}')">${money(c.balance)}</button><div class="muted">Clique no valor para detalhar por categoria</div></div>`).join("")||`<div class="muted">Nenhuma caixinha ainda.</div>`}</div></div>`;
+}
+
+async function openCashboxBreakdown(themeId,themeName){
+  openModal(`<div class="title-row"><h2>${esc(themeName)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando detalhamento...</div>`,true);
+  const {data,error}=await sb.from("sales").select("*,category:categories(name)").eq("theme_id",themeId).order("sold_at",{ascending:false});
+  if(error){openModal(`<div class="title-row"><h2>${esc(themeName)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="msg error">${esc(error.message)}</div>`,true);return}
+  const sales=data||[];
+  const breakdown={};
+  let total=0;
+  sales.forEach(s=>{
+    const name=s.category?.name||"Sem categoria / registro antigo";
+    breakdown[name]=(breakdown[name]||0)+Number(s.amount||0);
+    total+=Number(s.amount||0);
+  });
+  const rows=Object.entries(breakdown).sort((a,b)=>b[1]-a[1]);
+  openModal(`
+    <div class="title-row"><div><h2>${esc(themeName)}</h2><div class="muted">Detalhamento completo da caixinha por categoria</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="metric-grid"><div class="metric-box"><div class="metric-label">Total da caixinha</div><div class="metric-value">${money(total)}</div></div><div class="metric-box"><div class="metric-label">Vendas registradas</div><div class="metric-value">${sales.length}</div></div><div class="metric-box"><div class="metric-label">Categorias com vendas</div><div class="metric-value">${rows.length}</div></div></div>
+    <div class="history-section"><h3>Quanto vendeu por categoria</h3><div class="item">${rows.map(([name,value])=>`<div class="cashbox-breakdown-row"><div><b>${esc(name)}</b><div class="muted">${total?((value/total)*100).toLocaleString("pt-BR",{maximumFractionDigits:1}):0}% do tema</div></div><div class="stat-value" style="font-size:21px">${money(value)}</div></div>`).join("")||`<div class="muted">Nenhuma venda.</div>`}</div></div>
+    <div class="history-section"><h3>Vendas que formam esta caixinha</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Categoria</th><th>Produto</th><th>Valor</th></tr></thead><tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="4">Nenhuma venda.</td></tr>`}</tbody></table></div></div>
+  `,true);
 }
 
 async function loadAdminQueues(){

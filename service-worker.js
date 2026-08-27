@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v25-admin-action-emails-1";
+const CACHE_NAME="catinvestimentos-v26-historico-caixinhas-push-1";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -66,4 +66,39 @@ self.addEventListener("fetch",(event)=>{
       });
     })
   );
+});
+
+
+self.addEventListener("push",(event)=>{
+  let payload={};
+  try{payload=event.data?event.data.json():{}}catch(e){payload={message:event.data?.text?.()||""}}
+  const title=payload.title||"CATinvestimentos";
+  const appUrl=payload.url||"./";
+  const icon=new URL("./icon-192.png",self.location.href).href;
+  const badge=new URL("./icon-192.png",self.location.href).href;
+  event.waitUntil(
+    self.registration.showNotification(title,{
+      body:payload.message||"Você tem uma nova atualização.",
+      icon,
+      badge,
+      tag:payload.tag||"catinvestimentos",
+      renotify:true,
+      data:{url:appUrl}
+    })
+  );
+});
+
+self.addEventListener("notificationclick",(event)=>{
+  event.notification.close();
+  const target=event.notification.data?.url||"./";
+  event.waitUntil((async()=>{
+    const windows=await clients.matchAll({type:"window",includeUncontrolled:true});
+    for(const client of windows){
+      if("focus" in client){
+        try{if("navigate" in client)await client.navigate(target)}catch(e){}
+        return client.focus();
+      }
+    }
+    if(clients.openWindow)return clients.openWindow(target);
+  })());
 });
