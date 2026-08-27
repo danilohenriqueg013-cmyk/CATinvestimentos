@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v26-historico-caixinhas-push-1";
+const CACHE_NAME="catinvestimentos-v29-resumo-investidor-1";
 const APP_SHELL=[
   "./",
   "./index.html",

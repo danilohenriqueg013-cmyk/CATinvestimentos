@@ -322,16 +322,16 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
 
   <div class="stats stats-v19">
     <div class="card">
-      <div class="muted">Saldo total</div>
-      <div id="investorTotalBalance" class="stat-value">R$ 0,00</div>
+      <div class="muted">Saldo disponível</div>
+      <div id="investorAvailableBalance" class="stat-value">R$ 0,00</div>
     </div>
     <div class="card">
-      <div class="muted">Investimentos</div>
-      <div id="investorAppliedTotal" class="stat-value">R$ 0,00</div>
+      <div class="muted">Investimentos pendentes</div>
+      <div id="investorPendingTotal" class="stat-value">R$ 0,00</div>
     </div>
     <div class="card">
-      <div class="muted">Lucro</div>
-      <div id="investorProfitTotal" class="stat-value">R$ 0,00</div>
+      <div class="muted">Faturamento Total</div>
+      <div id="investorReturnedTotal" class="stat-value">R$ 0,00</div>
     </div>
   </div>
 
@@ -802,22 +802,25 @@ async function loadInvestorDashboard(){
 
   const rows=investments||[];
 
-  // Valor atualmente aplicado apenas nos investimentos em andamento.
-  const appliedTotal=rows
+  // 1) Saldo disponível = dinheiro realmente parado na conta do investidor.
+  // Não inclui dinheiro que já está aplicado em investimentos.
+  const availableBalance=Number(currentProfile.balance||0);
+
+  // 2) Investimentos pendentes = principal atualmente aplicado em investimentos ativos.
+  const pendingTotal=rows
     .filter(i=>i.status==="active")
     .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
 
-  // Lucro histórico já realizado: somente a parte de lucro dos investimentos concluídos.
-  const profitTotal=rows
+  // 3) Faturamento Total = todo o valor que já RETORNOU ao investidor
+  // em investimentos concluídos (principal + lucro/retorno).
+  // Ex.: investiu R$ 100 e recebeu R$ 130 no total -> mostra R$ 130.
+  const returnedTotal=rows
     .filter(i=>i.status==="completed")
-    .reduce((sum,i)=>sum+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+    .reduce((sum,i)=>sum+Number(i.target_amount||0),0);
 
-  // Saldo total = dinheiro disponível + principal atualmente aplicado.
-  const totalBalance=Number(currentProfile.balance||0)+appliedTotal;
-
-  document.getElementById("investorTotalBalance").textContent=money(totalBalance);
-  document.getElementById("investorAppliedTotal").textContent=money(appliedTotal);
-  document.getElementById("investorProfitTotal").textContent=money(profitTotal);
+  document.getElementById("investorAvailableBalance").textContent=money(availableBalance);
+  document.getElementById("investorPendingTotal").textContent=money(pendingTotal);
+  document.getElementById("investorReturnedTotal").textContent=money(returnedTotal);
 
   window._investorActiveSection=null;
   document.querySelectorAll(".investor-item[data-investor-section]").forEach(b=>b.classList.remove("active"));
@@ -844,21 +847,21 @@ async function refreshInvestorSummary(){
     .select("invested_amount,target_amount,status");
 
   const rows=investments||[];
-  const appliedTotal=rows
+  const availableBalance=Number(currentProfile.balance||0);
+  const pendingTotal=rows
     .filter(i=>i.status==="active")
     .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
-  const profitTotal=rows
+  const returnedTotal=rows
     .filter(i=>i.status==="completed")
-    .reduce((sum,i)=>sum+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
-  const totalBalance=Number(currentProfile.balance||0)+appliedTotal;
+    .reduce((sum,i)=>sum+Number(i.target_amount||0),0);
 
-  const totalEl=document.getElementById("investorTotalBalance");
-  const appliedEl=document.getElementById("investorAppliedTotal");
-  const profitEl=document.getElementById("investorProfitTotal");
+  const availableEl=document.getElementById("investorAvailableBalance");
+  const pendingEl=document.getElementById("investorPendingTotal");
+  const returnedEl=document.getElementById("investorReturnedTotal");
 
-  if(totalEl)totalEl.textContent=money(totalBalance);
-  if(appliedEl)appliedEl.textContent=money(appliedTotal);
-  if(profitEl)profitEl.textContent=money(profitTotal);
+  if(availableEl)availableEl.textContent=money(availableBalance);
+  if(pendingEl)pendingEl.textContent=money(pendingTotal);
+  if(returnedEl)returnedEl.textContent=money(returnedTotal);
 }
 
 async function investorSection(section,button=null){
@@ -1251,8 +1254,8 @@ async function loadMyInvestments(){
     const remain=Math.max(0,Number(i.target_amount)-Number(i.sold_amount));
     const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
     const label=i.option
-      ? `${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`
-      : `${i.themes?.name||"Tema"} • investimento antigo`;
+      ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
+      : `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
 
     return `<div class="card item">
       <div class="title-row"><h3>${esc(label)}</h3><span class="badge ${i.status==="completed"?"green":""}">${i.status==="completed"?"CONCLUÍDO":"EM ANDAMENTO"}</span></div>
@@ -1388,8 +1391,8 @@ async function loadAdminInvestors(){
 }
 
 function investorOptionLabel(i){
-  if(i.option)return `${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`;
-  return `${i.themes?.name||"Tema"} • legado`;
+  if(i.option)return `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`;
+  return `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
 }
 
 async function openInvestorHistory(id){
@@ -2013,7 +2016,7 @@ async function loadAdminInvestments(){
     </div>
     ${testMode?`<div class="notice"><b>Modo de testes:</b> você pode excluir qualquer investimento de teste. O sistema recalcula automaticamente as filas, vendas atribuídas, retornos e saldos dos registros que permanecerem.</div>`:""}
     <div class="table-wrap"><table class="table"><thead><tr><th>Investidor</th><th>Categoria + Tema</th><th>Investido</th><th>Retorno</th><th>Alvo</th><th>Vendido</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(i=>{
-      const label=i.option?`${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`:`${i.themes?.name||"Tema"} • legado`;
+      const label=i.option?`${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`:`Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
       const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
       const canDelete=testMode;
       return `<tr>
@@ -2068,10 +2071,10 @@ async function loadAdminSales(){
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
 
   box.innerHTML=`<div class="card">
-    <div class="title-row"><div><h2>Registrar Venda</h2><div class="muted">Marque o tema e a categoria reais do produto vendido.</div></div></div>
+    <div class="title-row"><div><h2>Registrar Venda</h2><div class="muted">Marque a categoria e o tema reais do produto vendido.</div></div></div>
     <div class="row">
-      <div><label>Tema vendido</label><select id="saleTheme">${(themes||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
       <div><label>Categoria vendida</label><select id="saleCategory">${(categories||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+      <div><label>Tema vendido</label><select id="saleTheme">${(themes||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
     </div>
     <div class="row">
       <div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div>
@@ -2084,10 +2087,10 @@ async function loadAdminSales(){
     <div class="title-row">
       <div><h3>Últimas vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, qualquer venda pode ser excluída. O sistema recalcula a fila automaticamente.":""}</div></div>
     </div>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema</th><th>Categoria</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${(sales||[]).map((s,idx)=>`<tr>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${(sales||[]).map((s,idx)=>`<tr>
       <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
+      <td>${esc(s.category?.name||"Categoria não registrada")}</td>
       <td>${esc(s.themes?.name||"-")}</td>
-      <td>${esc(s.category?.name||"Venda antiga")}</td>
       <td>${esc(s.product_name||"-")}</td>
       <td><b>${money(s.amount)}</b></td>
       <td>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:"-"}</td>
@@ -2163,7 +2166,7 @@ async function loadAdminQueues(){
     <div class="title-row"><div><h2>Fila inteligente</h2><span class="muted">Ordem cronológica geral dos investimentos ativos</span></div></div>
     <div class="notice">Na hora de registrar uma venda, o sistema começa pelo investimento compatível mais antigo. “Todos os temas” combina com qualquer tema e “Todas as categorias” combina com qualquer categoria. Investimentos incompatíveis são pulados automaticamente.</div>
     <div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Ordem</th><th>Horário</th><th>Investidor</th><th>Escopo</th><th>Progresso</th></tr></thead><tbody>${(data||[]).map((i,idx)=>{
-      const label=i.option?`${i.option.category?.name||"Todas as categorias"} • ${i.option.theme?.name||"Todos os temas"}`:`${i.themes?.name||"Tema"} • todas as categorias (legado)`;
+      const label=i.option?`${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`:`Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
       return `<tr><td><b>${idx+1}º</b></td><td>${new Date(i.created_at).toLocaleString("pt-BR")}</td><td>${esc(i.profiles?.name||"-")}</td><td>${esc(label)}</td><td>${money(i.sold_amount)} / ${money(i.target_amount)}</td></tr>`;
     }).join("")||`<tr><td colspan="5">Nenhum investimento ativo.</td></tr>`}</tbody></table></div>
   </div>`;
