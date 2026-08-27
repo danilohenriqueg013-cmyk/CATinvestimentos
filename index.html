@@ -345,6 +345,12 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
     <button class="investor-item" data-investor-section="transactions" onclick="investorSection('transactions',this)">
       <span class="nav-icon">↔️</span><span>Movimentações</span>
     </button>
+    <button class="investor-item" data-investor-section="deposits" onclick="investorSection('deposits',this)">
+      <span class="nav-icon">➕</span><span>Depósitos</span>
+    </button>
+    <button class="investor-item" data-investor-section="withdrawals" onclick="investorSection('withdrawals',this)">
+      <span class="nav-icon">💸</span><span>Saques</span>
+    </button>
     <button class="investor-item" data-investor-section="notifications" onclick="investorSection('notifications',this)">
       <span class="nav-icon">🔔</span><span>Notificações</span>
     </button>
@@ -361,7 +367,7 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
       <div style="font-size:26px;margin-bottom:8px">✨</div>
       <b>Escolha uma opção acima</b>
       <div class="muted" style="margin-top:6px">
-        Você pode investir, acompanhar seus investimentos, movimentações ou notificações.
+        Você pode investir, acompanhar seus investimentos, depósitos, saques, movimentações ou notificações.
       </div>
     </div>
   </div>
@@ -897,16 +903,48 @@ async function investorSection(section,button=null){
       <div class="title-row">
         <div>
           <h2>Movimentações</h2>
-          <div class="muted">Depósitos, saques e histórico da sua conta.</div>
-        </div>
-        <div class="actions" style="margin-top:0">
-          <button class="btn" onclick="openDepositRequest()">Adicionar saldo</button>
-          <button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button>
+          <div class="muted">Histórico geral das movimentações da sua conta.</div>
         </div>
       </div>
       <div id="myTransactions" class="card table-wrap"></div>
     `;
     return loadMyTransactions();
+  }
+
+  if(section==="deposits"){
+    box.innerHTML=`
+      <div class="title-row">
+        <div>
+          <h2>Depósitos</h2>
+          <div class="muted">Adicione saldo e acompanhe todas as suas solicitações de depósito.</div>
+        </div>
+        <button class="btn" onclick="openDepositRequest()">+ Adicionar saldo</button>
+      </div>
+      <div id="myDeposits"></div>
+    `;
+    return loadInvestorDeposits();
+  }
+
+  if(section==="withdrawals"){
+    const day=withdrawalDayBR();
+    const allowed=day>=1&&day<=5;
+    box.innerHTML=`
+      <div class="title-row">
+        <div>
+          <h2>Saques</h2>
+          <div class="muted">Solicite saques e acompanhe todo o histórico de retiradas da sua conta.</div>
+        </div>
+        <button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button>
+      </div>
+      <div class="notice withdraw-window">
+        <b>Janela de saques:</b> solicitações somente entre os dias <b>01 e 05</b> de cada mês.
+        ${allowed
+          ? `<br><span class="badge green" style="margin-top:8px">ABERTA HOJE</span>`
+          : `<br><span class="badge red" style="margin-top:8px">FECHADA HOJE</span>`}
+      </div>
+      <div id="myWithdrawals" style="margin-top:14px"></div>
+    `;
+    return loadInvestorWithdrawals();
   }
 
   if(section==="notifications"){
@@ -921,7 +959,7 @@ async function refreshProfile(){const {data}=await sb.from("profiles").select("*
 
 async function loadAvailableThemes(){
   const box=document.getElementById("availableThemes");
-  const {data,error}=await sb.rpc("get_available_investment_options");
+  const {data,error}=await sb.rpc("get_investment_options_for_investor");
   if(error){box.innerHTML=`<div class="card error">Erro: ${esc(error.message)}</div>`;return}
   if(!data?.length){box.innerHTML=`<div class="card muted">Nenhuma opção de investimento disponível no momento.</div>`;return}
 
@@ -935,7 +973,7 @@ async function loadAvailableThemes(){
       <div class="title-row">
         <div>
           <h3>Escolha a categoria e/ou o tema</h3>
-          <div class="muted">Sem filtros mostramos só 2 destaques. Com apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Você também pode escolher “Todas as categorias” e/ou “Todos os temas”. Com os dois filtros escolhidos, mostramos a combinação específica.</div>
+          <div class="muted">Sem filtros mostramos só 2 destaques. Com apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Você também pode escolher “Todas as categorias” e/ou “Todos os temas”. Com os dois filtros escolhidos, mostramos a combinação específica. Opções temporariamente esgotadas continuam visíveis, mas com o botão de investir bloqueado.</div>
         </div>
         <button class="btn secondary smallbtn" onclick="clearInvestmentFilters()">Limpar filtros</button>
       </div>
@@ -1018,34 +1056,49 @@ function renderAvailableInvestmentOptions(){
   let helperText="";
 
   if(!categorySelected && !themeSelected){
-    // Nenhum filtro: maior e menor de toda a plataforma.
-    filtered=pickHighLowSuggestions(list);
-    helperText="Destaques: maior e menor retorno disponíveis.";
+    // Nenhum filtro: destaca somente opções em que ainda é possível investir.
+    const available=list.filter(o=>o.is_available!==false);
+    filtered=pickHighLowSuggestions(available.length?available:list);
+    helperText=available.length
+      ? "Destaques: maior e menor retorno disponíveis."
+      : "No momento as opções em destaque estão temporariamente esgotadas. Escolha uma categoria e/ou tema para consultar outras opções.";
   }else if(categorySelected && !themeSelected){
     if(categoryIsAll){
       // "Todas as categorias" sozinho:
       // maior/menor entre as opções "Todas as categorias + tema".
       const candidates=list.filter(o=>o.category_id===null && o.theme_id!==null);
-      filtered=pickHighLowSuggestions(candidates);
-      helperText="Destaques de Todas as categorias: maior e menor retorno.";
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques de Todas as categorias: maior e menor retorno."
+        : "As opções deste filtro estão temporariamente esgotadas. Você pode escolher outra categoria ou tema.";
     }else{
       // Categoria específica sozinha: maior/menor dentro dela.
       const candidates=list.filter(o=>String(o.category_id)===category);
-      filtered=pickHighLowSuggestions(candidates);
-      helperText="Destaques desta categoria: maior e menor retorno.";
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques desta categoria: maior e menor retorno."
+        : "As opções desta categoria estão temporariamente esgotadas. Você pode escolher outro tema ou categoria.";
     }
   }else if(!categorySelected && themeSelected){
     if(themeIsAll){
       // "Todos os temas" sozinho:
       // maior/menor entre as opções "categoria + Todos os temas".
       const candidates=list.filter(o=>o.theme_id===null && o.category_id!==null);
-      filtered=pickHighLowSuggestions(candidates);
-      helperText="Destaques de Todos os temas: maior e menor retorno.";
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques de Todos os temas: maior e menor retorno."
+        : "As opções deste filtro estão temporariamente esgotadas. Você pode escolher outra categoria ou tema.";
     }else{
       // Tema específico sozinho: maior/menor dentro dele.
       const candidates=list.filter(o=>String(o.theme_id)===theme);
-      filtered=pickHighLowSuggestions(candidates);
-      helperText="Destaques deste tema: maior e menor retorno.";
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques deste tema: maior e menor retorno."
+        : "As opções deste tema estão temporariamente esgotadas. Você pode escolher outra categoria ou tema.";
     }
   }else{
     // Os dois filtros foram escolhidos: mostra a combinação EXATA.
@@ -1071,6 +1124,13 @@ function renderAvailableInvestmentOptions(){
     ${filtered.map(o=>{
       const label=`${o.category_name} • ${o.theme_name}`;
       const rate=Number(o.return_rate||0);
+      const available=o.is_available!==false;
+      const availabilityReason=String(o.availability_reason||"available");
+
+      const unavailableMessage=availabilityReason==="already_invested"
+        ? "Você já possui um investimento ativo nesta opção. Aguarde a conclusão dele ou escolha outra opção disponível para continuar investindo."
+        : "Opção esgotada no momento. Enquanto os investimentos desta opção estão sendo concluídos, você pode escolher outra opção disponível para continuar investindo.";
+
       const models=(o.theme_id!==null && o.theme_description)
         ? `<div class="notice" style="
               margin-top:14px;
@@ -1108,9 +1168,32 @@ function renderAvailableInvestmentOptions(){
         ${models}
 
         <div class="actions" style="margin-top:14px">
-          <button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>
+          ${available
+            ? `<button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>`
+            : `<button
+                 class="btn"
+                 disabled
+                 title="Opção temporariamente indisponível"
+                 style="background:#b8b8b8;border-color:#b8b8b8;color:#fff;cursor:not-allowed;opacity:.78"
+               >Investir</button>`}
           <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ver catálogo</a>
         </div>
+
+        ${available ? "" : `
+          <div style="
+            margin-top:12px;
+            padding:12px 14px;
+            border-radius:12px;
+            background:#f5f5f5;
+            border:1px solid #dddddd;
+            color:#6f5f65;
+            font-size:13px;
+            line-height:1.5;
+          ">
+            <b>${availabilityReason==="already_invested"?"Investimento já ativo nesta opção.":"Opção esgotada no momento."}</b><br>
+            ${esc(unavailableMessage)}
+          </div>
+        `}
       </div>`;
     }).join("")}
   `;
@@ -1141,6 +1224,16 @@ function updateInvestmentReturn(returnRate){
 function openInvestmentOption(id,label,returnRate){
   const rate=Number(returnRate||0);
   const option=(window._availableInvestmentOptions||[]).find(o=>Number(o.id)===Number(id));
+
+  if(option && option.is_available===false){
+    toast(
+      option.availability_reason==="already_invested"
+        ? "Você já possui um investimento ativo nesta opção. Escolha outra opção ou aguarde a conclusão."
+        : "Esta opção está esgotada no momento. Escolha outra opção disponível."
+    );
+    return;
+  }
+
   const models=(option?.theme_id!==null && option?.theme_description)
     ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(option.theme_description)}</div>`
     : "";
@@ -1277,6 +1370,135 @@ async function loadMyTransactions(){
   if(error){box.innerHTML=`<div class="error">${esc(error.message)}</div>`;return}
   box.innerHTML=`<table class="table"><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>${(data||[]).map(t=>`<tr><td>${new Date(t.created_at).toLocaleString("pt-BR")}</td><td>${esc(t.description||t.type)}</td><td><b>${money(t.amount)}</b></td></tr>`).join("")||`<tr><td colspan="3">Nenhuma movimentação.</td></tr>`}</tbody></table>`;
 }
+async function loadInvestorDeposits(){
+  const box=document.getElementById("myDeposits");
+  if(!box)return;
+
+  const {data,error}=await sb
+    .from("deposits")
+    .select("*")
+    .order("created_at",{ascending:false})
+    .limit(100);
+
+  if(error){
+    box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;
+    return;
+  }
+
+  const rows=data||[];
+  const totalConfirmed=rows
+    .filter(d=>d.status==="confirmed")
+    .reduce((sum,d)=>sum+Number(d.amount||0),0);
+
+  const totalPending=rows
+    .filter(d=>d.status==="pending")
+    .reduce((sum,d)=>sum+Number(d.amount||0),0);
+
+  box.innerHTML=`
+    <div class="grid" style="margin-bottom:14px">
+      <div class="card">
+        <div class="muted">Total confirmado</div>
+        <div class="stat-value">${money(totalConfirmed)}</div>
+      </div>
+      <div class="card">
+        <div class="muted">Aguardando confirmação</div>
+        <div class="stat-value">${money(totalPending)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Histórico de depósitos</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Valor</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(d=>`
+              <tr>
+                <td>${new Date(d.created_at).toLocaleString("pt-BR")}</td>
+                <td><b>${money(d.amount)}</b></td>
+                <td>
+                  <span class="badge ${d.status==="confirmed"?"green":d.status==="rejected"?"red":""}">
+                    ${d.status==="pending"?"PENDENTE":d.status==="confirmed"?"CONFIRMADO":d.status==="rejected"?"REJEITADO":esc(d.status)}
+                  </span>
+                </td>
+              </tr>
+            `).join("")||`<tr><td colspan="3">Nenhum depósito realizado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+async function loadInvestorWithdrawals(){
+  const box=document.getElementById("myWithdrawals");
+  if(!box)return;
+
+  const {data,error}=await sb
+    .from("withdrawals")
+    .select("*")
+    .order("created_at",{ascending:false})
+    .limit(100);
+
+  if(error){
+    box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;
+    return;
+  }
+
+  const rows=data||[];
+  const totalPaid=rows
+    .filter(w=>w.status==="paid")
+    .reduce((sum,w)=>sum+Number(w.amount||0),0);
+
+  const totalPending=rows
+    .filter(w=>w.status==="pending")
+    .reduce((sum,w)=>sum+Number(w.amount||0),0);
+
+  box.innerHTML=`
+    <div class="grid" style="margin-bottom:14px">
+      <div class="card">
+        <div class="muted">Total já sacado</div>
+        <div class="stat-value">${money(totalPaid)}</div>
+      </div>
+      <div class="card">
+        <div class="muted">Saques pendentes</div>
+        <div class="stat-value">${money(totalPending)}</div>
+      </div>
+      <div class="card">
+        <div class="muted">Saldo disponível agora</div>
+        <div class="stat-value">${money(currentProfile.balance)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Histórico de saques</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Valor</th><th>PIX</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(w=>`
+              <tr>
+                <td>${new Date(w.created_at).toLocaleString("pt-BR")}</td>
+                <td><b>${money(w.amount)}</b></td>
+                <td>${esc(w.pix||"-")}</td>
+                <td>
+                  <span class="badge ${w.status==="paid"?"green":w.status==="rejected"?"red":""}">
+                    ${w.status==="pending"?"PENDENTE":w.status==="paid"?"PAGO":w.status==="rejected"?"REJEITADO":esc(w.status)}
+                  </span>
+                </td>
+              </tr>
+            `).join("")||`<tr><td colspan="4">Nenhum saque solicitado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 async function loadMyNotifications(){
   const box=document.getElementById("myNotifications");
   const {data,error}=await sb.from("notifications").select("*").order("created_at",{ascending:false}).limit(20);
@@ -1345,7 +1567,14 @@ async function requestDeposit(){
   if(error){toast(error.message);return}
   closeModal();
   toast("Solicitação enviada. Seu saldo será atualizado após a confirmação do PIX pelo administrador.");
-  await loadMyTransactions();
+  await refreshProfile();
+  await refreshInvestorSummary();
+
+  if(window._investorActiveSection==="deposits"){
+    await loadInvestorDeposits();
+  }else if(window._investorActiveSection==="transactions"){
+    await loadMyTransactions();
+  }
 }
 
 function withdrawalDayBR(){
@@ -1364,7 +1593,16 @@ async function requestWithdrawal(){
   const amount=Number(document.getElementById("withdrawAmount")?.value);
   const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});
   if(error){toast(error.message);return}
-  closeModal();toast("Saque solicitado.");await refreshInvestorSummary();await investorSection("transactions")
+  closeModal();
+  toast("Saque solicitado.");
+  await refreshProfile();
+  await refreshInvestorSummary();
+
+  if(window._investorActiveSection==="withdrawals"){
+    await loadInvestorWithdrawals();
+  }else{
+    await investorSection("withdrawals");
+  }
 }
 
 async function adminSection(section){
