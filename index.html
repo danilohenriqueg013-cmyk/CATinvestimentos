@@ -980,22 +980,26 @@ async function refreshProfile(){const {data}=await sb.from("profiles").select("*
 
 async function loadAvailableThemes(){
   const box=document.getElementById("availableThemes");
-  const {data,error}=await sb.rpc("get_investment_options_for_investor");
+  const [optionsRes,subthemesRes]=await Promise.all([
+    sb.rpc("get_investment_options_for_investor"),
+    sb.from("subthemes").select("id,theme_id,name,active").eq("active",true).order("name")
+  ]);
+  const error=optionsRes.error||subthemesRes.error;
   if(error){box.innerHTML=`<div class="card error">Erro: ${esc(error.message)}</div>`;return}
-  if(!data?.length){box.innerHTML=`<div class="card muted">Nenhuma opção de investimento disponível no momento.</div>`;return}
+  const data=optionsRes.data||[];
+  if(!data.length){box.innerHTML=`<div class="card muted">Nenhuma opção de investimento disponível no momento.</div>`;return}
 
-  window._availableInvestmentOptions=data||[];
+  window._availableInvestmentOptions=data;
+  window._investorSubthemes=subthemesRes.data||[];
 
-  const categories=[...new Map((data||[]).map(o=>[o.category_id===null?"all":String(o.category_id),o.category_name])).entries()];
-  const themes=[...new Map((data||[]).map(o=>[o.theme_id===null?"all":String(o.theme_id),o.theme_name])).entries()];
+  const categories=[...new Map(data.map(o=>[o.category_id===null?"all":String(o.category_id),o.category_name])).entries()];
+  const themes=[...new Map(data.map(o=>[o.theme_id===null?"all":String(o.theme_id),o.theme_name])).entries()];
+  window._investmentThemeNames=Object.fromEntries(themes.filter(([id])=>id!=="all"));
 
   box.innerHTML=`
     <div class="card" style="margin-bottom:14px">
       <div class="title-row">
-        <div>
-          <h3>Escolha a categoria e/ou o tema</h3>
-          <div class="muted">Sem filtros mostramos só 2 destaques. Com apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Você também pode escolher “Todas as categorias” e/ou “Todos os temas”. Com os dois filtros escolhidos, mostramos a combinação específica. Opções temporariamente esgotadas continuam visíveis, mas com o botão de investir bloqueado.</div>
-        </div>
+        <div><h3>Escolha a categoria e o tema</h3></div>
         <button class="btn secondary smallbtn" onclick="clearInvestmentFilters()">Limpar filtros</button>
       </div>
       <div class="row">
@@ -1016,6 +1020,7 @@ async function loadAvailableThemes(){
           </select>
         </div>
       </div>
+      <div id="investmentSubthemesCompact" style="margin-top:12px"></div>
     </div>
     <div id="availableOptionsGrid" class="grid"></div>
   `;
@@ -1029,6 +1034,43 @@ function clearInvestmentFilters(){
   if(category)category.value="";
   if(theme)theme.value="";
   renderAvailableInvestmentOptions();
+}
+
+function subthemeNamesForTheme(themeId){
+  if(themeId===null||themeId===undefined)return [];
+  return (window._investorSubthemes||[])
+    .filter(s=>String(s.theme_id)===String(themeId) && s.active!==false)
+    .map(s=>s.name);
+}
+
+function renderInvestmentSubthemesCompact(){
+  const box=document.getElementById("investmentSubthemesCompact");
+  if(!box)return;
+
+  const selected=document.getElementById("optionThemeFilter")?.value||"";
+  const allSubthemes=window._investorSubthemes||[];
+  const themeNames=window._investmentThemeNames||{};
+
+  const themeIds=(selected && selected!=="all")
+    ? [selected]
+    : Object.keys(themeNames).sort((a,b)=>String(themeNames[a]).localeCompare(String(themeNames[b]),"pt-BR"));
+
+  const groups=themeIds.map(id=>({
+    id,
+    name:themeNames[id]||"Tema",
+    subs:allSubthemes.filter(s=>String(s.theme_id)===String(id) && s.active!==false).map(s=>s.name)
+  })).filter(g=>g.subs.length);
+
+  if(!groups.length){
+    box.innerHTML=`<div class="muted" style="font-size:11px">Nenhum subtema cadastrado para esta seleção.</div>`;
+    return;
+  }
+
+  box.innerHTML=`
+    <div style="border-top:1px solid #f0d8e0;padding-top:9px;max-height:105px;overflow:auto">
+      <div class="muted" style="font-size:11px;margin-bottom:6px"><b>Subtemas incluídos</b></div>
+      ${groups.map(g=>`<div style="font-size:11px;line-height:1.45;margin:3px 0"><b>${esc(g.name)}:</b> ${g.subs.map(esc).join(" • ")}</div>`).join("")}
+    </div>`;
 }
 
 function pickHighLowSuggestions(list){
@@ -1073,6 +1115,8 @@ function renderAvailableInvestmentOptions(){
   const categoryIsAll=category==="all";
   const themeIsAll=theme==="all";
 
+  renderInvestmentSubthemesCompact();
+
   let filtered=[];
   let helperText="";
 
@@ -1082,7 +1126,7 @@ function renderAvailableInvestmentOptions(){
     filtered=pickHighLowSuggestions(available.length?available:list);
     helperText=available.length
       ? "Destaques: maior e menor retorno disponíveis."
-      : "No momento as opções em destaque estão temporariamente esgotadas. Escolha uma categoria e/ou tema para consultar outras opções.";
+      : "No momento as opções em destaque estão temporariamente esgotadas. Escolha uma categoria e um tema para consultar outras opções.";
   }else if(categorySelected && !themeSelected){
     if(categoryIsAll){
       // "Todas as categorias" sozinho:
@@ -1152,16 +1196,9 @@ function renderAvailableInvestmentOptions(){
         ? "Você já possui um investimento ativo nesta opção. Aguarde a conclusão dele ou escolha outra opção disponível para continuar investindo."
         : "Opção esgotada no momento. Enquanto os investimentos desta opção estão sendo concluídos, você pode escolher outra opção disponível para continuar investindo.";
 
-      const models=(o.theme_id!==null && o.theme_description)
-        ? `<div class="notice" style="
-              margin-top:14px;
-              padding:16px;
-              font-size:14px;
-              line-height:1.55;
-            ">
-            <b style="font-size:14px">Modelos deste tema:</b><br>
-            ${esc(o.theme_description)}
-          </div>`
+      const cardSubthemes=o.theme_id!==null?subthemeNamesForTheme(o.theme_id):[];
+      const models=cardSubthemes.length
+        ? `<div class="notice" style="margin-top:12px;padding:10px 12px;font-size:11px;line-height:1.45"><b>Subtemas:</b> ${cardSubthemes.map(esc).join(" • ")}</div>`
         : "";
 
       return `<div class="card item" style="position:relative">
@@ -1768,7 +1805,7 @@ async function openInvestorHistory(id){
       allocations=allocRes.data||[];
       const saleIds=[...new Set(allocations.map(a=>a.sale_id))];
       if(saleIds.length){
-        const salesRes=await sb.from("sales").select("*,themes(name),category:categories(name)").in("id",saleIds);
+        const salesRes=await sb.from("sales").select("*,themes(name),subtheme:subthemes(name),category:categories(name)").in("id",saleIds);
         if(!salesRes.error)salesById=Object.fromEntries((salesRes.data||[]).map(s=>[s.id,s]));
       }
     }
@@ -1827,7 +1864,7 @@ async function openInvestorHistory(id){
 
     <div class="history-section"><h3>Histórico de investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Opção</th><th>Investido</th><th>Alvo</th><th>Progresso</th><th>Lucro</th><th>Status</th><th>Conclusão</th></tr></thead><tbody>${investments.map(i=>`<tr><td>${dt(i.created_at)}</td><td><b>${esc(investorOptionLabel(i))}</b></td><td>${money(i.invested_amount)}</td><td>${money(i.target_amount)}</td><td>${money(i.sold_amount)} / ${money(i.target_amount)}</td><td>${i.status==="completed"?money(Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0))):"-"}</td><td>${statusText(i.status)}</td><td>${dt(i.completed_at)}</td></tr>`).join("")||`<tr><td colspan="8">Nenhum investimento.</td></tr>`}</tbody></table></div></div>
 
-    <div class="history-section"><h3>Vendas atribuídas aos investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema</th><th>Categoria</th><th>Produto</th><th>Valor da venda</th><th>Valor atribuído</th></tr></thead><tbody>${allocations.map(a=>{const s=salesById[a.sale_id]||{};return `<tr><td>${dt(s.sold_at||a.created_at)}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td>${s.amount!=null?money(s.amount):"-"}</td><td><b>${money(a.amount)}</b></td></tr>`}).join("")||`<tr><td colspan="6">Nenhuma venda atribuída.</td></tr>`}</tbody></table></div></div>
+    <div class="history-section"><h3>Vendas atribuídas aos investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema global</th><th>Subtema</th><th>Categoria</th><th>Produto</th><th>Valor da venda</th><th>Valor atribuído</th></tr></thead><tbody>${allocations.map(a=>{const s=salesById[a.sale_id]||{};return `<tr><td>${dt(s.sold_at||a.created_at)}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.subtheme?.name||"-")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td>${s.amount!=null?money(s.amount):"-"}</td><td><b>${money(a.amount)}</b></td></tr>`}).join("")||`<tr><td colspan="7">Nenhuma venda atribuída.</td></tr>`}</tbody></table></div></div>
 
     <div class="history-section"><h3>Histórico de saques</h3><div class="table-wrap"><table class="table"><thead><tr><th>Solicitado</th><th>Valor</th><th>PIX</th><th>Status</th><th>Processado</th></tr></thead><tbody>${withdrawals.map(w=>`<tr><td>${dt(w.created_at)}</td><td><b>${money(w.amount)}</b></td><td>${esc(w.pix||"-")}</td><td>${statusText(w.status)}</td><td>${dt(w.processed_at)}</td></tr>`).join("")||`<tr><td colspan="5">Nenhum saque.</td></tr>`}</tbody></table></div></div>
 
@@ -1845,15 +1882,31 @@ async function saveDeposit(id){const amount=Number(document.getElementById("depo
 
 async function loadAdminThemes(){
   const box=document.getElementById("adminContent");
-  const {data,error}=await sb.from("themes").select("*").order("name");
+  const [themesRes,subthemesRes]=await Promise.all([
+    sb.from("themes").select("*").order("name"),
+    sb.from("subthemes").select("*").order("name")
+  ]);
+  const error=themesRes.error||subthemesRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  window._adminSubthemes=subthemesRes.data||[];
+
   box.innerHTML=`<div class="card">
-    <div class="title-row"><div><h2>Temas</h2><div class="muted">Ex.: Anime, Infantil, Marvel.</div></div><button class="btn" onclick="openThemeForm()">+ Novo tema</button></div>
-    <div class="grid">${(data||[]).map(t=>`<div class="item">
-      <div class="title-row"><h3>${esc(t.name)}</h3><span class="badge ${t.active?"green":"red"}">${t.active?"ATIVO":"INATIVO"}</span></div>
-      <div class="muted">${esc(t.description||"Sem descrição")}</div>
-      <div class="actions"><button class="btn smallbtn" onclick='openThemeForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteTheme(${t.id})">Excluir</button></div>
-    </div>`).join("")||`<div class="muted">Nenhum tema cadastrado.</div>`}</div>
+    <div class="title-row"><div><h2>Temas</h2><div class="muted">Cadastre os temas globais e, dentro de cada um, seus subtemas detalhados.</div></div><button class="btn" onclick="openThemeForm()">+ Novo tema</button></div>
+    <div class="grid">${(themesRes.data||[]).map(t=>{
+      const subs=(window._adminSubthemes||[]).filter(s=>Number(s.theme_id)===Number(t.id));
+      const activeSubs=subs.filter(s=>s.active!==false);
+      return `<div class="item">
+        <div class="title-row"><h3>${esc(t.name)}</h3><span class="badge ${t.active?"green":"red"}">${t.active?"ATIVO":"INATIVO"}</span></div>
+        <div class="muted">${esc(t.description||"Sem descrição")}</div>
+        <div style="margin-top:10px;font-size:11px;line-height:1.5"><b>Subtemas:</b> ${activeSubs.length?activeSubs.map(s=>esc(s.name)).join(" • "):"Nenhum cadastrado"}</div>
+        <div class="actions">
+          <button class="btn smallbtn" onclick='openSubthemesManager(${t.id},${JSON.stringify(t.name).replace(/'/g,"&#39;")})'>Subtemas (${activeSubs.length})</button>
+          <button class="btn secondary smallbtn" onclick='openThemeForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>Editar tema</button>
+          <button class="btn danger smallbtn" onclick="deleteTheme(${t.id})">Excluir</button>
+        </div>
+      </div>`;
+    }).join("")||`<div class="muted">Nenhum tema cadastrado.</div>`}</div>
   </div>`;
 }
 
@@ -1863,7 +1916,7 @@ function openThemeForm(t=null){
     <label>Descrição</label><textarea id="themeDescription">${esc(t?.description||"")}</textarea>
     <label>URL da imagem (opcional)</label><input id="themeImage" value="${esc(t?.image_url||"")}">
     <label>Status</label><select id="themeActive"><option value="true" ${!t||t.active?"selected":""}>Ativo</option><option value="false" ${t&&!t.active?"selected":""}>Inativo</option></select>
-    <div class="notice">A porcentagem e os limites agora são definidos em <b>Opções de investimento</b>, combinando Tema + Categoria.</div>
+    <div class="notice">A porcentagem e os limites são definidos em <b>Opções de investimento</b>. Os subtemas são gerenciados dentro do tema e não alteram a fila dos investimentos.</div>
     <button class="btn" style="width:100%;margin-top:15px" onclick="saveTheme(${t?.id??"null"})">Salvar tema</button>`);
 }
 
@@ -1884,6 +1937,44 @@ async function deleteTheme(id){
   const {error}=await sb.rpc("admin_delete_theme",{p_id:id});
   if(error){toast(error.message);return}
   await loadAdminThemes();
+}
+
+function openSubthemesManager(themeId,themeName){
+  const subs=(window._adminSubthemes||[]).filter(s=>Number(s.theme_id)===Number(themeId));
+  openModal(`
+    <div class="title-row"><div><h2>Subtemas — ${esc(themeName)}</h2><div class="muted">Detalhes usados nas vendas e relatórios. Não mudam a lógica do investimento.</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <button class="btn" style="margin:8px 0 14px" onclick='openSubthemeForm(${themeId},${JSON.stringify(themeName).replace(/'/g,"&#39;")})'>+ Novo subtema</button>
+    <div>${subs.map(st=>`<div class="item" style="margin-bottom:8px"><div class="title-row"><b>${esc(st.name)}</b><span class="badge ${st.active?"green":"red"}">${st.active?"ATIVO":"INATIVO"}</span></div><div class="actions"><button class="btn smallbtn" onclick='openSubthemeForm(${themeId},${JSON.stringify(themeName).replace(/'/g,"&#39;")},${JSON.stringify(st).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteSubtheme(${st.id})">Excluir</button></div></div>`).join("")||`<div class="muted">Nenhum subtema cadastrado neste tema.</div>`}</div>
+  `,true);
+}
+
+function openSubthemeForm(themeId,themeName,st=null){
+  openModal(`
+    <div class="title-row"><div><h2>${st?"Editar":"Novo"} subtema</h2><div class="muted">Tema global: <b>${esc(themeName)}</b></div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome do subtema</label><input id="subthemeName" value="${esc(st?.name||"")}" placeholder="Ex.: Naruto">
+    <label>Status</label><select id="subthemeActive"><option value="true" ${!st||st.active?"selected":""}>Ativo</option><option value="false" ${st&&!st.active?"selected":""}>Inativo</option></select>
+    <button class="btn" style="width:100%;margin-top:15px" onclick="saveSubtheme(${st?.id??"null"},${themeId})">Salvar subtema</button>
+  `);
+}
+
+async function saveSubtheme(id,themeId){
+  const name=document.getElementById("subthemeName").value.trim();
+  if(!name){toast("Informe o nome do subtema.");return}
+  const {error}=await sb.rpc("admin_save_subtheme",{
+    p_id:id,
+    p_theme_id:themeId,
+    p_name:name,
+    p_active:document.getElementById("subthemeActive").value==="true"
+  });
+  if(error){toast(error.message);return}
+  closeModal();toast("Subtema salvo.");await loadAdminThemes();
+}
+
+async function deleteSubtheme(id){
+  if(!confirm("Excluir este subtema? Se ele já estiver em vendas, será apenas desativado para preservar o histórico."))return;
+  const {error}=await sb.rpc("admin_delete_subtheme",{p_id:id});
+  if(error){toast(error.message);return}
+  closeModal();toast("Subtema atualizado.");await loadAdminThemes();
 }
 
 async function loadAdminCategories(){
@@ -2506,20 +2597,22 @@ async function resetAllTestData(){
 async function loadAdminSales(){
   const box=document.getElementById("adminContent");
 
-  const [themesRes,categoriesRes,customersRes,salesRes]=await Promise.all([
+  const [themesRes,subthemesRes,categoriesRes,customersRes,salesRes]=await Promise.all([
     sb.from("themes").select("id,name").eq("active",true).order("name"),
+    sb.from("subthemes").select("id,theme_id,name,active").eq("active",true).order("name"),
     sb.from("categories").select("id,name").eq("active",true).order("name"),
     sb.from("customers").select("*").eq("active",true).order("name"),
     fetchAllPaged(()=>sb.from("sales").select(`
-      *,themes(name),category:categories(name),
+      *,themes(name),subtheme:subthemes(name),category:categories(name),
       customer:customers(id,name,whatsapp,instagram)
     `).order("sold_at",{ascending:false}))
   ]);
 
-  const error=themesRes.error||categoriesRes.error||customersRes.error||salesRes.error;
+  const error=themesRes.error||subthemesRes.error||categoriesRes.error||customersRes.error||salesRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
 
   window._adminSalesData=salesRes.data||[];
+  window._saleSubthemes=subthemesRes.data||[];
 
   box.innerHTML=`
     <div class="card">
@@ -2527,8 +2620,12 @@ async function loadAdminSales(){
 
       <div class="row">
         <div><label>Categoria vendida</label><select id="saleCategory">${(categoriesRes.data||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
-        <div><label>Tema vendido</label><select id="saleTheme">${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+        <div><label>Tema global</label><select id="saleTheme" onchange="renderSaleSubthemes()">${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
       </div>
+
+      <label>Subtema</label>
+      <select id="saleSubtheme"></select>
+      <div id="saleSubthemeHint" class="muted" style="font-size:11px;margin-top:5px"></div>
 
       <div class="row">
         <div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div>
@@ -2551,7 +2648,7 @@ async function loadAdminSales(){
         <input id="newSaleCustomerInstagram" placeholder="@cliente">
       </div>
 
-      <div class="notice" style="margin-top:12px"><b>Fila inteligente:</b> a venda continua sendo distribuída para o investimento compatível mais antigo.</div>
+      <div class="notice" style="margin-top:12px"><b>Importante:</b> o subtema serve para detalhamento e relatórios. A fila dos investimentos continua considerando apenas <b>categoria + tema global</b>.</div>
       <button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button>
     </div>
 
@@ -2572,7 +2669,25 @@ async function loadAdminSales(){
     </div>
   `;
 
+  renderSaleSubthemes();
   renderSalesDashboard();
+}
+
+function renderSaleSubthemes(){
+  const themeId=Number(document.getElementById("saleTheme")?.value||0);
+  const select=document.getElementById("saleSubtheme");
+  const hint=document.getElementById("saleSubthemeHint");
+  if(!select)return;
+  const subs=(window._saleSubthemes||[]).filter(s=>Number(s.theme_id)===themeId && s.active!==false);
+  if(!subs.length){
+    select.innerHTML=`<option value="">Nenhum subtema cadastrado neste tema</option>`;
+    select.disabled=true;
+    if(hint)hint.textContent="Você pode cadastrar subtemas em Administração → Temas.";
+    return;
+  }
+  select.disabled=false;
+  select.innerHTML=`<option value="">Selecione o subtema</option>${subs.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}`;
+  if(hint)hint.textContent="Escolha o detalhamento desta venda.";
 }
 
 function toggleNewSaleCustomer(){
@@ -2586,6 +2701,11 @@ async function saveSale(){
   const amount=Number(document.getElementById("saleAmount").value);
   const product=document.getElementById("saleProduct").value;
   const customerChoice=document.getElementById("saleCustomer").value;
+  const subthemeSelect=document.getElementById("saleSubtheme");
+  const availableSubs=(window._saleSubthemes||[]).filter(s=>Number(s.theme_id)===theme && s.active!==false);
+  const subthemeId=subthemeSelect?.value?Number(subthemeSelect.value):null;
+
+  if(availableSubs.length && !subthemeId){toast("Escolha o subtema desta venda.");return}
 
   let customerId=null;
 
@@ -2614,7 +2734,8 @@ async function saveSale(){
     p_category_id:category,
     p_amount:amount,
     p_product_name:product,
-    p_customer_id:customerId
+    p_customer_id:customerId,
+    p_subtheme_id:subthemeId
   });
 
   if(error){toast(error.message);return}
@@ -2633,17 +2754,21 @@ function renderSalesDashboard(){
   const count=sales.length;
   const ticket=count?total/count:0;
   const identified=sales.filter(s=>s.customer_id!=null).length;
-  const byCategory={},byTheme={};
+  const byCategory={},byTheme={},bySubtheme={};
 
   sales.forEach(s=>{
     const category=s.category?.name||"Categoria não registrada";
     const theme=s.themes?.name||"Tema não registrado";
+    const subtheme=s.subtheme?.name||"Sem subtema informado";
     if(!byCategory[category])byCategory[category]={value:0,count:0};
     if(!byTheme[theme])byTheme[theme]={value:0,count:0};
+    if(!bySubtheme[subtheme])bySubtheme[subtheme]={value:0,count:0};
     byCategory[category].value+=Number(s.amount||0);
     byCategory[category].count++;
     byTheme[theme].value+=Number(s.amount||0);
     byTheme[theme].count++;
+    bySubtheme[subtheme].value+=Number(s.amount||0);
+    bySubtheme[subtheme].count++;
   });
 
   dash.innerHTML=`
@@ -2660,23 +2785,29 @@ function renderSalesDashboard(){
     </div>
 
     <div class="dashboard-group">
-      <div class="dashboard-group-title">Temas</div>
+      <div class="dashboard-group-title">Temas globais</div>
       <div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1].value-a[1].value).map(([name,v])=>`<div class="mini-metric"><span class="muted">${esc(name)}</span><b>${money(v.value)}</b><span class="muted">${v.count} venda(s)</span></div>`).join("")||`<div class="muted">Nenhuma venda no período.</div>`}</div>
+    </div>
+
+    <div class="dashboard-group">
+      <div class="dashboard-group-title">Subtemas</div>
+      <div class="mini-metrics">${Object.entries(bySubtheme).sort((a,b)=>b[1].value-a[1].value).map(([name,v])=>`<div class="mini-metric"><span class="muted">${esc(name)}</span><b>${money(v.value)}</b><span class="muted">${v.count} venda(s)</span></div>`).join("")||`<div class="muted">Nenhuma venda no período.</div>`}</div>
     </div>
   `;
 
   extract.innerHTML=`
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead>
       <tbody>${sales.map(s=>`<tr>
         <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
         <td>${esc(s.customer?.name||"Cliente não identificado")}</td>
         <td>${esc(s.category?.name||"Categoria não registrada")}</td>
         <td>${esc(s.themes?.name||"-")}</td>
+        <td>${esc(s.subtheme?.name||"-")}</td>
         <td>${esc(s.product_name||"-")}</td>
         <td><b>${money(s.amount)}</b></td>
         <td>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:"-"}</td>
-      </tr>`).join("")||`<tr><td colspan="7">Nenhuma venda neste período.</td></tr>`}</tbody>
+      </tr>`).join("")||`<tr><td colspan="8">Nenhuma venda neste período.</td></tr>`}</tbody>
     </table></div>
   `;
 }
@@ -2698,7 +2829,7 @@ async function loadAdminCustomers(){
     sb.from("customers").select("*").eq("active",true).order("name"),
     fetchAllPaged(()=>sb.from("sales").select(`
       id,customer_id,amount,sold_at,product_name,
-      category:categories(name),themes(name)
+      category:categories(name),themes(name),subtheme:subthemes(name)
     `).not("customer_id","is",null).order("sold_at",{ascending:false}))
   ]);
 
@@ -2788,7 +2919,7 @@ async function openCustomerHistory(id){
   const [customerRes,salesRes]=await Promise.all([
     sb.from("customers").select("*").eq("id",id).single(),
     fetchAllPaged(()=>sb.from("sales").select(`
-      *,category:categories(name),themes(name)
+      *,category:categories(name),themes(name),subtheme:subthemes(name)
     `).eq("customer_id",id).order("sold_at",{ascending:false}))
   ]);
 
@@ -2802,13 +2933,15 @@ async function openCustomerHistory(id){
   const sales=salesRes.data||[];
   const total=sales.reduce((s,x)=>s+Number(x.amount||0),0);
   const ticket=sales.length?total/sales.length:0;
-  const byCategory={},byTheme={};
+  const byCategory={},byTheme={},bySubtheme={};
 
   sales.forEach(s=>{
     const cat=s.category?.name||"Categoria não registrada";
     const theme=s.themes?.name||"Tema não registrado";
+    const subtheme=s.subtheme?.name||"Sem subtema informado";
     byCategory[cat]=(byCategory[cat]||0)+Number(s.amount||0);
     byTheme[theme]=(byTheme[theme]||0)+Number(s.amount||0);
+    bySubtheme[subtheme]=(bySubtheme[subtheme]||0)+Number(s.amount||0);
   });
 
   openModal(`
@@ -2823,11 +2956,12 @@ async function openCustomerHistory(id){
     </div>
 
     <div class="history-section"><h3>Por categoria</h3><div class="mini-metrics">${Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
-    <div class="history-section"><h3>Por tema</h3><div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
+    <div class="history-section"><h3>Por tema global</h3><div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
+    <div class="history-section"><h3>Por subtema</h3><div class="mini-metrics">${Object.entries(bySubtheme).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
 
     <div class="history-section"><h3>Histórico de compras</h3><div class="table-wrap"><table class="table">
-      <thead><tr><th>Data</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th></tr></thead>
-      <tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="5">Nenhuma compra.</td></tr>`}</tbody>
+      <thead><tr><th>Data</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Valor</th></tr></thead>
+      <tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.subtheme?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="6">Nenhuma compra.</td></tr>`}</tbody>
     </table></div></div>
   `,true);
 }
