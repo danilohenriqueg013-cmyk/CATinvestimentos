@@ -2680,7 +2680,7 @@ async function loadAdminSales(){
     </div>
 
     <div class="card" style="margin-top:14px">
-      <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, vendas podem ser excluídas.":""}</div></div></div>
+      <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Vendas totalmente não pagas podem ser excluídas em caso de cancelamento. Vendas com qualquer valor recebido ficam protegidas.</div></div></div>
       <div id="salesExtract"></div>
     </div>
   `;
@@ -2852,7 +2852,11 @@ function renderSalesDashboard(){
           <td class="flow-positive"><b>${money(s.paid_amount||0)}</b></td>
           <td class="${remaining>0?"flow-negative":"flow-neutral"}"><b>${money(remaining)}</b></td>
           <td><span class="badge ${s.payment_status==="paid"?"green":s.payment_status==="partial"?"":"red"}">${salePaymentStatusPt(s.payment_status)}</span></td>
-          <td><div class="actions">${remaining>0?`<button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Receber</button>`:""}${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:(remaining<=0?"-":"")}</div></td>
+          <td><div class="actions">
+            <button class="btn secondary smallbtn" onclick="openEditSaleSubtheme(${s.id})">Editar subtema</button>
+            ${remaining>0?`<button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Receber</button>`:""}
+            ${s.payment_status==="unpaid" && Number(s.paid_amount||0)===0?`<button class="btn danger smallbtn" onclick="deleteUnpaidSale(${s.id})">Excluir não paga</button>`:""}
+          </div></td>
         </tr>`;
       }).join("")||`<tr><td colspan="11">Nenhuma venda neste período.</td></tr>`}</tbody>
     </table></div>
@@ -2936,14 +2940,69 @@ async function recordSalePayment(id){
   else await loadAdminSales();
 }
 
-async function deleteAdminSale(id){
-  if(!confirm("Excluir esta venda de TESTE? O sistema vai apagar a venda e recalcular automaticamente caixinhas, filas, progresso e retornos. Esta ação não pode ser desfeita."))return;
+async function openEditSaleSubtheme(id){
+  const sale=(window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
+  if(!sale){toast("Venda não encontrada.");return}
 
-  const {error}=await sb.rpc("admin_delete_test_sale",{p_sale_id:id});
+  const themeId=Number(sale.theme_id||0);
+  const subs=(window._saleSubthemes||[])
+    .filter(s=>Number(s.theme_id)===themeId && s.active!==false)
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR"));
+
+  openModal(`
+    <div class="title-row">
+      <div>
+        <h2>Editar subtema da venda</h2>
+        <div class="muted">Venda #${sale.id} • ${new Date(sale.sold_at).toLocaleString("pt-BR")}</div>
+      </div>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+    <div class="item" style="margin-top:12px">
+      <b>${esc(sale.product_name||"Venda")}</b>
+      <div class="muted">Tema global: <b>${esc(sale.themes?.name||"Tema")}</b> • Categoria: ${esc(sale.category?.name||"Categoria")}</div>
+      <div class="muted" style="margin-top:5px">Valor: ${money(sale.amount)}</div>
+    </div>
+    <label>Subtema</label>
+    <select id="editSaleSubtheme">
+      <option value="">Sem subtema</option>
+      ${subs.map(st=>`<option value="${st.id}" ${Number(sale.subtheme_id)===Number(st.id)?"selected":""}>${esc(st.name)}</option>`).join("")}
+    </select>
+    ${subs.length?`<div class="muted" style="font-size:11px;margin-top:6px">A alteração é apenas de detalhamento. Não muda categoria, tema global, valores recebidos nem a fila dos investimentos.</div>`:`<div class="notice" style="margin-top:10px">Este tema ainda não possui subtemas ativos. Cadastre-os primeiro em Administração → Temas.</div>`}
+    <div class="actions" style="margin-top:14px">
+      <button class="btn" onclick="saveSaleSubtheme(${sale.id})" ${subs.length?"":"disabled"}>Salvar subtema</button>
+    </div>
+  `,true);
+}
+
+async function saveSaleSubtheme(id){
+  const value=document.getElementById("editSaleSubtheme")?.value||"";
+  const subthemeId=value?Number(value):null;
+
+  const {error}=await sb.rpc("admin_update_sale_subtheme",{
+    p_sale_id:id,
+    p_subtheme_id:subthemeId
+  });
   if(error){toast(error.message);return}
 
-  toast("Venda de teste excluída. Caixinhas, filas, progresso e saldos foram recalculados.");
+  closeModal();
+  toast("Subtema da venda atualizado.");
   await loadAdminSales();
+}
+
+async function deleteUnpaidSale(id,fromResults=false){
+  const sale=findSaleForReceivable(id) || (window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
+  const label=sale?.product_name?` “${sale.product_name}”`:"";
+  if(!confirm(`Excluir definitivamente a venda não paga${label}?
+
+Isso só é permitido quando nenhum valor foi recebido. Como a venda não teve entrada no caixa nem nos investimentos, ela será removida também de Receitas a receber.`))return;
+
+  const {error}=await sb.rpc("admin_delete_unpaid_sale",{p_sale_id:id});
+  if(error){toast(error.message);return}
+
+  closeModal();
+  toast("Venda não paga excluída.");
+  if(fromResults || document.getElementById("receivablesPanel"))await loadAdminResults();
+  else await loadAdminSales();
 }
 
 
@@ -3318,7 +3377,10 @@ function renderReceivablesPanel(){
           <td class="flow-positive">${money(s.paid_amount||0)}</td>
           <td class="flow-negative"><b>${money(remaining)}</b></td>
           <td>${salePaymentStatusPt(s.payment_status)}</td>
-          <td><button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Abrir / receber</button></td>
+          <td><div class="actions">
+            <button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Abrir / receber</button>
+            ${s.payment_status==="unpaid" && Number(s.paid_amount||0)===0?`<button class="btn danger smallbtn" onclick="deleteUnpaidSale(${s.id},true)">Excluir não paga</button>`:""}
+          </div></td>
         </tr>`;
       }).join("")||`<tr><td colspan="9">Nenhuma receita a receber. Todas as vendas estão pagas.</td></tr>`}</tbody>
     </table></div>
