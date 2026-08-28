@@ -1,0 +1,3601 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#a94366">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CATinvestimentos">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>CATinvestimentos | Cat Encantus</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--primary:#a94366;--secondary:#f7dfe6;--bg:#fff8fa;--text:#5f3545;--border:#efd6df;--muted:#85616e}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+header{background:var(--secondary);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.header{max-width:1180px;margin:auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand-wrap{display:flex;align-items:center;gap:12px}.logo{width:52px;height:52px;border-radius:50%;object-fit:cover;background:white}
+.brand{font-weight:800;font-size:25px;color:var(--primary)}.store{font-size:12px;color:var(--muted)}
+.btn{border:0;border-radius:11px;padding:11px 15px;background:var(--primary);color:white;font-weight:700}.btn.secondary{background:white;color:var(--primary);border:1px solid var(--border)}
+.btn.danger{background:#a32645}.btn.success{background:#25734b}.btn.smallbtn{padding:8px 11px;font-size:12px}
+main{max-width:1180px;margin:32px auto;padding:0 20px}.card{background:white;border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:0 8px 24px rgba(120,63,84,.07)}
+.hero{text-align:center;margin:40px 0}.hero h1{font-size:38px;color:var(--primary);margin:0 0 10px}.muted{color:var(--muted);font-size:13px;line-height:1.55}
+.login{max-width:430px;margin:auto}.login h2{text-align:center;color:var(--primary)}
+label{display:block;margin:12px 0 6px;font-weight:700;font-size:13px}input,select,textarea{width:100%;border:1px solid #dfc4ce;border-radius:10px;padding:11px;background:white;color:var(--text)}
+textarea{min-height:80px;resize:vertical}.msg{margin-top:12px;font-size:13px}.error{color:#a32645}.ok{color:#25734b}
+.notice{margin-top:18px;background:#fff0f4;border-radius:12px;padding:14px;font-size:12px;line-height:1.6}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}.title-row h1,.title-row h2{margin:0;color:var(--primary)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:20px 0}.stat-value{font-size:27px;font-weight:800;color:var(--primary);margin-top:6px}
+.admin-menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}.admin-item{min-height:100px;background:white;color:var(--primary);border:1px solid var(--border);border-radius:15px;font-weight:800}
+.admin-item:hover{background:#fff0f4}.section{margin-top:22px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.item{border:1px solid var(--border);border-radius:14px;padding:16px;background:#fffafb}.item h3{margin:0 0 7px;color:var(--primary)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.progress{height:10px;background:#f3dfe6;border-radius:20px;overflow:hidden;margin:10px 0}.progress>div{height:100%;background:var(--primary)}
+.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;min-width:720px}.table th,.table td{text-align:left;padding:10px;border-bottom:1px solid #f1e1e6;font-size:13px;vertical-align:top}.table th{color:var(--primary)}
+.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;background:#f4dfe6;color:var(--primary)}.badge.green{background:#e1f4e9;color:#25734b}.badge.red{background:#f8e1e6;color:#a32645}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}.modal-card{background:white;width:min(560px,100%);max-height:90vh;overflow:auto;border-radius:18px;padding:22px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tab{background:white;color:var(--primary);border:1px solid var(--border);border-radius:999px;padding:8px 12px}.tab.active{background:var(--primary);color:white}
+footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
+@media(max-width:700px){.row,.row3{grid-template-columns:1fr}.hero h1{font-size:29px}.brand{font-size:21px}.header{padding:10px 14px}}
+
+/* ===== V19: LOGIN E PAINEL DO INVESTIDOR ===== */
+.login-stage{
+  position:relative;
+  min-height:690px;
+  display:grid;
+  grid-template-columns:minmax(0,1.05fr) minmax(360px,.75fr);
+  gap:42px;
+  align-items:center;
+  padding:54px 42px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:30px;
+  background:
+    radial-gradient(circle at 12% 12%,rgba(255,255,255,.98) 0 8%,transparent 27%),
+    radial-gradient(circle at 88% 84%,rgba(255,226,237,.95) 0 12%,transparent 35%),
+    linear-gradient(135deg,#fffafb 0%,#fff1f6 50%,#fbe1eb 100%);
+  box-shadow:0 22px 60px rgba(120,63,84,.10);
+}
+.login-stage:before,.investor-home-hero:before{
+  content:"";
+  position:absolute;inset:0;
+  background-image:
+    radial-gradient(circle,rgba(169,67,102,.18) 1.3px,transparent 1.4px),
+    radial-gradient(circle,rgba(255,255,255,.9) 1.4px,transparent 1.5px);
+  background-size:34px 34px,52px 52px;
+  background-position:0 0,12px 18px;
+  opacity:.35;
+  pointer-events:none;
+}
+.login-copy{position:relative;z-index:3;padding:24px 14px 24px 26px}
+.login-kicker{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:999px;
+  background:#fff;color:var(--primary);
+  border:1px solid var(--border);
+  font-size:12px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;
+  box-shadow:0 8px 20px rgba(120,63,84,.07)
+}
+.login-copy h1{
+  max-width:680px;
+  margin:20px 0 14px;
+  font-size:clamp(42px,5vw,66px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  color:var(--primary);
+}
+.login-copy p{
+  max-width:620px;
+  font-size:18px;
+  line-height:1.65;
+  color:#77505f;
+}
+.login-pills{display:flex;flex-wrap:wrap;gap:9px;margin-top:22px}
+.login-pill{
+  background:rgba(255,255,255,.82);
+  border:1px solid var(--border);
+  border-radius:999px;padding:9px 12px;
+  font-size:12px;font-weight:700;color:var(--primary);
+  backdrop-filter:blur(7px)
+}
+.login-card-v19{
+  position:relative;z-index:5;
+  margin:0 8px 0 auto;
+  width:min(440px,100%);
+  padding:28px;
+  border-radius:24px;
+  box-shadow:0 26px 70px rgba(108,42,66,.16);
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(12px);
+}
+.login-card-v19 h2{font-size:26px;margin-bottom:4px}
+.login-card-sub{text-align:center;margin-bottom:18px}
+.login-card-v19 input{padding:13px 14px;background:#fffafd}
+.login-card-v19 .btn{padding:13px 15px}
+.login-product,.home-product{
+  position:absolute;z-index:2;pointer-events:none;
+  object-fit:contain;
+  filter:drop-shadow(0 14px 15px rgba(105,54,73,.18));
+  transform-origin:center;
+}
+.lp1{width:100px;left:43%;top:8px;transform:rotate(-8deg)}
+.lp2{width:118px;left:42%;bottom:12px;transform:rotate(6deg)}
+.lp3{width:82px;right:12px;top:10px;transform:rotate(7deg)}
+.lp4{width:108px;right:36%;bottom:10px;transform:rotate(-8deg)}
+.lp5{width:86px;right:12px;bottom:10px;transform:rotate(5deg)}
+.login-shop-link{
+  display:inline-flex;align-items:center;gap:8px;
+  margin-top:18px;color:var(--primary);font-weight:800;text-decoration:none
+}
+
+.investor-home-hero{
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:26px;
+  min-height:178px;
+  padding:30px 250px 30px 30px;
+  background:
+    radial-gradient(circle at 85% 20%,#ffe4ee 0,transparent 28%),
+    linear-gradient(135deg,#fff 0%,#fff3f7 60%,#f8dfe8 100%);
+  box-shadow:0 12px 35px rgba(120,63,84,.08);
+}
+.investor-home-hero .home-copy{position:relative;z-index:3}
+.investor-home-hero h1{font-size:34px;margin:0 0 7px;color:var(--primary)}
+.investor-home-hero p{max-width:640px;margin:0;color:var(--muted);line-height:1.6}
+.hp1{width:115px;right:118px;top:10px;transform:rotate(-7deg)}
+.hp2{width:112px;right:18px;bottom:2px;transform:rotate(7deg)}
+.hp3{width:88px;right:238px;bottom:7px;transform:rotate(5deg);opacity:.96}
+.hp4{width:78px;right:345px;top:18px;transform:rotate(-5deg);opacity:.92}
+
+.investor-menu{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(130px,1fr));
+  gap:12px;
+  margin:20px 0;
+}
+.investor-item{
+  min-height:92px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;
+  background:#fff;
+  color:var(--primary);
+  border:1px solid var(--border);
+  border-radius:16px;
+  font-weight:800;
+  box-shadow:0 8px 22px rgba(120,63,84,.05);
+  transition:.15s ease;
+}
+.investor-item:hover,.investor-item.active{
+  transform:translateY(-2px);
+  background:#fff0f4;
+  border-color:#deb8c6;
+  box-shadow:0 12px 26px rgba(120,63,84,.10);
+}
+.investor-item .nav-icon{font-size:22px}
+.investor-content-empty{
+  text-align:center;padding:36px 20px;
+  border:1px dashed #e4c4cf;border-radius:18px;
+  background:rgba(255,255,255,.55)
+}
+.stats-v19 .card{position:relative;overflow:hidden}
+.stats-v19 .card:after{
+  content:"";position:absolute;width:80px;height:80px;
+  right:-22px;bottom:-28px;border-radius:50%;
+  background:#fff0f4
+}
+
+@media(max-width:980px){
+  .login-stage{grid-template-columns:1fr;padding:36px 22px}
+  .login-copy{text-align:center;padding:10px 30px}
+  .login-copy p{margin-left:auto;margin-right:auto}
+  .login-pills{justify-content:center}
+  .login-card-v19{margin:auto}
+  .lp1,.lp2{width:82px}.lp3,.lp4{width:72px}
+  .lp5{display:none}
+  .investor-menu{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:700px){
+  .login-stage{padding:26px 14px;min-height:0}
+  .login-copy{padding:10px 8px}
+  .login-copy h1{font-size:38px}
+  .login-copy p{font-size:15px}
+  .login-product{opacity:.22}
+  .login-card-v19{padding:21px}
+  .investor-home-hero{padding:24px 115px 24px 20px;min-height:155px}
+  .investor-home-hero h1{font-size:27px}
+  .hp1{width:78px;right:82px;top:16px}.hp2{width:72px;right:8px;bottom:3px}.hp3{display:none}.hp4{display:none}
+  .investor-menu{grid-template-columns:repeat(2,1fr)}
+  .investor-item{min-height:82px;font-size:13px}
+}
+
+/* ===== V26: HISTÓRICO 360, CAIXINHAS DETALHADAS E PUSH ===== */
+.modal-card.wide{width:min(1120px,100%)}
+.investor-name-link{background:none;border:0;padding:0;color:var(--primary);font-weight:800;text-align:left;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.investor-name-link:hover{opacity:.75}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+.metric-box{border:1px solid var(--border);background:#fffafb;border-radius:14px;padding:14px}
+.metric-box .metric-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.metric-box .metric-value{font-size:22px;color:var(--primary);font-weight:800;margin-top:5px}
+.history-section{margin-top:22px}.history-section h3{margin:0 0 10px;color:var(--primary)}
+.cashbox-value-btn{background:none;border:0;padding:0;color:var(--primary);font-size:27px;font-weight:800;text-align:left;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+.cashbox-value-btn:hover{opacity:.72}
+.cashbox-breakdown-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #f1e1e6}
+.cashbox-breakdown-row:last-child{border-bottom:0}
+.header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+#pushBtn.push-on{background:#25734b;border-color:#25734b;color:#fff}
+#pushBtn{white-space:nowrap}
+.withdraw-window{margin-top:12px}
+@media(max-width:700px){
+  .modal-card.wide{width:100%;padding:16px}
+  .metric-grid{grid-template-columns:repeat(2,1fr)}
+  #pushBtn{font-size:11px;padding:8px 9px}
+  .header-actions{gap:6px}
+}
+
+
+/* ===== V32: GESTÃO COMPLETA ===== */
+.filter-bar{display:grid;grid-template-columns:repeat(2,minmax(150px,1fr)) auto auto;gap:10px;align-items:end;margin-top:12px}
+.report-subtitle{font-size:12px;color:var(--muted);margin-top:5px}
+.metric-box.warning{background:#fff8e8;border-color:#ead9a2}
+.metric-box.danger-soft{background:#fff0f3;border-color:#efc6d0}
+.metric-box.success-soft{background:#effaf4;border-color:#c9e8d6}
+.metric-box.neutral-soft{background:#f7f7f8;border-color:#dedee2}
+.dashboard-group{margin-top:18px}
+.dashboard-group-title{font-weight:800;color:var(--primary);margin:0 0 9px}
+.mini-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}
+.mini-metric{border:1px solid var(--border);border-radius:13px;padding:12px;background:#fff}
+.mini-metric b{display:block;font-size:19px;color:var(--primary);margin-top:4px}
+.customer-new-fields{margin-top:10px;padding:12px;border:1px dashed var(--border);border-radius:13px;background:#fffafb}
+.flow-positive{color:#25734b;font-weight:800}
+.flow-negative{color:#a32645;font-weight:800}
+.flow-neutral{color:#725563;font-weight:800}
+.pending-action{border:1px solid #ead9a2;background:#fff9e9;border-radius:14px;padding:14px;margin-top:10px}
+.balance-card{position:relative}
+.balance-card .balance-status{font-size:11px;margin-top:6px}
+.obligation-card{border-left:4px solid var(--primary)}
+@media(max-width:760px){
+  .filter-bar{grid-template-columns:1fr 1fr}
+  .filter-bar .btn{width:100%}
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="header">
+    <div class="brand-wrap">
+      <img id="brandLogo" class="logo" src="logo.png" alt="Cat Encantus" onerror="this.style.display='none'">
+      <div><div id="brandName" class="brand">CATinvestimentos</div><div id="storeName" class="store">Cat Encantus • Produtos Personalizados</div></div>
+    </div>
+    <div class="header-actions">
+      <button id="pushBtn" class="btn secondary hidden" onclick="enablePushNotifications()">🔔 Ativar alertas</button>
+      <button id="logoutBtn" class="btn hidden" onclick="logout()">Sair</button>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="loginArea">
+  <div class="login-stage">
+    <img src="produto-fantasma-v20.png" class="login-product lp1" alt="" aria-hidden="true">
+    <img src="produto-sonic-v20.png" class="login-product lp2" alt="" aria-hidden="true">
+    <img src="produto-coringa.png" class="login-product lp3" alt="" aria-hidden="true">
+    <img src="produto-panico.png" class="login-product lp4" alt="" aria-hidden="true">
+    <img src="produto-caveiras.png" class="login-product lp5" alt="" aria-hidden="true">
+
+    <div class="login-copy">
+      <span class="login-kicker">✦ Cat Encantus • feito à mão</span>
+      <h1>Invista nas ideias que podem virar os próximos encantos.</h1>
+      <p>
+        Escolha categorias e temas da Cat Encantus, acompanhe seus investimentos
+        e veja cada venda elegível aproximar você do valor-alvo.
+      </p>
+      <div class="login-pills">
+        <span class="login-pill">♡ Produtos personalizados</span>
+        <span class="login-pill">✦ Investimento por tema e categoria</span>
+        <span class="login-pill">⌁ Acompanhamento em um só lugar</span>
+      </div>
+      <a class="login-shop-link" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer">
+        🛍️ Conhecer o catálogo da Cat Encantus →
+      </a>
+    </div>
+
+    <div class="card login login-card-v19">
+      <h2>Área do Investidor</h2>
+      <div class="muted login-card-sub">Entre para acompanhar sua conta.</div>
+
+      <label>E-mail</label>
+      <input id="email" type="email" autocomplete="email" placeholder="seuemail@exemplo.com">
+
+      <label>Senha</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Sua senha" onkeydown="if(event.key==='Enter') login()">
+
+      <button class="btn" style="width:100%;margin-top:18px" onclick="login()">Entrar</button>
+      <button class="btn secondary" style="width:100%;margin-top:10px" onclick="openSignup()">Criar minha conta</button>
+      <button id="forgotPasswordBtn" class="btn secondary hidden" style="width:100%;margin-top:10px" onclick="openForgotPassword()">Esqueceu a senha?</button>
+
+      <div id="loginMsg" class="msg"></div>
+
+      <div class="notice">
+        <b>Importante:</b> o retorno é um valor-alvo e o prazo depende das vendas
+        elegíveis da categoria e do tema escolhidos.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="loadingArea" class="hidden" style="text-align:center;padding:70px"><h2>Carregando CATinvestimentos...</h2></section>
+
+<section id="investorArea" class="hidden">
+  <div class="investor-home-hero">
+    <div class="home-copy">
+      <div class="muted" style="font-weight:800;letter-spacing:.08em;text-transform:uppercase">Sua conta Cat Encantus</div>
+      <h1 id="helloInvestor">Olá!</h1>
+      <p>
+        Acompanhe seu patrimônio dentro da plataforma e escolha abaixo a área
+        que deseja acessar.
+      </p>
+    </div>
+    <img src="produto-squirtle.png" class="home-product hp1" alt="" aria-hidden="true">
+    <img src="produto-mario-yoshi.png" class="home-product hp2" alt="" aria-hidden="true">
+    <img src="produto-coracoes-v20.png" class="home-product hp3" alt="" aria-hidden="true">
+    <img src="produto-chaves-v20.png" class="home-product hp4" alt="" aria-hidden="true">
+  </div>
+
+  <div class="stats stats-v19">
+    <div class="card">
+      <div class="muted">Saldo disponível</div>
+      <div id="investorAvailableBalance" class="stat-value">R$ 0,00</div>
+    </div>
+    <div class="card">
+      <div class="muted">Investimentos pendentes</div>
+      <div id="investorPendingTotal" class="stat-value">R$ 0,00</div>
+    </div>
+    <div class="card">
+      <div class="muted">Faturamento Total</div>
+      <div id="investorReturnedTotal" class="stat-value">R$ 0,00</div>
+    </div>
+  </div>
+
+  <div class="investor-menu">
+    <button class="investor-item" data-investor-section="invest" onclick="investorSection('invest',this)">
+      <span class="nav-icon">💗</span><span>Investir</span>
+    </button>
+    <button class="investor-item" data-investor-section="investments" onclick="investorSection('investments',this)">
+      <span class="nav-icon">💰</span><span>Meus investimentos</span>
+    </button>
+    <button class="investor-item" data-investor-section="transactions" onclick="investorSection('transactions',this)">
+      <span class="nav-icon">↔️</span><span>Movimentações</span>
+    </button>
+    <button class="investor-item" data-investor-section="deposits" onclick="investorSection('deposits',this)">
+      <span class="nav-icon">➕</span><span>Depósitos</span>
+    </button>
+    <button class="investor-item" data-investor-section="withdrawals" onclick="investorSection('withdrawals',this)">
+      <span class="nav-icon">💸</span><span>Saques</span>
+    </button>
+    <button class="investor-item" data-investor-section="notifications" onclick="investorSection('notifications',this)">
+      <span class="nav-icon">🔔</span><span>Notificações</span>
+    </button>
+    <button class="investor-item" onclick="window.open('https://catencantus.kicatalogo.com','_blank','noopener')">
+      <span class="nav-icon">🛍️</span><span>Catálogo da Loja</span>
+    </button>
+    <button class="investor-item" onclick="installCATApp()">
+      <span class="nav-icon">📱</span><span>Baixar App</span>
+    </button>
+  </div>
+
+  <div id="investorContent" class="section">
+    <div class="investor-content-empty">
+      <div style="font-size:26px;margin-bottom:8px">✨</div>
+      <b>Escolha uma opção acima</b>
+      <div class="muted" style="margin-top:6px">
+        Você pode investir, acompanhar seus investimentos, depósitos, saques, movimentações ou notificações.
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="adminArea" class="hidden">
+  <div class="title-row"><div><h1>Painel Administrativo</h1><div class="muted">Cat Encantus • controle exclusivo do administrador</div></div></div>
+  <div class="admin-menu">
+    <button class="admin-item" onclick="adminSection('investors')">👥<br><br>Investidores</button>
+    <button class="admin-item" onclick="adminSection('themes')">🎨<br><br>Temas</button>
+    <button class="admin-item" onclick="adminSection('categories')">🏷️<br><br>Categorias</button>
+    <button class="admin-item" onclick="adminSection('options')">🧩<br><br>Opções de investimento</button>
+    <button class="admin-item" onclick="adminSection('investments')">💰<br><br>Investimentos</button>
+    <button class="admin-item" onclick="adminSection('sales')">🧾<br><br>Vendas</button>
+    <button class="admin-item" onclick="adminSection('results')">📊<br><br>Resultados</button>
+    <button class="admin-item" onclick="adminSection('customers')">🤝<br><br>Clientes</button>
+    <button class="admin-item" onclick="adminSection('cashboxes')">📦<br><br>Caixinhas</button>
+    <button class="admin-item" onclick="adminSection('queues')">🔄<br><br>Filas</button>
+    <button class="admin-item" onclick="adminSection('deposits')">➕<br><br>Depósitos</button>
+    <button class="admin-item" onclick="adminSection('withdrawals')">💸<br><br>Saques</button>
+    <button class="admin-item" onclick="adminSection('notifications')">🔔<br><br>Notificações</button>
+    <button class="admin-item" onclick="adminSection('settings')">⚙️<br><br>Configurações</button>
+  </div>
+  <div id="adminContent" class="section"></div>
+</section>
+</main>
+
+<footer>CATinvestimentos • Cat Encantus</footer>
+<div id="modal" class="modal hidden"></div>
+
+<script>
+const SUPABASE_URL="https://gjjzddsuqphahfjjgkda.supabase.co";
+const SUPABASE_KEY="sb_publishable_VuPY2hFbsEcftj37cVnXbQ__wM0Ulfc";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let currentProfile=null, settings={target_return_rate:15,minimum_deposit:40,minimum_investment:10,maximum_investment:100,maximum_investors_per_theme:3};
+
+const money=v=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v||0));
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+function hideAll(){["loginArea","loadingArea","investorArea","adminArea"].forEach(id=>document.getElementById(id).classList.add("hidden"))}
+function show(id){hideAll();document.getElementById(id).classList.remove("hidden")}
+function openModal(html,wide=false){const m=document.getElementById("modal");m.innerHTML=`<div class="modal-card${wide?" wide":""}">${html}</div>`;m.classList.remove("hidden")}
+function closeModal(){document.getElementById("modal").classList.add("hidden");document.getElementById("modal").innerHTML=""}
+function toast(msg){alert(msg)}
+
+
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
+async function refreshPushButton(){
+  const btn=document.getElementById("pushBtn");
+  if(!btn||!currentProfile){return}
+  btn.classList.remove("hidden","push-on");
+
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+    btn.textContent="🔕 Alertas não suportados";
+    btn.disabled=true;
+    return;
+  }
+
+  if(!settings.push_vapid_public_key){
+    btn.textContent="🔔 Alertas em configuração";
+    btn.disabled=true;
+    return;
+  }
+
+  if(Notification.permission==="denied"){
+    btn.textContent="🔕 Alertas bloqueados";
+    btn.disabled=false;
+    return;
+  }
+
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(Notification.permission==="granted"&&sub){
+      btn.textContent="🔔 Alertas ativos";
+      btn.classList.add("push-on");
+      btn.disabled=false;
+      return;
+    }
+  }catch(e){console.warn("Status push:",e)}
+
+  btn.textContent="🔔 Ativar alertas";
+  btn.disabled=false;
+}
+
+async function enablePushNotifications(){
+  if(!currentProfile)return;
+  if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+    toast("Este navegador não suporta notificações push.");
+    return;
+  }
+  if(!settings.push_vapid_public_key){
+    toast("As notificações do celular ainda não foram finalizadas pelo administrador.");
+    return;
+  }
+  if(Notification.permission==="denied"){
+    toast("As notificações estão bloqueadas neste navegador. Abra as permissões do site no celular e permita notificações. No iPhone, o CATinvestimentos precisa estar adicionado à Tela de Início.");
+    return;
+  }
+
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){
+      toast("Permissão de notificações não concedida.");
+      await refreshPushButton();
+      return;
+    }
+
+    const reg=await navigator.serviceWorker.ready;
+    let subscription=await reg.pushManager.getSubscription();
+    if(!subscription){
+      subscription=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(settings.push_vapid_public_key)
+      });
+    }
+
+    const json=subscription.toJSON();
+    const {error}=await sb.rpc("save_push_subscription",{
+      p_endpoint:subscription.endpoint,
+      p_p256dh:json.keys?.p256dh||"",
+      p_auth:json.keys?.auth||"",
+      p_user_agent:navigator.userAgent||""
+    });
+    if(error)throw error;
+
+    toast("Notificações ativadas neste aparelho. A partir de agora os avisos também podem aparecer na barra do celular.");
+    await refreshPushButton();
+  }catch(e){
+    console.error("Push subscription error:",e);
+    toast("Não foi possível ativar as notificações: "+(e?.message||e));
+  }
+}
+
+function openSignup(){
+  openModal(`
+    <div class="title-row">
+      <h2>Criar conta de investidor</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <label>Nome completo</label>
+    <input id="signupName" autocomplete="name">
+
+    <label>E-mail</label>
+    <input id="signupEmail" type="email" autocomplete="email">
+
+    <label>Telefone</label>
+    <input id="signupPhone" type="tel" placeholder="(31) 99999-9999">
+
+    <label>Chave PIX</label>
+    <input id="signupPix" placeholder="CPF, e-mail, telefone ou chave aleatória">
+
+    <div class="row">
+      <div>
+        <label>Senha</label>
+        <input id="signupPassword" type="password" minlength="6" autocomplete="new-password">
+      </div>
+      <div>
+        <label>Confirmar senha</label>
+        <input id="signupPassword2" type="password" minlength="6" autocomplete="new-password">
+      </div>
+    </div>
+
+    <label style="display:flex;gap:9px;align-items:flex-start;font-weight:400;margin-top:16px">
+      <input id="signupTerms" type="checkbox" style="width:auto;margin-top:3px">
+      <span class="muted">
+        Li e entendi que o retorno-alvo não é imediato nem garantido,
+        que o prazo depende das vendas do tema e que valores investidos
+        só ficam disponíveis novamente após a conclusão do investimento.
+      </span>
+    </label>
+
+    <button class="btn" style="width:100%;margin-top:16px" onclick="signupInvestor()">
+      Criar conta
+    </button>
+
+    <div id="signupMsg" class="msg"></div>
+  `);
+}
+
+async function signupInvestor(){
+  const name=document.getElementById("signupName").value.trim();
+  const email=document.getElementById("signupEmail").value.trim();
+  const phone=document.getElementById("signupPhone").value.trim();
+  const pix=document.getElementById("signupPix").value.trim();
+  const password=document.getElementById("signupPassword").value;
+  const password2=document.getElementById("signupPassword2").value;
+  const accepted=document.getElementById("signupTerms").checked;
+  const msg=document.getElementById("signupMsg");
+
+  if(!name||!email||!phone||!pix||!password||!password2){
+    msg.className="msg error";
+    msg.textContent="Preencha todos os campos.";
+    return;
+  }
+
+  if(password.length<6){
+    msg.className="msg error";
+    msg.textContent="A senha precisa ter pelo menos 6 caracteres.";
+    return;
+  }
+
+  if(password!==password2){
+    msg.className="msg error";
+    msg.textContent="As senhas não coincidem.";
+    return;
+  }
+
+  if(!accepted){
+    msg.className="msg error";
+    msg.textContent="Você precisa confirmar que leu e entendeu as regras.";
+    return;
+  }
+
+  msg.className="msg";
+  msg.textContent="Criando conta...";
+
+  const redirectUrl=window.location.origin+window.location.pathname;
+
+  const {data,error}=await sb.auth.signUp({
+    email,
+    password,
+    options:{
+      emailRedirectTo:redirectUrl,
+      data:{
+        name,
+        phone,
+        pix,
+        accepted_terms:true
+      }
+    }
+  });
+
+  if(error){
+    msg.className="msg error";
+    msg.textContent=error.message;
+    return;
+  }
+
+  if(data.session){
+    closeModal();
+    await loadUser();
+  }else{
+    msg.className="msg ok";
+    msg.innerHTML="Conta criada! Verifique seu e-mail para confirmar o cadastro. Depois volte a esta página e faça login.";
+  }
+}
+
+
+
+function passwordRecoveryRedirectUrl(){
+  return window.location.origin + window.location.pathname;
+}
+
+function openForgotPassword(){
+  const currentEmail=document.getElementById("email")?.value.trim()||"";
+
+  openModal(`
+    <div class="title-row">
+      <h2>Recuperar senha</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <div class="muted">
+      Informe o e-mail usado no CATinvestimentos. Você receberá um link para criar uma nova senha.
+    </div>
+
+    <label>E-mail</label>
+    <input id="recoveryEmail" type="email" autocomplete="email" value="${esc(currentEmail)}" placeholder="seuemail@exemplo.com">
+
+    <button class="btn" style="width:100%;margin-top:16px" onclick="sendPasswordRecoveryEmail()">
+      Enviar link para redefinir senha
+    </button>
+
+    <div id="recoveryMsg" class="msg"></div>
+  `);
+}
+
+async function sendPasswordRecoveryEmail(){
+  const email=document.getElementById("recoveryEmail").value.trim();
+  const msg=document.getElementById("recoveryMsg");
+
+  if(!email){
+    msg.className="msg error";
+    msg.textContent="Digite seu e-mail.";
+    return;
+  }
+
+  msg.className="msg";
+  msg.textContent="Enviando e-mail...";
+
+  const {error}=await sb.auth.resetPasswordForEmail(email,{
+    redirectTo:passwordRecoveryRedirectUrl()
+  });
+
+  if(error){
+    msg.className="msg error";
+
+    if(String(error.message||"").toLowerCase().includes("rate")){
+      msg.textContent="Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.";
+    }else{
+      msg.textContent="Não foi possível enviar o e-mail agora. Tente novamente em alguns instantes.";
+    }
+    return;
+  }
+
+  msg.className="msg ok";
+  msg.innerHTML="Pronto! Se este e-mail estiver cadastrado, você receberá uma mensagem com o link para criar uma nova senha. Confira também a caixa de spam.";
+}
+
+function openNewPasswordModal(){
+  openModal(`
+    <div class="title-row">
+      <h2>Criar nova senha</h2>
+    </div>
+
+    <div class="notice">
+      Crie uma nova senha para sua conta do CATinvestimentos.
+    </div>
+
+    <label>Nova senha</label>
+    <input id="newRecoveryPassword" type="password" minlength="6" autocomplete="new-password">
+
+    <label>Confirmar nova senha</label>
+    <input id="newRecoveryPassword2" type="password" minlength="6" autocomplete="new-password">
+
+    <button class="btn" style="width:100%;margin-top:16px" onclick="saveRecoveredPassword()">
+      Salvar nova senha
+    </button>
+
+    <div id="newPasswordMsg" class="msg"></div>
+  `);
+}
+
+async function saveRecoveredPassword(){
+  const password=document.getElementById("newRecoveryPassword").value;
+  const password2=document.getElementById("newRecoveryPassword2").value;
+  const msg=document.getElementById("newPasswordMsg");
+
+  if(password.length<6){
+    msg.className="msg error";
+    msg.textContent="A nova senha precisa ter pelo menos 6 caracteres.";
+    return;
+  }
+
+  if(password!==password2){
+    msg.className="msg error";
+    msg.textContent="As senhas não coincidem.";
+    return;
+  }
+
+  msg.className="msg";
+  msg.textContent="Salvando nova senha...";
+
+  const {error}=await sb.auth.updateUser({password});
+
+  if(error){
+    msg.className="msg error";
+    msg.textContent="Não foi possível alterar a senha: "+error.message;
+    return;
+  }
+
+  msg.className="msg ok";
+  msg.textContent="Senha alterada com sucesso!";
+
+  try{
+    history.replaceState({},document.title,window.location.pathname);
+  }catch(e){}
+
+  setTimeout(async()=>{
+    closeModal();
+    await loadUser();
+  },900);
+}
+
+async function loadSettings(){
+  const {data}=await sb.from("platform_settings").select("*").order("id").limit(1).maybeSingle();
+  if(data){settings=data;document.documentElement.style.setProperty("--primary",data.primary_color||"#a94366");document.documentElement.style.setProperty("--secondary",data.secondary_color||"#f7dfe6");document.getElementById("brandName").textContent=data.platform_name||"CATinvestimentos";document.getElementById("storeName").textContent=(data.store_name||"Cat Encantus")+" • Produtos Personalizados";if(data.logo_url)document.getElementById("brandLogo").src=data.logo_url}
+}
+async function login(){
+  const msg=document.getElementById("loginMsg"),email=document.getElementById("email").value.trim(),password=document.getElementById("password").value;
+  if(!email||!password){msg.className="msg error";msg.textContent="Digite e-mail e senha.";return}
+  msg.className="msg";
+  msg.textContent="Entrando...";
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error){
+    msg.className="msg error";
+    msg.textContent="E-mail ou senha incorretos.";
+    document.getElementById("forgotPasswordBtn")?.classList.remove("hidden");
+    return
+  }
+  document.getElementById("forgotPasswordBtn")?.classList.add("hidden");
+  msg.textContent="";
+  await loadUser();
+}
+async function logout(){await sb.auth.signOut();currentProfile=null;document.getElementById("logoutBtn").classList.add("hidden");document.getElementById("pushBtn")?.classList.add("hidden");show("loginArea")}
+async function loadUser(){
+  show("loadingArea");
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){show("loginArea");return}
+  const {data:profile,error}=await sb.from("profiles").select("*").eq("id",user.id).single();
+  if(error||!profile){toast("Não foi possível carregar seu perfil: "+(error?.message||"perfil não encontrado"));await logout();return}
+  currentProfile=profile;document.getElementById("logoutBtn").classList.remove("hidden");
+  await loadSettings();
+  await refreshPushButton();
+  if(profile.role==="admin"){
+    show("adminArea");
+    adminSection("themes");
+  }else{
+    show("investorArea");
+
+    // Avisa o administrador somente no PRIMEIRO acesso confirmado deste investidor.
+    // A função no banco garante que atualizações/reloads futuros não criem avisos duplicados.
+    try{
+      const {error:firstLoginError}=await sb.rpc("notify_admin_first_login");
+      if(firstLoginError)console.warn("Aviso de primeiro acesso não enviado:",firstLoginError.message);
+    }catch(e){
+      console.warn("Aviso de primeiro acesso não enviado:",e);
+    }
+
+    await loadInvestorDashboard();
+  }
+}
+async function loadInvestorDashboard(){
+  document.getElementById("helloInvestor").textContent="Olá, "+currentProfile.name+"!";
+
+  const [{data:investments,error},{data:repayments}]=await Promise.all([
+    sb.from("investments").select("invested_amount,target_amount,status"),
+    sb.from("investment_repayments").select("total_amount,status")
+  ]);
+
+  if(error){
+    console.warn("Não foi possível carregar o resumo financeiro:",error);
+  }
+
+  const rows=investments||[];
+  const availableBalance=Number(currentProfile.balance||0);
+  const pendingTotal=rows
+    .filter(i=>i.status==="active")
+    .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
+  const returnedTotal=(repayments||[])
+    .filter(r=>r.status==="confirmed")
+    .reduce((sum,r)=>sum+Number(r.total_amount||0),0);
+
+  document.getElementById("investorAvailableBalance").textContent=money(availableBalance);
+  document.getElementById("investorPendingTotal").textContent=money(pendingTotal);
+  document.getElementById("investorReturnedTotal").textContent=money(returnedTotal);
+
+  window._investorActiveSection=null;
+  document.querySelectorAll(".investor-item[data-investor-section]").forEach(b=>b.classList.remove("active"));
+
+  const content=document.getElementById("investorContent");
+  if(content){
+    content.innerHTML=`
+      <div class="investor-content-empty">
+        <div style="font-size:26px;margin-bottom:8px">✨</div>
+        <b>Escolha uma opção acima</b>
+        <div class="muted" style="margin-top:6px">
+          Você pode investir, acompanhar seus investimentos, movimentações ou notificações.
+        </div>
+      </div>
+    `;
+  }
+}
+
+async function refreshInvestorSummary(){
+  await refreshProfile();
+
+  const [{data:investments},{data:repayments}]=await Promise.all([
+    sb.from("investments").select("invested_amount,target_amount,status"),
+    sb.from("investment_repayments").select("total_amount,status")
+  ]);
+
+  const rows=investments||[];
+  const availableBalance=Number(currentProfile.balance||0);
+  const pendingTotal=rows
+    .filter(i=>i.status==="active")
+    .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
+  const returnedTotal=(repayments||[])
+    .filter(r=>r.status==="confirmed")
+    .reduce((sum,r)=>sum+Number(r.total_amount||0),0);
+
+  const availableEl=document.getElementById("investorAvailableBalance");
+  const pendingEl=document.getElementById("investorPendingTotal");
+  const returnedEl=document.getElementById("investorReturnedTotal");
+
+  if(availableEl)availableEl.textContent=money(availableBalance);
+  if(pendingEl)pendingEl.textContent=money(pendingTotal);
+  if(returnedEl)returnedEl.textContent=money(returnedTotal);
+}
+
+async function investorSection(section,button=null){
+  window._investorActiveSection=section;
+
+  document.querySelectorAll(".investor-item[data-investor-section]").forEach(b=>{
+    b.classList.toggle("active",b.dataset.investorSection===section);
+  });
+
+  const box=document.getElementById("investorContent");
+  if(!box)return;
+
+  box.innerHTML=`<div class="card">Carregando...</div>`;
+
+  if(section==="invest"){
+    box.innerHTML=`
+      <div class="title-row"><h2>Investir</h2></div>
+      <div id="availableThemes" class="grid"></div>
+    `;
+    return loadAvailableThemes();
+  }
+
+  if(section==="investments"){
+    box.innerHTML=`
+      <div class="title-row"><h2>Meus investimentos</h2></div>
+      <div id="myInvestments" class="grid"></div>
+    `;
+    return loadMyInvestments();
+  }
+
+  if(section==="transactions"){
+    box.innerHTML=`
+      <div class="title-row">
+        <div>
+          <h2>Movimentações</h2>
+          <div class="muted">Histórico geral das movimentações da sua conta.</div>
+        </div>
+      </div>
+      <div id="myTransactions" class="card table-wrap"></div>
+    `;
+    return loadMyTransactions();
+  }
+
+  if(section==="deposits"){
+    box.innerHTML=`
+      <div class="title-row">
+        <div>
+          <h2>Depósitos</h2>
+          <div class="muted">Adicione saldo e acompanhe todas as suas solicitações de depósito.</div>
+        </div>
+        <button class="btn" onclick="openDepositRequest()">+ Adicionar saldo</button>
+      </div>
+      <div id="myDeposits"></div>
+    `;
+    return loadInvestorDeposits();
+  }
+
+  if(section==="withdrawals"){
+    const day=withdrawalDayBR();
+    const allowed=day>=1&&day<=5;
+    box.innerHTML=`
+      <div class="title-row">
+        <div>
+          <h2>Saques</h2>
+          <div class="muted">Solicite saques e acompanhe todo o histórico de retiradas da sua conta.</div>
+        </div>
+        <button class="btn secondary" onclick="openWithdrawal()">Solicitar saque</button>
+      </div>
+      <div class="notice withdraw-window">
+        <b>Janela de saques:</b> solicitações somente entre os dias <b>01 e 05</b> de cada mês.
+        ${allowed
+          ? `<br><span class="badge green" style="margin-top:8px">ABERTA HOJE</span>`
+          : `<br><span class="badge red" style="margin-top:8px">FECHADA HOJE</span>`}
+      </div>
+      <div id="myWithdrawals" style="margin-top:14px"></div>
+    `;
+    return loadInvestorWithdrawals();
+  }
+
+  if(section==="notifications"){
+    box.innerHTML=`
+      <div class="title-row"><h2>Notificações</h2></div>
+      <div id="myNotifications"></div>
+    `;
+    return loadMyNotifications();
+  }
+}
+async function refreshProfile(){const {data}=await sb.from("profiles").select("*").eq("id",currentProfile.id).single();if(data)currentProfile=data}
+
+async function loadAvailableThemes(){
+  const box=document.getElementById("availableThemes");
+  const {data,error}=await sb.rpc("get_investment_options_for_investor");
+  if(error){box.innerHTML=`<div class="card error">Erro: ${esc(error.message)}</div>`;return}
+  if(!data?.length){box.innerHTML=`<div class="card muted">Nenhuma opção de investimento disponível no momento.</div>`;return}
+
+  window._availableInvestmentOptions=data||[];
+
+  const categories=[...new Map((data||[]).map(o=>[o.category_id===null?"all":String(o.category_id),o.category_name])).entries()];
+  const themes=[...new Map((data||[]).map(o=>[o.theme_id===null?"all":String(o.theme_id),o.theme_name])).entries()];
+
+  box.innerHTML=`
+    <div class="card" style="margin-bottom:14px">
+      <div class="title-row">
+        <div>
+          <h3>Escolha a categoria e/ou o tema</h3>
+          <div class="muted">Sem filtros mostramos só 2 destaques. Com apenas categoria ou apenas tema, mostramos no máximo 2 opções: maior e menor retorno. Você também pode escolher “Todas as categorias” e/ou “Todos os temas”. Com os dois filtros escolhidos, mostramos a combinação específica. Opções temporariamente esgotadas continuam visíveis, mas com o botão de investir bloqueado.</div>
+        </div>
+        <button class="btn secondary smallbtn" onclick="clearInvestmentFilters()">Limpar filtros</button>
+      </div>
+      <div class="row">
+        <div>
+          <label>Categoria</label>
+          <select id="optionCategoryFilter" onchange="renderAvailableInvestmentOptions()">
+            <option value="">Selecione uma categoria (opcional)</option>
+            <option value="all">Todas as categorias</option>
+            ${categories.filter(([id])=>id!=="all").map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label>Tema</label>
+          <select id="optionThemeFilter" onchange="renderAvailableInvestmentOptions()">
+            <option value="">Selecione um tema (opcional)</option>
+            <option value="all">Todos os temas</option>
+            ${themes.filter(([id])=>id!=="all").map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="availableOptionsGrid" class="grid"></div>
+  `;
+
+  renderAvailableInvestmentOptions();
+}
+
+function clearInvestmentFilters(){
+  const category=document.getElementById("optionCategoryFilter");
+  const theme=document.getElementById("optionThemeFilter");
+  if(category)category.value="";
+  if(theme)theme.value="";
+  renderAvailableInvestmentOptions();
+}
+
+function pickHighLowSuggestions(list){
+  if(!list.length)return [];
+  if(list.length===1)return [list[0]];
+
+  const rates=list.map(o=>Number(o.return_rate||0));
+  const maxRate=Math.max(...rates);
+  const minRate=Math.min(...rates);
+
+  // Se todas as opções filtradas tiverem a mesma porcentagem,
+  // exibe apenas duas opções diferentes aleatórias.
+  if(maxRate===minRate){
+    const shuffled=[...list].sort(()=>Math.random()-0.5);
+    return shuffled.slice(0,2);
+  }
+
+  const highest=list.filter(o=>Number(o.return_rate||0)===maxRate);
+  const lowest=list.filter(o=>Number(o.return_rate||0)===minRate);
+
+  const high=highest[Math.floor(Math.random()*highest.length)];
+  let low=lowest[Math.floor(Math.random()*lowest.length)];
+
+  if(Number(low.id)===Number(high.id)){
+    low=list.find(o=>Number(o.id)!==Number(high.id))||low;
+  }
+
+  return [high,low].filter((o,index,arr)=>
+    arr.findIndex(x=>Number(x.id)===Number(o.id))===index
+  ).slice(0,2);
+}
+
+function renderAvailableInvestmentOptions(){
+  const list=window._availableInvestmentOptions||[];
+  const category=document.getElementById("optionCategoryFilter")?.value||"";
+  const theme=document.getElementById("optionThemeFilter")?.value||"";
+  const grid=document.getElementById("availableOptionsGrid");
+  if(!grid)return;
+
+  const categorySelected=category!=="";
+  const themeSelected=theme!=="";
+  const categoryIsAll=category==="all";
+  const themeIsAll=theme==="all";
+
+  let filtered=[];
+  let helperText="";
+
+  if(!categorySelected && !themeSelected){
+    // Nenhum filtro: destaca somente opções em que ainda é possível investir.
+    const available=list.filter(o=>o.is_available!==false);
+    filtered=pickHighLowSuggestions(available.length?available:list);
+    helperText=available.length
+      ? "Destaques: maior e menor retorno disponíveis."
+      : "No momento as opções em destaque estão temporariamente esgotadas. Escolha uma categoria e/ou tema para consultar outras opções.";
+  }else if(categorySelected && !themeSelected){
+    if(categoryIsAll){
+      // "Todas as categorias" sozinho:
+      // maior/menor entre as opções "Todas as categorias + tema".
+      const candidates=list.filter(o=>o.category_id===null && o.theme_id!==null);
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques de Todas as categorias: maior e menor retorno."
+        : "As opções deste filtro estão temporariamente esgotadas. Você pode escolher outra categoria ou tema.";
+    }else{
+      // Categoria específica sozinha: maior/menor dentro dela.
+      const candidates=list.filter(o=>String(o.category_id)===category);
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques desta categoria: maior e menor retorno."
+        : "As opções desta categoria estão temporariamente esgotadas. Você pode escolher outro tema ou categoria.";
+    }
+  }else if(!categorySelected && themeSelected){
+    if(themeIsAll){
+      // "Todos os temas" sozinho:
+      // maior/menor entre as opções "categoria + Todos os temas".
+      const candidates=list.filter(o=>o.theme_id===null && o.category_id!==null);
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques de Todos os temas: maior e menor retorno."
+        : "As opções deste filtro estão temporariamente esgotadas. Você pode escolher outra categoria ou tema.";
+    }else{
+      // Tema específico sozinho: maior/menor dentro dele.
+      const candidates=list.filter(o=>String(o.theme_id)===theme);
+      const available=candidates.filter(o=>o.is_available!==false);
+      filtered=pickHighLowSuggestions(available.length?available:candidates);
+      helperText=available.length
+        ? "Destaques deste tema: maior e menor retorno."
+        : "As opções deste tema estão temporariamente esgotadas. Você pode escolher outra categoria ou tema.";
+    }
+  }else{
+    // Os dois filtros foram escolhidos: mostra a combinação EXATA.
+    filtered=list.filter(o=>{
+      const optionCategory=o.category_id===null?"all":String(o.category_id);
+      const optionTheme=o.theme_id===null?"all":String(o.theme_id);
+      return optionCategory===category && optionTheme===theme;
+    });
+
+    helperText=
+      categoryIsAll && themeIsAll
+        ? "Opção geral: Todas as categorias • Todos os temas."
+        : "Resultado específico para a categoria e o tema selecionados.";
+  }
+
+  if(!filtered.length){
+    grid.innerHTML=`<div class="card muted">Nenhuma opção disponível para essa seleção.</div>`;
+    return;
+  }
+
+  grid.innerHTML=`
+    <div style="grid-column:1/-1" class="muted">${helperText}</div>
+    ${filtered.map(o=>{
+      const label=`${o.category_name} • ${o.theme_name}`;
+      const rate=Number(o.return_rate||0);
+      const available=o.is_available!==false;
+      const availabilityReason=String(o.availability_reason||"available");
+
+      const unavailableMessage=availabilityReason==="already_invested"
+        ? "Você já possui um investimento ativo nesta opção. Aguarde a conclusão dele ou escolha outra opção disponível para continuar investindo."
+        : "Opção esgotada no momento. Enquanto os investimentos desta opção estão sendo concluídos, você pode escolher outra opção disponível para continuar investindo.";
+
+      const models=(o.theme_id!==null && o.theme_description)
+        ? `<div class="notice" style="
+              margin-top:14px;
+              padding:16px;
+              font-size:14px;
+              line-height:1.55;
+            ">
+            <b style="font-size:14px">Modelos deste tema:</b><br>
+            ${esc(o.theme_description)}
+          </div>`
+        : "";
+
+      return `<div class="card item" style="position:relative">
+        <div style="padding-right:92px">
+          <div class="muted" style="font-size:12px;margin-bottom:2px">Categoria</div>
+          <h3 style="margin:0;font-size:19px">${esc(o.category_name)}</h3>
+
+          <div class="muted" style="font-size:12px;margin-top:12px;margin-bottom:2px">Tema</div>
+          <h3 style="margin:0;font-size:19px">${esc(o.theme_name)}</h3>
+        </div>
+
+        <span class="badge green" style="
+          position:absolute;
+          top:16px;
+          right:16px;
+          font-size:24px;
+          padding:9px 13px;
+          line-height:1;
+          font-weight:900;
+          white-space:nowrap;
+        ">
+          ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
+        </span>
+
+        ${models}
+
+        <div class="actions" style="margin-top:14px">
+          ${available
+            ? `<button class="btn" onclick='openInvestmentOption(${o.id},${JSON.stringify(label)},${rate})'>Investir</button>`
+            : `<button
+                 class="btn"
+                 disabled
+                 title="Opção temporariamente indisponível"
+                 style="background:#b8b8b8;border-color:#b8b8b8;color:#fff;cursor:not-allowed;opacity:.78"
+               >Investir</button>`}
+          <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ver catálogo</a>
+        </div>
+
+        ${available ? "" : `
+          <div style="
+            margin-top:12px;
+            padding:12px 14px;
+            border-radius:12px;
+            background:#f5f5f5;
+            border:1px solid #dddddd;
+            color:#6f5f65;
+            font-size:13px;
+            line-height:1.5;
+          ">
+            <b>${availabilityReason==="already_invested"?"Investimento já ativo nesta opção.":"Opção esgotada no momento."}</b><br>
+            ${esc(unavailableMessage)}
+          </div>
+        `}
+      </div>`;
+    }).join("")}
+  `;
+}
+
+function updateInvestmentReturn(returnRate){
+  const input=document.getElementById("investmentAmount");
+  const totalEl=document.getElementById("liveInvestmentTotal");
+  const profitEl=document.getElementById("liveInvestmentProfit");
+  if(!input||!totalEl||!profitEl)return;
+
+  const amount=Number(input.value||0);
+  const rate=Number(returnRate||0);
+
+  if(!amount || amount<=0){
+    totalEl.textContent=money(0);
+    profitEl.textContent=money(0);
+    return;
+  }
+
+  const profit=amount*(rate/100);
+  const total=amount+profit;
+
+  profitEl.textContent=money(profit);
+  totalEl.textContent=money(total);
+}
+
+function openInvestmentOption(id,label,returnRate){
+  const rate=Number(returnRate||0);
+  const option=(window._availableInvestmentOptions||[]).find(o=>Number(o.id)===Number(id));
+
+  if(option && option.is_available===false){
+    toast(
+      option.availability_reason==="already_invested"
+        ? "Você já possui um investimento ativo nesta opção. Escolha outra opção ou aguarde a conclusão."
+        : "Esta opção está esgotada no momento. Escolha outra opção disponível."
+    );
+    return;
+  }
+
+  const models=(option?.theme_id!==null && option?.theme_description)
+    ? `<div class="notice" style="margin-top:10px"><b>Modelos deste tema:</b><br>${esc(option.theme_description)}</div>`
+    : "";
+
+  openModal(`
+    <div class="title-row">
+      <h2>${esc(label)}</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <label>Valor do investimento</label>
+    <input
+      id="investmentAmount"
+      type="number"
+      min="${settings.minimum_investment||10}"
+      max="${settings.maximum_investment||100}"
+      step="0.01"
+      inputmode="decimal"
+      placeholder="Digite quanto deseja investir"
+      oninput="updateInvestmentReturn(${rate})"
+    >
+
+    <div class="notice">
+      Mínimo: ${money(settings.minimum_investment||10)} •
+      Máximo por investimento: ${money(settings.maximum_investment||100)}<br>
+      Retorno-alvo desta combinação:
+      <b style="font-size:18px">${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b>
+    </div>
+
+    <div style="
+      margin-top:14px;
+      padding:18px;
+      border-radius:16px;
+      background:#fff0f5;
+      border:2px solid #e7b8c8;
+      text-align:center;
+    ">
+      <div class="muted" style="font-size:14px">Quando este investimento for concluído, o valor total será:</div>
+      <div id="liveInvestmentTotal" style="font-size:32px;font-weight:800;color:#96264d;margin-top:5px">
+        ${money(0)}
+      </div>
+      <div class="muted" style="margin-top:6px">
+        Lucro incluído: <b id="liveInvestmentProfit">${money(0)}</b>
+      </div>
+    </div>
+
+    ${models}
+
+    <div class="actions" style="margin-top:15px">
+      <button class="btn" style="flex:1" onclick="makeInvestment(${id})">Confirmar investimento</button>
+      <a class="btn secondary" href="https://catencantus.kicatalogo.com" target="_blank" rel="noopener noreferrer" style="text-decoration:none;flex:1;text-align:center">Ver catálogo</a>
+    </div>
+  `);
+}
+
+async function makeInvestment(optionId){
+  const amount=Number(document.getElementById("investmentAmount").value);
+
+  if(!amount || amount<=0){
+    toast("Informe um valor válido para investir.");
+    return;
+  }
+
+  if(Number(currentProfile?.balance||0) < amount){
+    closeModal();
+    toast(
+      "Seu saldo disponível é "+money(currentProfile?.balance||0)+
+      ". Para investir "+money(amount)+", adicione saldo primeiro."
+    );
+    await openDepositRequest("Você não tem saldo suficiente para concluir este investimento.");
+    return;
+  }
+
+  const {error}=await sb.rpc("make_option_investment",{
+    p_option_id:optionId,
+    p_amount:amount
+  });
+
+  if(error){
+    const message=String(error.message||"");
+    if(message.toLowerCase().includes("saldo insuficiente")){
+      await refreshProfile();
+      closeModal();
+      toast("Saldo insuficiente para este investimento. Você será encaminhado para adicionar saldo.");
+      await openDepositRequest("Saldo insuficiente. Adicione saldo para continuar.");
+      return;
+    }
+    toast(message);
+    return;
+  }
+
+  closeModal();
+  toast("Investimento registrado!");
+  await refreshInvestorSummary();
+  await investorSection("investments");
+}
+
+async function loadMyInvestments(){
+  const box=document.getElementById("myInvestments");
+  const [{data,error},{data:repayments}]=await Promise.all([
+    sb.from("investments").select(`
+      id,invested_amount,target_amount,sold_amount,status,created_at,
+      themes(name),
+      option:investment_options(id,return_rate,category:categories(name),theme:themes(name))
+    `).order("created_at",{ascending:false}),
+    sb.from("investment_repayments").select("investment_id,status,total_amount,profit_amount")
+  ]);
+
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  if(!data?.length){box.innerHTML=`<div class="card muted">Você ainda não possui investimentos.</div>`;return}
+
+  const repaymentMap=Object.fromEntries((repayments||[]).map(r=>[r.investment_id,r]));
+
+  box.innerHTML=data.map(i=>{
+    const pct=Math.min(100,Number(i.sold_amount)/Number(i.target_amount)*100);
+    const remain=Math.max(0,Number(i.target_amount)-Number(i.sold_amount));
+    const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
+    const label=i.option
+      ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
+      : `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
+
+    const repayment=repaymentMap[i.id];
+    let badge="EM ANDAMENTO",badgeClass="";
+    if(i.status==="completed"&&repayment?.status==="pending"){
+      badge="AGUARDANDO REPASSE";
+    }else if(i.status==="completed"&&repayment?.status==="confirmed"){
+      badge="RETORNO LIBERADO";
+      badgeClass="green";
+    }else if(i.status==="completed"){
+      badge="CONCLUÍDO";
+      badgeClass="green";
+    }
+
+    return `<div class="card item">
+      <div class="title-row"><h3>${esc(label)}</h3><span class="badge ${badgeClass}">${badge}</span></div>
+      <div class="muted">
+        Investido: <b>${money(i.invested_amount)}</b><br>
+        Retorno-alvo contratado: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b><br>
+        Lucro-alvo: <b>${money(Number(i.target_amount)-Number(i.invested_amount))}</b><br>
+        Valor final: <b>${money(i.target_amount)}</b>
+      </div>
+      <div class="progress"><div style="width:${pct}%"></div></div>
+      <div class="muted">Vendido atribuído: <b>${money(i.sold_amount)}</b><br>Falta: <b>${money(remain)}</b></div>
+      ${i.status==="completed"&&repayment?.status==="pending"
+        ? `<div class="notice" style="margin-top:10px"><b>Investimento concluído.</b> O retorno aguarda o repasse da Cat Encantus para a CATinvestimentos antes de entrar no seu saldo disponível.</div>`
+        : ""}
+    </div>`;
+  }).join("");
+}
+
+async function loadMyTransactions(){
+  const box=document.getElementById("myTransactions");
+  const {data,error}=await sb.from("transactions").select("*").order("created_at",{ascending:false}).limit(30);
+  if(error){box.innerHTML=`<div class="error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<table class="table"><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>${(data||[]).map(t=>`<tr><td>${new Date(t.created_at).toLocaleString("pt-BR")}</td><td>${esc(t.description||t.type)}</td><td><b>${money(t.amount)}</b></td></tr>`).join("")||`<tr><td colspan="3">Nenhuma movimentação.</td></tr>`}</tbody></table>`;
+}
+async function loadInvestorDeposits(){
+  const box=document.getElementById("myDeposits");
+  if(!box)return;
+
+  const {data,error}=await sb
+    .from("deposits")
+    .select("*")
+    .order("created_at",{ascending:false})
+    .limit(100);
+
+  if(error){
+    box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;
+    return;
+  }
+
+  const rows=data||[];
+  const totalConfirmed=rows
+    .filter(d=>d.status==="confirmed")
+    .reduce((sum,d)=>sum+Number(d.amount||0),0);
+
+  const totalPending=rows
+    .filter(d=>d.status==="pending")
+    .reduce((sum,d)=>sum+Number(d.amount||0),0);
+
+  box.innerHTML=`
+    <div class="grid" style="margin-bottom:14px">
+      <div class="card">
+        <div class="muted">Total confirmado</div>
+        <div class="stat-value">${money(totalConfirmed)}</div>
+      </div>
+      <div class="card">
+        <div class="muted">Aguardando confirmação</div>
+        <div class="stat-value">${money(totalPending)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Histórico de depósitos</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Valor</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(d=>`
+              <tr>
+                <td>${new Date(d.created_at).toLocaleString("pt-BR")}</td>
+                <td><b>${money(d.amount)}</b></td>
+                <td>
+                  <span class="badge ${d.status==="confirmed"?"green":d.status==="rejected"?"red":""}">
+                    ${d.status==="pending"?"PENDENTE":d.status==="confirmed"?"CONFIRMADO":d.status==="rejected"?"REJEITADO":esc(d.status)}
+                  </span>
+                </td>
+              </tr>
+            `).join("")||`<tr><td colspan="3">Nenhum depósito realizado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+async function loadInvestorWithdrawals(){
+  const box=document.getElementById("myWithdrawals");
+  if(!box)return;
+
+  const {data,error}=await sb
+    .from("withdrawals")
+    .select("*")
+    .order("created_at",{ascending:false})
+    .limit(100);
+
+  if(error){
+    box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;
+    return;
+  }
+
+  const rows=data||[];
+  const totalPaid=rows
+    .filter(w=>w.status==="paid")
+    .reduce((sum,w)=>sum+Number(w.amount||0),0);
+
+  const totalPending=rows
+    .filter(w=>w.status==="pending")
+    .reduce((sum,w)=>sum+Number(w.amount||0),0);
+
+  box.innerHTML=`
+    <div class="grid" style="margin-bottom:14px">
+      <div class="card">
+        <div class="muted">Total já sacado</div>
+        <div class="stat-value">${money(totalPaid)}</div>
+      </div>
+      <div class="card">
+        <div class="muted">Saques pendentes</div>
+        <div class="stat-value">${money(totalPending)}</div>
+      </div>
+      <div class="card">
+        <div class="muted">Saldo disponível agora</div>
+        <div class="stat-value">${money(currentProfile.balance)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Histórico de saques</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Valor</th><th>PIX</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(w=>`
+              <tr>
+                <td>${new Date(w.created_at).toLocaleString("pt-BR")}</td>
+                <td><b>${money(w.amount)}</b></td>
+                <td>${esc(w.pix||"-")}</td>
+                <td>
+                  <span class="badge ${w.status==="paid"?"green":w.status==="rejected"?"red":""}">
+                    ${w.status==="pending"?"PENDENTE":w.status==="paid"?"PAGO":w.status==="rejected"?"REJEITADO":esc(w.status)}
+                  </span>
+                </td>
+              </tr>
+            `).join("")||`<tr><td colspan="4">Nenhum saque solicitado.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+async function loadMyNotifications(){
+  const box=document.getElementById("myNotifications");
+  const {data,error}=await sb.from("notifications").select("*").order("created_at",{ascending:false}).limit(20);
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=(data||[]).map(n=>`<div class="card" style="margin-bottom:10px"><b>${esc(n.title)}</b><div class="muted" style="margin-top:5px">${esc(n.message)}</div><div class="muted" style="margin-top:6px">${new Date(n.created_at).toLocaleString("pt-BR")}</div></div>`).join("")||`<div class="card muted">Nenhuma notificação.</div>`;
+}
+
+async function openDepositRequest(autoMessage=""){
+  const {data,error}=await sb.rpc("get_deposit_info");
+  if(error){toast(error.message);return}
+
+  const info=Array.isArray(data)?data[0]:data;
+  const pix=info?.pix||"";
+  const min=Number(info?.minimum_deposit||settings.minimum_deposit||40);
+  const store=info?.store_name||"Cat Encantus";
+
+  openModal(`
+    <div class="title-row">
+      <h2>Adicionar saldo</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    ${autoMessage ? `<div class="notice"><b>${esc(autoMessage)}</b></div>` : ""}
+
+    <div class="notice">
+      <b>1.</b> Faça um PIX para a loja.<br>
+      <b>2.</b> Informe abaixo o valor enviado.<br>
+      <b>3.</b> O saldo só será liberado depois que o administrador confirmar o recebimento.
+    </div>
+
+    <label>PIX da ${esc(store)}</label>
+    <div class="row">
+      <input id="storePix" value="${esc(pix)}" readonly>
+      <button class="btn secondary" type="button" onclick="copyStorePix()">Copiar PIX</button>
+    </div>
+
+    ${pix ? "" : `<div class="msg error">A loja ainda não configurou a chave PIX para depósitos.</div>`}
+
+    <label>Valor enviado</label>
+    <input id="depositRequestAmount" type="number" min="${min}" step="0.01" placeholder="${min.toFixed(2)}">
+
+    <div class="muted" style="margin-top:8px">
+      Depósito mínimo: <b>${money(min)}</b>
+    </div>
+
+    <button class="btn" style="width:100%;margin-top:15px" ${pix ? "" : "disabled"} onclick="requestDeposit()">
+      Já fiz o PIX — solicitar confirmação
+    </button>
+  `);
+}
+
+async function copyStorePix(){
+  const pix=document.getElementById("storePix")?.value||"";
+  if(!pix)return;
+  try{
+    await navigator.clipboard.writeText(pix);
+    toast("PIX copiado.");
+  }catch(e){
+    toast("Não foi possível copiar automaticamente. Selecione o PIX e copie manualmente.");
+  }
+}
+
+async function requestDeposit(){
+  const amount=Number(document.getElementById("depositRequestAmount").value);
+  const {error}=await sb.rpc("request_deposit",{p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Solicitação enviada. Seu saldo será atualizado após a confirmação do PIX pelo administrador.");
+  await refreshProfile();
+  await refreshInvestorSummary();
+
+  if(window._investorActiveSection==="deposits"){
+    await loadInvestorDeposits();
+  }else if(window._investorActiveSection==="transactions"){
+    await loadMyTransactions();
+  }
+}
+
+function withdrawalDayBR(){
+  return Number(new Intl.DateTimeFormat("pt-BR",{day:"2-digit",timeZone:"America/Sao_Paulo"}).format(new Date()));
+}
+function openWithdrawal(){
+  const day=withdrawalDayBR();
+  const allowed=day>=1&&day<=5;
+  openModal(`<div class="title-row"><h2>Solicitar saque</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="muted">Saldo disponível para saque: <b>${money(currentProfile.balance)}</b></div>
+    <div class="notice withdraw-window"><b>Janela de saques:</b> as solicitações podem ser feitas somente do dia <b>01 ao dia 05</b> de cada mês.</div>
+    <div class="notice"><b>Importante:</b> somente o dinheiro que está no seu <b>saldo disponível</b> pode ser sacado. Valores que estão em investimentos ativos não podem ser retirados.</div>
+    ${allowed?`<label>Valor</label><input id="withdrawAmount" type="number" min="0.01" max="${Number(currentProfile.balance||0)}" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="requestWithdrawal()">Solicitar saque</button>`:`<div class="msg error" style="margin-top:16px"><b>Solicitações fechadas hoje.</b><br>Volte entre os dias 01 e 05 do próximo mês.</div>`}`)
+}
+async function requestWithdrawal(){
+  const amount=Number(document.getElementById("withdrawAmount")?.value);
+  const {error}=await sb.rpc("request_withdrawal",{p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Saque solicitado.");
+  await refreshProfile();
+  await refreshInvestorSummary();
+
+  if(window._investorActiveSection==="withdrawals"){
+    await loadInvestorWithdrawals();
+  }else{
+    await investorSection("withdrawals");
+  }
+}
+
+
+function reportDateRange(prefix){
+  const from=document.getElementById(prefix+"From")?.value||"";
+  const to=document.getElementById(prefix+"To")?.value||"";
+  return {
+    from,
+    to,
+    fromDate:from?new Date(from+"T00:00:00"):null,
+    toDate:to?new Date(to+"T23:59:59.999"):null
+  };
+}
+function inReportRange(value,range){
+  if(!value)return true;
+  const d=new Date(value);
+  if(range.fromDate&&d<range.fromDate)return false;
+  if(range.toDate&&d>range.toDate)return false;
+  return true;
+}
+function clearReportRange(prefix,renderFn){
+  const a=document.getElementById(prefix+"From");
+  const b=document.getElementById(prefix+"To");
+  if(a)a.value="";
+  if(b)b.value="";
+  renderFn();
+}
+async function fetchAllPaged(makeQuery,pageSize=1000){
+  let out=[],from=0;
+  while(true){
+    const {data,error}=await makeQuery().range(from,from+pageSize-1);
+    if(error)return {data:out,error};
+    const rows=data||[];
+    out=out.concat(rows);
+    if(rows.length<pageSize)break;
+    from+=pageSize;
+  }
+  return {data:out,error:null};
+}
+function statusPt(status){
+  return ({
+    pending:"Pendente",confirmed:"Confirmado",paid:"Pago",
+    rejected:"Rejeitado",active:"Ativo",completed:"Concluído",
+    cancelled:"Cancelado"
+  })[status]||status||"-";
+}
+
+async function adminSection(section){
+  const box=document.getElementById("adminContent");box.innerHTML=`<div class="card">Carregando...</div>`;
+  if(section==="investors")return loadAdminInvestors();
+  if(section==="themes")return loadAdminThemes();
+  if(section==="categories")return loadAdminCategories();
+  if(section==="options")return loadAdminOptions();
+  if(section==="investments")return loadAdminInvestments();
+  if(section==="sales")return loadAdminSales();
+  if(section==="results")return loadAdminResults();
+  if(section==="customers")return loadAdminCustomers();
+  if(section==="cashboxes")return loadAdminCashboxes();
+  if(section==="queues")return loadAdminQueues();
+  if(section==="deposits")return loadAdminDeposits();
+  if(section==="withdrawals")return loadAdminWithdrawals();
+  if(section==="notifications")return loadAdminNotifications();
+  if(section==="settings")return loadAdminSettings();
+}
+
+async function loadAdminInvestors(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("profiles").select("*").eq("role","investor").order("created_at",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Investidores</h2><span class="muted">Clique no nome ou em “Ver histórico” para abrir a visão completa da vida do investidor na CATinvestimentos.</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Contato</th><th>PIX</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(data||[]).map(p=>`<tr><td><button class="investor-name-link" onclick="openInvestorHistory('${p.id}')">${esc(p.name)}</button><br><span class="muted">${esc(p.email)}</span></td><td>${esc(p.phone||"-")}</td><td>${esc(p.pix||"-")}</td><td><b>${money(p.balance)}</b></td><td><span class="badge ${p.status==="active"?"green":"red"}">${p.status==="active"?"ATIVO":"BLOQUEADO"}</span></td><td><div class="actions"><button class="btn smallbtn" onclick="openInvestorHistory('${p.id}')">Ver histórico</button><button class="btn secondary smallbtn" onclick='openInvestorEdit(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Editar</button><button class="btn secondary smallbtn" onclick="openDeposit('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Adicionar saldo</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum investidor.</td></tr>`}</tbody></table></div></div>`;
+}
+
+function investorOptionLabel(i){
+  if(i.option)return `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`;
+  return `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
+}
+
+async function openInvestorHistory(id){
+  openModal(`<div class="title-row"><h2>Histórico do investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando todas as informações...</div>`,true);
+
+  const [profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes,repaymentsRes]=await Promise.all([
+    sb.from("profiles").select("*").eq("id",id).single(),
+    sb.from("deposits").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("withdrawals").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("investments").select(`*,themes(name),option:investment_options(id,return_rate,category:categories(name),theme:themes(name))`).eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("transactions").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("notifications").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("investment_repayments").select("*").eq("investor_id",id).order("created_at",{ascending:false})
+  ]);
+
+  const firstError=[profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes,repaymentsRes].find(r=>r.error)?.error;
+  if(firstError){openModal(`<div class="title-row"><h2>Histórico do investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="msg error">${esc(firstError.message)}</div>`,true);return}
+
+  const p=profileRes.data;
+  const deposits=depositsRes.data||[];
+  const withdrawals=withdrawalsRes.data||[];
+  const investments=investmentsRes.data||[];
+  const transactions=transactionsRes.data||[];
+  const notifications=notificationsRes.data||[];
+  const repayments=repaymentsRes.data||[];
+
+  let allocations=[];
+  let salesById={};
+  const investmentIds=investments.map(i=>i.id);
+  if(investmentIds.length){
+    const allocRes=await sb.from("sale_allocations").select("*").in("investment_id",investmentIds).order("created_at",{ascending:false});
+    if(!allocRes.error){
+      allocations=allocRes.data||[];
+      const saleIds=[...new Set(allocations.map(a=>a.sale_id))];
+      if(saleIds.length){
+        const salesRes=await sb.from("sales").select("*,themes(name),category:categories(name)").in("id",saleIds);
+        if(!salesRes.error)salesById=Object.fromEntries((salesRes.data||[]).map(s=>[s.id,s]));
+      }
+    }
+  }
+
+  const validInvestments=investments.filter(i=>i.status!=="cancelled");
+  const active=validInvestments.filter(i=>i.status==="active");
+  const completed=validInvestments.filter(i=>i.status==="completed");
+  const totalDeposited=deposits.filter(d=>d.status==="confirmed").reduce((s,d)=>s+Number(d.amount||0),0);
+  const totalInvested=validInvestments.reduce((s,i)=>s+Number(i.invested_amount||0),0);
+  const activeInvested=active.reduce((s,i)=>s+Number(i.invested_amount||0),0);
+  const confirmedRepayments=repayments.filter(r=>r.status==="confirmed");
+  const pendingRepayments=repayments.filter(r=>r.status==="pending");
+  const totalProfit=confirmedRepayments.reduce((s,r)=>s+Number(r.profit_amount||0),0);
+  const totalReturnReleased=confirmedRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
+  const totalReturnPending=pendingRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
+  const totalWithdrawn=withdrawals.filter(w=>w.status==="paid").reduce((s,w)=>s+Number(w.amount||0),0);
+  const pendingWithdrawal=withdrawals.filter(w=>w.status==="pending").reduce((s,w)=>s+Number(w.amount||0),0);
+  const allocatedTotal=allocations.reduce((s,a)=>s+Number(a.amount||0),0);
+
+  const byOption={};
+  validInvestments.forEach(i=>{
+    const label=investorOptionLabel(i);
+    if(!byOption[label])byOption[label]={count:0,invested:0,target:0,credited:0,profit:0};
+    byOption[label].count++;
+    byOption[label].invested+=Number(i.invested_amount||0);
+    byOption[label].target+=Number(i.target_amount||0);
+    byOption[label].credited+=Number(i.sold_amount||0);
+    if(i.status==="completed")byOption[label].profit+=Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0));
+  });
+
+  const statusText=s=>({pending:"Pendente",confirmed:"Confirmado",rejected:"Rejeitado",paid:"Pago",active:"Ativo",completed:"Concluído",cancelled:"Cancelado"}[s]||s||"-");
+  const dt=v=>v?new Date(v).toLocaleString("pt-BR"):"-";
+
+  openModal(`
+    <div class="title-row"><div><h2>${esc(p.name||"Investidor")}</h2><div class="muted">Visão 360° da vida deste investidor na CATinvestimentos</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+
+    <div class="item"><b>Cadastro</b><div class="grid" style="margin-top:10px"><div><span class="muted">E-mail</span><br>${esc(p.email||"-")}</div><div><span class="muted">Telefone</span><br>${esc(p.phone||"-")}</div><div><span class="muted">PIX</span><br>${esc(p.pix||"-")}</div><div><span class="muted">Status</span><br>${statusText(p.status)}</div><div><span class="muted">Cadastro</span><br>${dt(p.created_at)}</div><div><span class="muted">Primeiro acesso registrado</span><br>${dt(p.admin_first_login_notified_at)}</div></div></div>
+
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Saldo disponível hoje</div><div class="metric-value">${money(p.balance)}</div></div>
+      <div class="metric-box"><div class="metric-label">Total depositado confirmado</div><div class="metric-value">${money(totalDeposited)}</div></div>
+      <div class="metric-box"><div class="metric-label">Total investido histórico</div><div class="metric-value">${money(totalInvested)}</div></div>
+      <div class="metric-box"><div class="metric-label">Investido ativo hoje</div><div class="metric-value">${money(activeInvested)}</div></div>
+      <div class="metric-box"><div class="metric-label">Vendas atribuídas</div><div class="metric-value">${money(allocatedTotal)}</div></div>
+      <div class="metric-box"><div class="metric-label">Lucro realizado</div><div class="metric-value">${money(totalProfit)}</div></div>
+      <div class="metric-box"><div class="metric-label">Retorno total liberado</div><div class="metric-value">${money(totalReturnReleased)}</div></div>
+      <div class="metric-box warning"><div class="metric-label">Retorno aguardando repasse</div><div class="metric-value">${money(totalReturnPending)}</div></div>
+      <div class="metric-box"><div class="metric-label">Total sacado</div><div class="metric-value">${money(totalWithdrawn)}</div></div>
+      <div class="metric-box"><div class="metric-label">Saque pendente</div><div class="metric-value">${money(pendingWithdrawal)}</div></div>
+    </div>
+
+    <div class="history-section"><h3>Quanto investiu em cada opção</h3><div class="table-wrap"><table class="table"><thead><tr><th>Opção</th><th>Aplicações</th><th>Total investido</th><th>Alvos somados</th><th>Vendas atribuídas</th><th>Lucro realizado</th></tr></thead><tbody>${Object.entries(byOption).map(([label,v])=>`<tr><td><b>${esc(label)}</b></td><td>${v.count}</td><td>${money(v.invested)}</td><td>${money(v.target)}</td><td>${money(v.credited)}</td><td>${money(v.profit)}</td></tr>`).join("")||`<tr><td colspan="6">Nenhum investimento.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Histórico de depósitos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Valor</th><th>Status</th><th>Processado</th></tr></thead><tbody>${deposits.map(d=>`<tr><td>${dt(d.created_at)}</td><td><b>${money(d.amount)}</b></td><td>${statusText(d.status)}</td><td>${dt(d.processed_at)}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum depósito.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Histórico de investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Opção</th><th>Investido</th><th>Alvo</th><th>Progresso</th><th>Lucro</th><th>Status</th><th>Conclusão</th></tr></thead><tbody>${investments.map(i=>`<tr><td>${dt(i.created_at)}</td><td><b>${esc(investorOptionLabel(i))}</b></td><td>${money(i.invested_amount)}</td><td>${money(i.target_amount)}</td><td>${money(i.sold_amount)} / ${money(i.target_amount)}</td><td>${i.status==="completed"?money(Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0))):"-"}</td><td>${statusText(i.status)}</td><td>${dt(i.completed_at)}</td></tr>`).join("")||`<tr><td colspan="8">Nenhum investimento.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Vendas atribuídas aos investimentos</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tema</th><th>Categoria</th><th>Produto</th><th>Valor da venda</th><th>Valor atribuído</th></tr></thead><tbody>${allocations.map(a=>{const s=salesById[a.sale_id]||{};return `<tr><td>${dt(s.sold_at||a.created_at)}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td>${s.amount!=null?money(s.amount):"-"}</td><td><b>${money(a.amount)}</b></td></tr>`}).join("")||`<tr><td colspan="6">Nenhuma venda atribuída.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Histórico de saques</h3><div class="table-wrap"><table class="table"><thead><tr><th>Solicitado</th><th>Valor</th><th>PIX</th><th>Status</th><th>Processado</th></tr></thead><tbody>${withdrawals.map(w=>`<tr><td>${dt(w.created_at)}</td><td><b>${money(w.amount)}</b></td><td>${esc(w.pix||"-")}</td><td>${statusText(w.status)}</td><td>${dt(w.processed_at)}</td></tr>`).join("")||`<tr><td colspan="5">Nenhum saque.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Movimentações financeiras</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>${transactions.map(t=>`<tr><td>${dt(t.created_at)}</td><td>${esc(t.type)}</td><td>${esc(t.description||"-")}</td><td><b>${money(t.amount)}</b></td></tr>`).join("")||`<tr><td colspan="4">Nenhuma movimentação.</td></tr>`}</tbody></table></div></div>
+
+    <div class="history-section"><h3>Notificações enviadas</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Título</th><th>Mensagem</th><th>Lida</th></tr></thead><tbody>${notifications.map(n=>`<tr><td>${dt(n.created_at)}</td><td><b>${esc(n.title)}</b></td><td>${esc(n.message)}</td><td>${n.read?"Sim":"Não"}</td></tr>`).join("")||`<tr><td colspan="4">Nenhuma notificação.</td></tr>`}</tbody></table></div></div>
+  `,true);
+}
+function openInvestorEdit(p){
+  openModal(`<div class="title-row"><h2>Editar investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Nome</label><input id="editInvName" value="${esc(p.name)}"><label>Telefone</label><input id="editInvPhone" value="${esc(p.phone||"")}"><label>PIX</label><input id="editInvPix" value="${esc(p.pix||"")}"><label>Status</label><select id="editInvStatus"><option value="active" ${p.status==="active"?"selected":""}>Ativo</option><option value="blocked" ${p.status==="blocked"?"selected":""}>Bloqueado</option></select><button class="btn" style="width:100%;margin-top:15px" onclick="saveInvestor('${p.id}')">Salvar</button>`);
+}
+async function saveInvestor(id){const {error}=await sb.rpc("admin_update_investor",{p_investor_id:id,p_name:document.getElementById("editInvName").value,p_phone:document.getElementById("editInvPhone").value,p_pix:document.getElementById("editInvPix").value,p_status:document.getElementById("editInvStatus").value});if(error){toast(error.message);return}closeModal();await loadAdminInvestors()}
+function openDeposit(id,name){openModal(`<div class="title-row"><h2>Adicionar saldo — ${name}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Valor recebido via PIX</label><input id="depositAmount" type="number" min="${settings.minimum_deposit||40}" step="0.01"><div class="notice">Depósito mínimo: ${money(settings.minimum_deposit||40)}</div><button class="btn" style="width:100%;margin-top:15px" onclick="saveDeposit('${id}')">Confirmar depósito</button>`)}
+async function saveDeposit(id){const amount=Number(document.getElementById("depositAmount").value);const {error}=await sb.rpc("admin_add_deposit",{p_investor_id:id,p_amount:amount});if(error){toast(error.message);return}closeModal();toast("Saldo adicionado.");await loadAdminInvestors()}
+
+async function loadAdminThemes(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("themes").select("*").order("name");
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card">
+    <div class="title-row"><div><h2>Temas</h2><div class="muted">Ex.: Anime, Infantil, Marvel.</div></div><button class="btn" onclick="openThemeForm()">+ Novo tema</button></div>
+    <div class="grid">${(data||[]).map(t=>`<div class="item">
+      <div class="title-row"><h3>${esc(t.name)}</h3><span class="badge ${t.active?"green":"red"}">${t.active?"ATIVO":"INATIVO"}</span></div>
+      <div class="muted">${esc(t.description||"Sem descrição")}</div>
+      <div class="actions"><button class="btn smallbtn" onclick='openThemeForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteTheme(${t.id})">Excluir</button></div>
+    </div>`).join("")||`<div class="muted">Nenhum tema cadastrado.</div>`}</div>
+  </div>`;
+}
+
+function openThemeForm(t=null){
+  openModal(`<div class="title-row"><h2>${t?"Editar":"Novo"} tema</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome</label><input id="themeName" value="${esc(t?.name||"")}">
+    <label>Descrição</label><textarea id="themeDescription">${esc(t?.description||"")}</textarea>
+    <label>URL da imagem (opcional)</label><input id="themeImage" value="${esc(t?.image_url||"")}">
+    <label>Status</label><select id="themeActive"><option value="true" ${!t||t.active?"selected":""}>Ativo</option><option value="false" ${t&&!t.active?"selected":""}>Inativo</option></select>
+    <div class="notice">A porcentagem e os limites agora são definidos em <b>Opções de investimento</b>, combinando Tema + Categoria.</div>
+    <button class="btn" style="width:100%;margin-top:15px" onclick="saveTheme(${t?.id??"null"})">Salvar tema</button>`);
+}
+
+async function saveTheme(id){
+  const {error}=await sb.rpc("admin_save_theme_basic",{
+    p_id:id,
+    p_name:document.getElementById("themeName").value,
+    p_description:document.getElementById("themeDescription").value,
+    p_image_url:document.getElementById("themeImage").value,
+    p_active:document.getElementById("themeActive").value==="true"
+  });
+  if(error){toast(error.message);return}
+  closeModal();toast("Tema salvo.");await loadAdminThemes();
+}
+
+async function deleteTheme(id){
+  if(!confirm("Excluir este tema? Se ele já tiver histórico ou opções de investimento, será necessário apenas desativá-lo."))return;
+  const {error}=await sb.rpc("admin_delete_theme",{p_id:id});
+  if(error){toast(error.message);return}
+  await loadAdminThemes();
+}
+
+async function loadAdminCategories(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("categories").select("*").order("name");
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  box.innerHTML=`<div class="card">
+    <div class="title-row"><div><h2>Categorias</h2><div class="muted">Ex.: Chaveiros, Brincos, Presilhas, Porta-copos.</div></div><button class="btn" onclick="openCategoryForm()">+ Nova categoria</button></div>
+    <div class="grid">${(data||[]).map(c=>`<div class="item">
+      <div class="title-row"><h3>${esc(c.name)}</h3><span class="badge ${c.active?"green":"red"}">${c.active?"ATIVA":"INATIVA"}</span></div>
+      <div class="muted">${esc(c.description||"Sem descrição")}</div>
+      <div class="actions"><button class="btn smallbtn" onclick='openCategoryForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Editar</button><button class="btn danger smallbtn" onclick="deleteCategory(${c.id})">Excluir</button></div>
+    </div>`).join("")||`<div class="muted">Nenhuma categoria cadastrada.</div>`}</div>
+  </div>`;
+}
+
+function openCategoryForm(c=null){
+  openModal(`<div class="title-row"><h2>${c?"Editar":"Nova"} categoria</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome</label><input id="categoryName" value="${esc(c?.name||"")}" placeholder="Ex.: Chaveiros">
+    <label>Descrição</label><textarea id="categoryDescription">${esc(c?.description||"")}</textarea>
+    <label>Status</label><select id="categoryActive"><option value="true" ${!c||c.active?"selected":""}>Ativa</option><option value="false" ${c&&!c.active?"selected":""}>Inativa</option></select>
+    <button class="btn" style="width:100%;margin-top:15px" onclick="saveCategory(${c?.id??"null"})">Salvar categoria</button>`);
+}
+
+async function saveCategory(id){
+  const {error}=await sb.rpc("admin_save_category",{
+    p_id:id,
+    p_name:document.getElementById("categoryName").value,
+    p_description:document.getElementById("categoryDescription").value,
+    p_active:document.getElementById("categoryActive").value==="true"
+  });
+  if(error){toast(error.message);return}
+  closeModal();toast("Categoria salva.");await loadAdminCategories();
+}
+
+async function deleteCategory(id){
+  if(!confirm("Excluir esta categoria? Se já houver histórico, será necessário apenas desativá-la."))return;
+  const {error}=await sb.rpc("admin_delete_category",{p_id:id});
+  if(error){toast(error.message);return}
+  await loadAdminCategories();
+}
+
+
+window._adminOptionFilterState=window._adminOptionFilterState||{category:"",theme:""};
+window._adminSelectedOptionIds=window._adminSelectedOptionIds||new Set();
+
+async function loadAdminOptions(){
+  const box=document.getElementById("adminContent");
+
+  // Preserva o ponto onde o administrador estava antes de recarregar.
+  const oldCategory=document.getElementById("adminOptionCategoryFilter");
+  const oldTheme=document.getElementById("adminOptionThemeFilter");
+  if(oldCategory)window._adminOptionFilterState.category=oldCategory.value;
+  if(oldTheme)window._adminOptionFilterState.theme=oldTheme.value;
+
+  const {data:options,error}=await sb.rpc("admin_get_investment_options");
+
+  if(error){
+    box.innerHTML=`<div class="card error">Erro ao carregar opções: ${esc(error.message)}</div>`;
+    return;
+  }
+
+  window._adminInvestmentOptions=options||[];
+
+  // Remove da seleção IDs que já não existem mais.
+  const validIds=new Set((options||[]).map(o=>Number(o.id)));
+  window._adminSelectedOptionIds=new Set(
+    [...window._adminSelectedOptionIds].filter(id=>validIds.has(Number(id)))
+  );
+
+  const categoryMap=new Map();
+  const themeMap=new Map();
+
+  (options||[]).forEach(o=>{
+    if(o.category_id!==null)categoryMap.set(String(o.category_id),o.category_name);
+    if(o.theme_id!==null)themeMap.set(String(o.theme_id),o.theme_name);
+  });
+
+  const categories=[...categoryMap.entries()].sort((a,b)=>a[1].localeCompare(b[1],"pt-BR"));
+  const themes=[...themeMap.entries()].sort((a,b)=>a[1].localeCompare(b[1],"pt-BR"));
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div>
+          <h2>Opções de investimento</h2>
+          <div class="muted">
+            As combinações são criadas automaticamente. Você pode alterar uma opção por vez ou várias de uma vez.
+          </div>
+        </div>
+        <button class="btn secondary" onclick="loadAdminOptions()">Atualizar lista</button>
+      </div>
+
+      <div class="notice">
+        <b>Padrão automático para opções novas: 10%.</b><br>
+        Alterar a porcentagem afeta novos investimentos feitos depois da mudança. Investimentos já existentes mantêm o valor-alvo original.
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <div>
+          <label>Filtrar por categoria</label>
+          <select id="adminOptionCategoryFilter" onchange="adminOptionFilterChanged()">
+            <option value="">Todas as opções de categoria</option>
+            <option value="all">Todas as categorias</option>
+            ${categories.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div>
+          <label>Filtrar por tema</label>
+          <select id="adminOptionThemeFilter" onchange="adminOptionFilterChanged()">
+            <option value="">Todas as opções de tema</option>
+            <option value="all">Todos os temas</option>
+            ${themes.map(([id,name])=>`<option value="${id}">${esc(name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary smallbtn" onclick="clearAdminOptionFilters()">Limpar filtros</button>
+        <button class="btn secondary smallbtn" onclick="selectAllVisibleAdminOptions()">Selecionar visíveis</button>
+        <button class="btn secondary smallbtn" onclick="clearAdminOptionSelection()">Limpar seleção</button>
+      </div>
+
+      <div style="
+        margin-top:14px;
+        padding:14px;
+        border:1px solid var(--border);
+        border-radius:14px;
+        background:#fff8fa;
+      ">
+        <div class="title-row" style="margin-bottom:0">
+          <div>
+            <b>Alteração em lote</b>
+            <div class="muted">
+              <span id="adminSelectedOptionsCount">0 opção(ões) selecionada(s)</span>
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:0;align-items:end">
+            <div style="min-width:170px">
+              <label style="margin-top:0">Nova porcentagem (%)</label>
+              <input
+                id="adminBatchReturnRate"
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                placeholder="Ex.: 12"
+              >
+            </div>
+            <button class="btn" onclick="applyAdminBatchRate()">Aplicar nas selecionadas</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="adminInvestmentOptionsGrid" class="grid" style="margin-top:14px"></div>
+    </div>
+  `;
+
+  // Restaura os filtros depois de salvar/recarregar.
+  const categorySelect=document.getElementById("adminOptionCategoryFilter");
+  const themeSelect=document.getElementById("adminOptionThemeFilter");
+
+  if(categorySelect && [...categorySelect.options].some(o=>o.value===window._adminOptionFilterState.category)){
+    categorySelect.value=window._adminOptionFilterState.category;
+  }else{
+    window._adminOptionFilterState.category="";
+  }
+
+  if(themeSelect && [...themeSelect.options].some(o=>o.value===window._adminOptionFilterState.theme)){
+    themeSelect.value=window._adminOptionFilterState.theme;
+  }else{
+    window._adminOptionFilterState.theme="";
+  }
+
+  renderAdminInvestmentOptions();
+}
+
+function adminOptionFilterChanged(){
+  window._adminOptionFilterState.category=
+    document.getElementById("adminOptionCategoryFilter")?.value||"";
+  window._adminOptionFilterState.theme=
+    document.getElementById("adminOptionThemeFilter")?.value||"";
+  renderAdminInvestmentOptions();
+}
+
+function clearAdminOptionFilters(){
+  window._adminOptionFilterState={category:"",theme:""};
+
+  const c=document.getElementById("adminOptionCategoryFilter");
+  const t=document.getElementById("adminOptionThemeFilter");
+  if(c)c.value="";
+  if(t)t.value="";
+
+  renderAdminInvestmentOptions();
+}
+
+function getFilteredAdminInvestmentOptions(){
+  const list=window._adminInvestmentOptions||[];
+  const category=document.getElementById("adminOptionCategoryFilter")?.value||"";
+  const theme=document.getElementById("adminOptionThemeFilter")?.value||"";
+
+  return list.filter(o=>{
+    const optionCategory=o.category_id===null?"all":String(o.category_id);
+    const optionTheme=o.theme_id===null?"all":String(o.theme_id);
+
+    const categoryMatches=!category || optionCategory===category;
+    const themeMatches=!theme || optionTheme===theme;
+
+    return categoryMatches && themeMatches;
+  });
+}
+
+function toggleAdminOptionSelection(id,checked){
+  const numericId=Number(id);
+  if(checked){
+    window._adminSelectedOptionIds.add(numericId);
+  }else{
+    window._adminSelectedOptionIds.delete(numericId);
+  }
+  updateAdminOptionSelectionUI();
+}
+
+function selectAllVisibleAdminOptions(){
+  const visible=getFilteredAdminInvestmentOptions();
+
+  visible.forEach(o=>window._adminSelectedOptionIds.add(Number(o.id)));
+  renderAdminInvestmentOptions();
+}
+
+function clearAdminOptionSelection(){
+  window._adminSelectedOptionIds.clear();
+  renderAdminInvestmentOptions();
+}
+
+function updateAdminOptionSelectionUI(){
+  const count=window._adminSelectedOptionIds.size;
+  const counter=document.getElementById("adminSelectedOptionsCount");
+  if(counter){
+    counter.textContent=`${count} opção(ões) selecionada(s)`;
+  }
+
+  document.querySelectorAll("[data-admin-option-checkbox]").forEach(cb=>{
+    cb.checked=window._adminSelectedOptionIds.has(Number(cb.value));
+  });
+}
+
+function renderAdminInvestmentOptions(){
+  const grid=document.getElementById("adminInvestmentOptionsGrid");
+  if(!grid)return;
+
+  const filtered=getFilteredAdminInvestmentOptions();
+
+  if(!filtered.length){
+    grid.innerHTML=`
+      <div class="muted" style="grid-column:1/-1;padding:18px 0">
+        Nenhuma opção corresponde a esses filtros.
+      </div>
+    `;
+    updateAdminOptionSelectionUI();
+    return;
+  }
+
+  const sorted=filtered.slice().sort((a,b)=>{
+    const ca=a.category_name||"Todas as categorias";
+    const cb=b.category_name||"Todas as categorias";
+    const ta=a.theme_name||"Todos os temas";
+    const tb=b.theme_name||"Todos os temas";
+    return ca.localeCompare(cb,"pt-BR") || ta.localeCompare(tb,"pt-BR");
+  });
+
+  grid.innerHTML=sorted.map(o=>{
+    const categoryName=o.category_name||"Todas as categorias";
+    const themeName=o.theme_name||"Todos os temas";
+    const rate=Number(o.return_rate||10);
+    const available=o.option_active!==false &&
+      o.category_active!==false &&
+      o.theme_active!==false;
+
+    const checked=window._adminSelectedOptionIds.has(Number(o.id));
+
+    return `
+      <div class="item" style="position:relative">
+        <label style="
+          position:absolute;
+          top:12px;
+          right:12px;
+          display:flex;
+          align-items:center;
+          gap:6px;
+          margin:0;
+          cursor:pointer;
+          padding:6px 8px;
+          background:#fff;
+          border:1px solid var(--border);
+          border-radius:10px;
+          z-index:2;
+        ">
+          <input
+            data-admin-option-checkbox
+            type="checkbox"
+            value="${o.id}"
+            ${checked?"checked":""}
+            onchange="toggleAdminOptionSelection(${o.id},this.checked)"
+            style="width:18px;height:18px;margin:0"
+          >
+          <span style="font-size:12px;font-weight:700">Selecionar</span>
+        </label>
+
+        <div class="title-row" style="padding-right:105px">
+          <div>
+            <div class="muted" style="font-size:12px">Categoria</div>
+            <h3 style="margin:2px 0 0">${esc(categoryName)}</h3>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="muted" style="font-size:12px">Tema</div>
+          <h3 style="margin:2px 0 0">${esc(themeName)}</h3>
+        </div>
+
+        <div style="margin-top:10px">
+          <span class="badge ${available?"green":"red"}">
+            ${available?"DISPONÍVEL":"INATIVA"}
+          </span>
+        </div>
+
+        <div style="
+          margin-top:14px;
+          padding:14px;
+          border-radius:14px;
+          background:#fff0f4;
+          text-align:center
+        ">
+          <div class="muted">Retorno atual</div>
+          <div class="stat-value" style="font-size:30px">
+            ${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%
+          </div>
+        </div>
+
+        <button
+          class="btn"
+          style="width:100%;margin-top:14px"
+          onclick='openOptionRateForm(${o.id},${JSON.stringify(categoryName+" • "+themeName)},${rate})'
+        >
+          Alterar porcentagem
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  updateAdminOptionSelectionUI();
+}
+
+function openOptionRateForm(id,label,currentRate){
+  openModal(`
+    <div class="title-row">
+      <h2>Alterar retorno</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <div class="notice">
+      <b>${esc(label)}</b>
+    </div>
+
+    <label>Retorno-alvo / lucro (%)</label>
+    <input
+      id="optionReturnRate"
+      type="number"
+      min="0.01"
+      max="100"
+      step="0.01"
+      value="${Number(currentRate||10)}"
+    >
+
+    <button
+      class="btn"
+      style="width:100%;margin-top:15px"
+      onclick="saveOptionRate(${id})"
+    >
+      Salvar porcentagem
+    </button>
+  `);
+}
+
+async function saveOptionRate(id){
+  const rate=Number(document.getElementById("optionReturnRate").value);
+
+  if(!rate || rate<=0 || rate>100){
+    toast("Informe uma porcentagem válida entre 0,01% e 100%.");
+    return;
+  }
+
+  // Salva o filtro atual antes de atualizar a lista.
+  window._adminOptionFilterState.category=
+    document.getElementById("adminOptionCategoryFilter")?.value||
+    window._adminOptionFilterState.category||"";
+  window._adminOptionFilterState.theme=
+    document.getElementById("adminOptionThemeFilter")?.value||
+    window._adminOptionFilterState.theme||"";
+
+  const {error}=await sb.rpc("admin_update_investment_option_rate",{
+    p_option_id:id,
+    p_return_rate:rate
+  });
+
+  if(error){
+    toast(error.message);
+    return;
+  }
+
+  closeModal();
+  toast("Porcentagem atualizada.");
+  await loadAdminOptions();
+}
+
+async function applyAdminBatchRate(){
+  const ids=[...window._adminSelectedOptionIds].map(Number);
+  const rate=Number(document.getElementById("adminBatchReturnRate")?.value);
+
+  if(!ids.length){
+    toast("Selecione pelo menos uma opção.");
+    return;
+  }
+
+  if(!rate || rate<=0 || rate>100){
+    toast("Informe uma porcentagem válida entre 0,01% e 100%.");
+    return;
+  }
+
+  if(!confirm(`Aplicar ${rate}% em ${ids.length} opção(ões) selecionada(s)?`)){
+    return;
+  }
+
+  window._adminOptionFilterState.category=
+    document.getElementById("adminOptionCategoryFilter")?.value||"";
+  window._adminOptionFilterState.theme=
+    document.getElementById("adminOptionThemeFilter")?.value||"";
+
+  const {data,error}=await sb.rpc("admin_bulk_update_investment_option_rate",{
+    p_option_ids:ids,
+    p_return_rate:rate
+  });
+
+  if(error){
+    toast(error.message);
+    return;
+  }
+
+  // Mantém filtros, mas limpa a seleção depois da alteração para evitar repetição acidental.
+  window._adminSelectedOptionIds.clear();
+
+  toast(`${Number(data||ids.length)} opção(ões) atualizada(s) para ${rate}%.`);
+  await loadAdminOptions();
+}
+
+async function loadAdminInvestments(){
+  const box=document.getElementById("adminContent");
+
+  const [invRes,profilesRes,transferRes,repaymentRes]=await Promise.all([
+    fetchAllPaged(()=>sb.from("investments").select(`
+      *,profiles(name,email),themes(name),
+      option:investment_options(id,return_rate,category:categories(name),theme:themes(name))
+    `).order("created_at",{ascending:false})),
+    sb.from("profiles").select("id,name,email,created_at,status").eq("role","investor"),
+    sb.from("investment_transfers").select("*"),
+    sb.from("investment_repayments").select("*")
+  ]);
+
+  const error=invRes.error||profilesRes.error||transferRes.error||repaymentRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  window._adminInvestmentReport={
+    investments:invRes.data||[],
+    profiles:profilesRes.data||[],
+    transfers:transferRes.data||[],
+    repayments:repaymentRes.data||[]
+  };
+
+  const testMode=settings.test_mode!==false;
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div>
+          <h2>Investimentos</h2>
+          <div class="muted">Visão completa do capital dos investidores e das obrigações atuais da Cat Encantus.</div>
+        </div>
+        ${testMode?`<button class="btn danger" onclick="resetAllTestData()">Limpar TODOS os testes</button>`:""}
+      </div>
+
+      <div class="filter-bar">
+        <div><label>Data inicial</label><input id="investReportFrom" type="date"></div>
+        <div><label>Data final</label><input id="investReportTo" type="date"></div>
+        <button class="btn" onclick="renderAdminInvestmentDashboard()">Filtrar</button>
+        <button class="btn secondary" onclick="clearReportRange('investReport',renderAdminInvestmentDashboard)">Limpar filtro</button>
+      </div>
+      <div class="report-subtitle">Indicadores históricos respeitam o período. Indicadores “atuais” mostram a situação de hoje.</div>
+      <div id="investmentDashboard"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Histórico de investimentos</h3><div class="muted">Extrato do período selecionado.</div></div></div>
+      <div id="investmentHistoryTable"></div>
+    </div>
+  `;
+
+  renderAdminInvestmentDashboard();
+}
+
+function renderAdminInvestmentDashboard(){
+  const target=document.getElementById("investmentDashboard");
+  const tableTarget=document.getElementById("investmentHistoryTable");
+  if(!target||!window._adminInvestmentReport)return;
+
+  const {investments,profiles,transfers,repayments}=window._adminInvestmentReport;
+  const range=reportDateRange("investReport");
+
+  const filteredInv=investments.filter(i=>inReportRange(i.created_at,range));
+  const filteredTransfers=transfers.filter(t=>t.status==="confirmed"&&inReportRange(t.confirmed_at||t.created_at,range));
+  const filteredRepayments=repayments.filter(r=>r.status==="confirmed"&&inReportRange(r.confirmed_at||r.created_at,range));
+
+  const totalHistorical=filteredInv.filter(i=>i.status!=="cancelled").reduce((s,i)=>s+Number(i.invested_amount||0),0);
+  const capitalReceived=filteredTransfers.reduce((s,t)=>s+Number(t.amount||0),0);
+  const profitPaid=filteredRepayments.reduce((s,r)=>s+Number(r.profit_amount||0),0);
+  const currentActive=investments.filter(i=>i.status==="active").reduce((s,i)=>s+Number(i.invested_amount||0),0);
+
+  const repaymentMap=Object.fromEntries(repayments.map(r=>[r.investment_id,r]));
+  const unpaid=investments.filter(i=>i.status!=="cancelled"&&repaymentMap[i.id]?.status!=="confirmed");
+  const currentObligation=unpaid.reduce((s,i)=>s+Number(i.target_amount||0),0);
+  const committedProfit=unpaid.reduce((s,i)=>s+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+
+  const cutoff=Date.now()-30*24*60*60*1000;
+  const last30ByInvestor={};
+  investments.filter(i=>i.status!=="cancelled"&&new Date(i.created_at).getTime()>=cutoff).forEach(i=>{
+    last30ByInvestor[i.investor_id]=(last30ByInvestor[i.investor_id]||0)+Number(i.invested_amount||0);
+  });
+
+  let activeCount=0,lowCount=0,stoppedCount=0;
+  profiles.forEach(p=>{
+    const v=Number(last30ByInvestor[p.id]||0);
+    if(v>=50)activeCount++;
+    else if(v>0)lowCount++;
+    else stoppedCount++;
+  });
+
+  target.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Capital recebido na Cat Encantus</div><div class="metric-value">${money(capitalReceived)}</div><div class="muted">Transferências confirmadas no período</div></div>
+      <div class="metric-box"><div class="metric-label">Investimento histórico</div><div class="metric-value">${money(totalHistorical)}</div><div class="muted">Investimentos criados no período</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Retorno pago aos investidores</div><div class="metric-value">${money(profitPaid)}</div><div class="muted">Somente o lucro/custo do capital</div></div>
+      <div class="metric-box"><div class="metric-label">Investidores cadastrados</div><div class="metric-value">${profiles.length}</div><div class="muted">Total atual</div></div>
+      <div class="metric-box success-soft"><div class="metric-label">Investidores ativos</div><div class="metric-value">${activeCount}</div><div class="muted">≥ R$ 50 nos últimos 30 dias</div></div>
+      <div class="metric-box warning"><div class="metric-label">Baixa atividade</div><div class="metric-value">${lowCount}</div><div class="muted">R$ 0,01 a R$ 49,99 nos últimos 30 dias</div></div>
+      <div class="metric-box neutral-soft"><div class="metric-label">Investidores parados</div><div class="metric-value">${stoppedCount}</div><div class="muted">R$ 0 nos últimos 30 dias</div></div>
+      <div class="metric-box"><div class="metric-label">Investimento acontecendo agora</div><div class="metric-value">${money(currentActive)}</div><div class="muted">Principal dos investimentos ativos</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Obrigação atual da Cat Encantus</div><div class="metric-value">${money(currentObligation)}</div><div class="muted">Principal + retorno ainda não repassados</div></div>
+      <div class="metric-box warning"><div class="metric-label">Retorno ainda comprometido</div><div class="metric-value">${money(committedProfit)}</div><div class="muted">Lucro futuro ainda não repassado</div></div>
+    </div>
+  `;
+
+  const testMode=settings.test_mode!==false;
+  tableTarget.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Investidor</th><th>Categoria + Tema</th><th>Investido</th><th>Retorno</th><th>Alvo</th><th>Vendido</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead>
+      <tbody>${filteredInv.map(i=>{
+        const label=i.option
+          ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
+          : `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
+        const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
+        const rep=repaymentMap[i.id];
+        let status=i.status;
+        if(i.status==="completed"&&rep?.status==="pending")status="Concluído • repasse pendente";
+        if(i.status==="completed"&&rep?.status==="confirmed")status="Concluído • repassado";
+        return `<tr>
+          <td>${esc(i.profiles?.name||"-")}<br><span class="muted">${esc(i.profiles?.email||"")}</span></td>
+          <td><b>${esc(label)}</b></td>
+          <td>${money(i.invested_amount)}</td>
+          <td>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td>
+          <td>${money(i.target_amount)}</td>
+          <td>${money(i.sold_amount)}</td>
+          <td>${esc(status)}</td>
+          <td>${new Date(i.created_at).toLocaleString("pt-BR")}</td>
+          <td>${testMode?`<button class="btn danger smallbtn" onclick="deleteAdminInvestment(${i.id})">Excluir</button>`:"-"}</td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="9">Nenhum investimento neste período.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+async function deleteAdminInvestment(id){
+  if(!confirm("Excluir este investimento de TESTE? O sistema vai remover o investimento e recalcular automaticamente as vendas, filas e saldo relacionados. Esta ação não pode ser desfeita."))return;
+  const {error}=await sb.rpc("admin_delete_test_investment",{p_investment_id:id});
+  if(error){toast(error.message);return}
+  toast("Investimento de teste excluído. Filas, vendas atribuídas e saldos foram recalculados.");
+  await loadAdminInvestments();
+}
+
+async function resetAllTestData(){
+  const confirmation=prompt(
+    "ATENÇÃO: isso excluirá TODOS os investimentos, vendas e distribuições de vendas registrados durante os testes.\n\n" +
+    "Depósitos e saques NÃO serão apagados. Os saldos serão recalculados para desfazer somente os investimentos.\n\n" +
+    "Para confirmar, digite exatamente: LIMPAR TESTES"
+  );
+  if(confirmation!=="LIMPAR TESTES"){
+    if(confirmation!==null)toast("Confirmação incorreta. Nada foi apagado.");
+    return;
+  }
+
+  const {data,error}=await sb.rpc("admin_reset_test_investments_and_sales",{p_confirmation:confirmation});
+  if(error){toast(error.message);return}
+
+  toast("Dados de teste limpos.");
+  await refreshProfile();
+  await loadAdminInvestments();
+}
+
+async function loadAdminSales(){
+  const box=document.getElementById("adminContent");
+
+  const [themesRes,categoriesRes,customersRes,salesRes]=await Promise.all([
+    sb.from("themes").select("id,name").eq("active",true).order("name"),
+    sb.from("categories").select("id,name").eq("active",true).order("name"),
+    sb.from("customers").select("*").eq("active",true).order("name"),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      *,themes(name),category:categories(name),
+      customer:customers(id,name,whatsapp,instagram)
+    `).order("sold_at",{ascending:false}))
+  ]);
+
+  const error=themesRes.error||categoriesRes.error||customersRes.error||salesRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  window._adminSalesData=salesRes.data||[];
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row"><div><h2>Vendas</h2><div class="muted">Registre uma venda e acompanhe o desempenho completo da loja.</div></div></div>
+
+      <div class="row">
+        <div><label>Categoria vendida</label><select id="saleCategory">${(categoriesRes.data||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+        <div><label>Tema vendido</label><select id="saleTheme">${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+      </div>
+
+      <div class="row">
+        <div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div>
+        <div><label>Valor da venda</label><input id="saleAmount" type="number" min="0.01" step="0.01"></div>
+      </div>
+
+      <label>Cliente</label>
+      <select id="saleCustomer" onchange="toggleNewSaleCustomer()">
+        <option value="">Cliente não identificado</option>
+        ${(customersRes.data||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+        <option value="__new__">+ Cadastrar novo cliente nesta venda</option>
+      </select>
+
+      <div id="newSaleCustomerFields" class="customer-new-fields hidden">
+        <div class="row">
+          <div><label>Nome do cliente</label><input id="newSaleCustomerName" placeholder="Nome"></div>
+          <div><label>WhatsApp (opcional)</label><input id="newSaleCustomerWhatsapp" placeholder="(31) 99999-9999"></div>
+        </div>
+        <label>Instagram (opcional)</label>
+        <input id="newSaleCustomerInstagram" placeholder="@cliente">
+      </div>
+
+      <div class="notice" style="margin-top:12px"><b>Fila inteligente:</b> a venda continua sendo distribuída para o investimento compatível mais antigo.</div>
+      <button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Relatório de vendas</h3><div class="muted">Sem filtro, mostra toda a história registrada.</div></div></div>
+      <div class="filter-bar">
+        <div><label>Data inicial</label><input id="salesReportFrom" type="date"></div>
+        <div><label>Data final</label><input id="salesReportTo" type="date"></div>
+        <button class="btn" onclick="renderSalesDashboard()">Filtrar</button>
+        <button class="btn secondary" onclick="clearReportRange('salesReport',renderSalesDashboard)">Limpar filtro</button>
+      </div>
+      <div id="salesDashboard"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, vendas podem ser excluídas.":""}</div></div></div>
+      <div id="salesExtract"></div>
+    </div>
+  `;
+
+  renderSalesDashboard();
+}
+
+function toggleNewSaleCustomer(){
+  const value=document.getElementById("saleCustomer")?.value;
+  document.getElementById("newSaleCustomerFields")?.classList.toggle("hidden",value!=="__new__");
+}
+
+async function saveSale(){
+  const theme=Number(document.getElementById("saleTheme").value);
+  const category=Number(document.getElementById("saleCategory").value);
+  const amount=Number(document.getElementById("saleAmount").value);
+  const product=document.getElementById("saleProduct").value;
+  const customerChoice=document.getElementById("saleCustomer").value;
+
+  let customerId=null;
+
+  if(customerChoice==="__new__"){
+    const name=document.getElementById("newSaleCustomerName").value.trim();
+    const whatsapp=document.getElementById("newSaleCustomerWhatsapp").value.trim();
+    const instagram=document.getElementById("newSaleCustomerInstagram").value.trim();
+
+    if(!name){toast("Informe o nome do novo cliente.");return}
+
+    const {data,error}=await sb.rpc("admin_save_customer",{
+      p_customer_id:null,
+      p_name:name,
+      p_whatsapp:whatsapp||null,
+      p_instagram:instagram||null
+    });
+
+    if(error){toast(error.message);return}
+    customerId=data?.id||null;
+  }else if(customerChoice){
+    customerId=Number(customerChoice);
+  }
+
+  const {error}=await sb.rpc("register_sale",{
+    p_theme_id:theme,
+    p_category_id:category,
+    p_amount:amount,
+    p_product_name:product,
+    p_customer_id:customerId
+  });
+
+  if(error){toast(error.message);return}
+  toast("Venda registrada.");
+  await loadAdminSales();
+}
+
+function renderSalesDashboard(){
+  const dash=document.getElementById("salesDashboard");
+  const extract=document.getElementById("salesExtract");
+  if(!dash||!extract)return;
+
+  const range=reportDateRange("salesReport");
+  const sales=(window._adminSalesData||[]).filter(s=>inReportRange(s.sold_at,range));
+  const total=sales.reduce((a,s)=>a+Number(s.amount||0),0);
+  const count=sales.length;
+  const ticket=count?total/count:0;
+  const identified=sales.filter(s=>s.customer_id!=null).length;
+  const byCategory={},byTheme={};
+
+  sales.forEach(s=>{
+    const category=s.category?.name||"Categoria não registrada";
+    const theme=s.themes?.name||"Tema não registrado";
+    if(!byCategory[category])byCategory[category]={value:0,count:0};
+    if(!byTheme[theme])byTheme[theme]={value:0,count:0};
+    byCategory[category].value+=Number(s.amount||0);
+    byCategory[category].count++;
+    byTheme[theme].value+=Number(s.amount||0);
+    byTheme[theme].count++;
+  });
+
+  dash.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Faturamento em vendas</div><div class="metric-value">${money(total)}</div></div>
+      <div class="metric-box"><div class="metric-label">Quantidade de vendas</div><div class="metric-value">${count}</div></div>
+      <div class="metric-box"><div class="metric-label">Ticket médio</div><div class="metric-value">${money(ticket)}</div></div>
+      <div class="metric-box"><div class="metric-label">Vendas com cliente identificado</div><div class="metric-value">${identified}</div></div>
+    </div>
+
+    <div class="dashboard-group">
+      <div class="dashboard-group-title">Categorias</div>
+      <div class="mini-metrics">${Object.entries(byCategory).sort((a,b)=>b[1].value-a[1].value).map(([name,v])=>`<div class="mini-metric"><span class="muted">${esc(name)}</span><b>${money(v.value)}</b><span class="muted">${v.count} venda(s)</span></div>`).join("")||`<div class="muted">Nenhuma venda no período.</div>`}</div>
+    </div>
+
+    <div class="dashboard-group">
+      <div class="dashboard-group-title">Temas</div>
+      <div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1].value-a[1].value).map(([name,v])=>`<div class="mini-metric"><span class="muted">${esc(name)}</span><b>${money(v.value)}</b><span class="muted">${v.count} venda(s)</span></div>`).join("")||`<div class="muted">Nenhuma venda no período.</div>`}</div>
+    </div>
+  `;
+
+  extract.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead>
+      <tbody>${sales.map(s=>`<tr>
+        <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
+        <td>${esc(s.customer?.name||"Cliente não identificado")}</td>
+        <td>${esc(s.category?.name||"Categoria não registrada")}</td>
+        <td>${esc(s.themes?.name||"-")}</td>
+        <td>${esc(s.product_name||"-")}</td>
+        <td><b>${money(s.amount)}</b></td>
+        <td>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:"-"}</td>
+      </tr>`).join("")||`<tr><td colspan="7">Nenhuma venda neste período.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+async function deleteAdminSale(id){
+  if(!confirm("Excluir esta venda de TESTE? O sistema vai apagar a venda e recalcular automaticamente caixinhas, filas, progresso e retornos. Esta ação não pode ser desfeita."))return;
+
+  const {error}=await sb.rpc("admin_delete_test_sale",{p_sale_id:id});
+  if(error){toast(error.message);return}
+
+  toast("Venda de teste excluída. Caixinhas, filas, progresso e saldos foram recalculados.");
+  await loadAdminSales();
+}
+
+
+async function loadAdminCustomers(){
+  const box=document.getElementById("adminContent");
+  const [customersRes,salesRes]=await Promise.all([
+    sb.from("customers").select("*").eq("active",true).order("name"),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      id,customer_id,amount,sold_at,product_name,
+      category:categories(name),themes(name)
+    `).not("customer_id","is",null).order("sold_at",{ascending:false}))
+  ]);
+
+  const error=customersRes.error||salesRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  const customers=customersRes.data||[];
+  const sales=salesRes.data||[];
+  const stats={};
+  customers.forEach(c=>stats[c.id]={total:0,count:0,last:null});
+
+  sales.forEach(s=>{
+    if(!stats[s.customer_id])return;
+    stats[s.customer_id].total+=Number(s.amount||0);
+    stats[s.customer_id].count++;
+    if(!stats[s.customer_id].last||new Date(s.sold_at)>new Date(stats[s.customer_id].last)){
+      stats[s.customer_id].last=s.sold_at;
+    }
+  });
+
+  const now=Date.now();
+  const inactive30=customers.filter(c=>{
+    const last=stats[c.id]?.last;
+    return last&&(now-new Date(last).getTime())>=30*24*60*60*1000;
+  }).length;
+  const customerRevenue=customers.reduce((s,c)=>s+Number(stats[c.id]?.total||0),0);
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div><h2>Clientes</h2><div class="muted">Histórico de relacionamento e compras dos clientes identificados.</div></div>
+        <button class="btn" onclick="openCustomerEditor(null)">+ Novo cliente</button>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-box"><div class="metric-label">Clientes cadastrados</div><div class="metric-value">${customers.length}</div></div>
+        <div class="metric-box success-soft"><div class="metric-label">Faturamento identificado</div><div class="metric-value">${money(customerRevenue)}</div></div>
+        <div class="metric-box warning"><div class="metric-label">30+ dias sem comprar</div><div class="metric-value">${inactive30}</div></div>
+      </div>
+
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Cliente</th><th>WhatsApp</th><th>Instagram</th><th>Última compra</th><th>Compras</th><th>Total comprado</th><th>Ação</th></tr></thead>
+        <tbody>${customers.map(c=>{
+          const st=stats[c.id]||{};
+          return `<tr>
+            <td><button class="investor-name-link" onclick="openCustomerHistory(${c.id})">${esc(c.name)}</button></td>
+            <td>${esc(c.whatsapp||"-")}</td>
+            <td>${esc(c.instagram||"-")}</td>
+            <td>${st.last?new Date(st.last).toLocaleString("pt-BR"):"Nunca"}</td>
+            <td>${st.count||0}</td>
+            <td><b>${money(st.total||0)}</b></td>
+            <td><div class="actions"><button class="btn smallbtn" onclick="openCustomerHistory(${c.id})">Ver histórico</button><button class="btn secondary smallbtn" onclick='openCustomerEditor(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Editar</button></div></td>
+          </tr>`;
+        }).join("")||`<tr><td colspan="7">Nenhum cliente cadastrado.</td></tr>`}</tbody>
+      </table></div>
+    </div>
+  `;
+}
+
+function openCustomerEditor(customer){
+  const c=customer||{};
+  openModal(`
+    <div class="title-row"><h2>${c.id?"Editar cliente":"Novo cliente"}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome</label><input id="customerEditName" value="${esc(c.name||"")}">
+    <label>WhatsApp (opcional)</label><input id="customerEditWhatsapp" value="${esc(c.whatsapp||"")}">
+    <label>Instagram (opcional)</label><input id="customerEditInstagram" value="${esc(c.instagram||"")}">
+    <button class="btn" style="width:100%;margin-top:14px" onclick="saveCustomerEditor(${c.id||"null"})">Salvar cliente</button>
+  `);
+}
+
+async function saveCustomerEditor(id){
+  const {error}=await sb.rpc("admin_save_customer",{
+    p_customer_id:id,
+    p_name:document.getElementById("customerEditName").value,
+    p_whatsapp:document.getElementById("customerEditWhatsapp").value||null,
+    p_instagram:document.getElementById("customerEditInstagram").value||null
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Cliente salvo.");
+  await loadAdminCustomers();
+}
+
+async function openCustomerHistory(id){
+  openModal(`<div class="title-row"><h2>Cliente</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando...</div>`,true);
+
+  const [customerRes,salesRes]=await Promise.all([
+    sb.from("customers").select("*").eq("id",id).single(),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      *,category:categories(name),themes(name)
+    `).eq("customer_id",id).order("sold_at",{ascending:false}))
+  ]);
+
+  const error=customerRes.error||salesRes.error;
+  if(error){
+    openModal(`<div class="msg error">${esc(error.message)}</div>`,true);
+    return;
+  }
+
+  const c=customerRes.data;
+  const sales=salesRes.data||[];
+  const total=sales.reduce((s,x)=>s+Number(x.amount||0),0);
+  const ticket=sales.length?total/sales.length:0;
+  const byCategory={},byTheme={};
+
+  sales.forEach(s=>{
+    const cat=s.category?.name||"Categoria não registrada";
+    const theme=s.themes?.name||"Tema não registrado";
+    byCategory[cat]=(byCategory[cat]||0)+Number(s.amount||0);
+    byTheme[theme]=(byTheme[theme]||0)+Number(s.amount||0);
+  });
+
+  openModal(`
+    <div class="title-row"><div><h2>${esc(c.name)}</h2><div class="muted">${esc(c.whatsapp||"Sem WhatsApp")} • ${esc(c.instagram||"Sem Instagram")}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Total comprado</div><div class="metric-value">${money(total)}</div></div>
+      <div class="metric-box"><div class="metric-label">Compras</div><div class="metric-value">${sales.length}</div></div>
+      <div class="metric-box"><div class="metric-label">Ticket médio</div><div class="metric-value">${money(ticket)}</div></div>
+      <div class="metric-box"><div class="metric-label">Primeira compra</div><div class="metric-value" style="font-size:15px">${sales.length?new Date(sales[sales.length-1].sold_at).toLocaleDateString("pt-BR"):"-"}</div></div>
+      <div class="metric-box"><div class="metric-label">Última compra</div><div class="metric-value" style="font-size:15px">${sales.length?new Date(sales[0].sold_at).toLocaleDateString("pt-BR"):"-"}</div></div>
+    </div>
+
+    <div class="history-section"><h3>Por categoria</h3><div class="mini-metrics">${Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
+    <div class="history-section"><h3>Por tema</h3><div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
+
+    <div class="history-section"><h3>Histórico de compras</h3><div class="table-wrap"><table class="table">
+      <thead><tr><th>Data</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th></tr></thead>
+      <tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="5">Nenhuma compra.</td></tr>`}</tbody>
+    </table></div></div>
+  `,true);
+}
+
+
+async function loadAdminResults(){
+  const box=document.getElementById("adminContent");
+
+  const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes]=await Promise.all([
+    sb.rpc("admin_get_account_balances"),
+    fetchAllPaged(()=>sb.from("financial_entries").select("*").order("occurred_at",{ascending:false})),
+    sb.from("investment_transfers").select("*,profiles:profiles!investment_transfers_investor_id_fkey(name,email)").eq("status","pending").order("created_at"),
+    sb.from("investment_repayments").select("*,profiles:profiles!investment_repayments_investor_id_fkey(name,email)").eq("status","pending").order("created_at"),
+    sb.from("investment_repayments").select("investment_id,status,total_amount,profit_amount,principal_amount,confirmed_at,created_at"),
+    fetchAllPaged(()=>sb.from("investments").select(`
+      id,investor_id,invested_amount,target_amount,status,created_at,
+      profiles(name,email),
+      option:investment_options(id,category:categories(name),theme:themes(name))
+    `).neq("status","cancelled").order("created_at",{ascending:false}))
+  ]);
+
+  const error=balancesRes.error||entriesRes.error||transferRes.error||repaymentRes.error||allRepaymentRes.error||investmentsRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  window._resultsData={
+    balances:balancesRes.data||[],
+    entries:entriesRes.data||[],
+    pendingTransfers:transferRes.data||[],
+    pendingRepayments:repaymentRes.data||[],
+    repayments:allRepaymentRes.data||[],
+    investments:investmentsRes.data||[]
+  };
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row"><div><h2>Resultados</h2><div class="muted">Vida financeira da Cat Encantus e controle do dinheiro da CATinvestimentos.</div></div></div>
+
+      <div id="currentAccountBalances"></div>
+
+      <div class="filter-bar" style="margin-top:20px">
+        <div><label>Data inicial</label><input id="resultsReportFrom" type="date"></div>
+        <div><label>Data final</label><input id="resultsReportTo" type="date"></div>
+        <button class="btn" onclick="renderResultsDashboard()">Filtrar</button>
+        <button class="btn secondary" onclick="clearReportRange('resultsReport',renderResultsDashboard)">Limpar filtro</button>
+      </div>
+      <div class="report-subtitle">Sem filtro, os resultados mostram toda a história registrada. Os saldos bancários são sempre atuais.</div>
+
+      <div id="resultsDashboard"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Registrar entrada ou saída manual</h3><div class="muted">Use para movimentos que o aplicativo não reconhece sozinho.</div></div></div>
+
+      <div class="row">
+        <div><label>Conta</label><select id="financeAccount"><option value="cat_encantus">Cat Encantus</option><option value="cat_investimentos">CATinvestimentos</option></select></div>
+        <div><label>Tipo</label><select id="financeDirection" onchange="updateFinancialCategoryOptions()"><option value="out">Saída</option><option value="in">Entrada</option></select></div>
+      </div>
+
+      <div class="row">
+        <div><label>Categoria</label><select id="financeCategory"></select></div>
+        <div><label>Valor</label><input id="financeAmount" type="number" min="0.01" step="0.01"></div>
+      </div>
+
+      <div class="row">
+        <div><label>Descrição</label><input id="financeDescription" placeholder="Ex.: Compra de Hama Beads"></div>
+        <div><label>Local / Destino / Origem</label><input id="financeCounterparty" placeholder="Shopee, Mercado Livre, vendedor..."></div>
+      </div>
+
+      <div class="row">
+        <div><label>Data</label><input id="financeDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div><label>Observação (opcional)</label><input id="financeNotes"></div>
+      </div>
+
+      <button class="btn" style="margin-top:14px" onclick="saveManualFinancialEntry()">Registrar movimentação</button>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><h3>Ações financeiras pendentes</h3></div>
+      <div id="pendingFinancialActions"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><h3>Contas a pagar / obrigações com investidores</h3></div>
+      <div id="investorObligations"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><h3>Extrato financeiro</h3></div>
+      <div id="financialExtract"></div>
+    </div>
+  `;
+
+  updateFinancialCategoryOptions();
+  renderResultsDashboard();
+}
+
+function updateFinancialCategoryOptions(){
+  const direction=document.getElementById("financeDirection")?.value||"out";
+  const select=document.getElementById("financeCategory");
+  if(!select)return;
+
+  const outgoing=[
+    "Materiais","Embalagens","Fretes","Feiras / Eventos",
+    "Equipamentos","Marketing","Taxas","Serviços",
+    "Comissão de vendedores","Aluguel","Outras saídas"
+  ];
+
+  const incoming=[
+    "Aporte dos sócios","Venda fora do sistema",
+    "Reembolso recebido","Outras entradas"
+  ];
+
+  const list=direction==="out"?outgoing:incoming;
+  select.innerHTML=list.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+}
+
+function renderResultsDashboard(){
+  if(!window._resultsData)return;
+
+  const {balances,entries,pendingTransfers,pendingRepayments,repayments,investments}=window._resultsData;
+  const range=reportDateRange("resultsReport");
+  const filtered=entries.filter(e=>inReportRange(e.occurred_at,range));
+
+  const ce=filtered.filter(e=>e.account_code==="cat_encantus");
+  const ci=filtered.filter(e=>e.account_code==="cat_investimentos");
+
+  const ceIn=ce.filter(e=>e.direction==="in").reduce((s,e)=>s+Number(e.amount||0),0);
+  const ceOut=ce.filter(e=>e.direction==="out").reduce((s,e)=>s+Number(e.amount||0),0);
+  const ciIn=ci.filter(e=>e.direction==="in").reduce((s,e)=>s+Number(e.amount||0),0);
+  const ciOut=ci.filter(e=>e.direction==="out").reduce((s,e)=>s+Number(e.amount||0),0);
+
+  const result=ce.reduce((s,e)=>s+Number(e.result_amount||0),0);
+  const investorCost=ce
+    .filter(e=>e.category==="Retorno de investidores")
+    .reduce((s,e)=>s+Math.abs(Number(e.result_amount||0)),0);
+  const expenses=ce
+    .filter(e=>Number(e.result_amount||0)<0&&e.category!=="Retorno de investidores")
+    .reduce((s,e)=>s+Math.abs(Number(e.result_amount||0)),0);
+  const revenue=ce
+    .filter(e=>Number(e.result_amount||0)>0)
+    .reduce((s,e)=>s+Number(e.result_amount||0),0);
+
+  const pendingTransferTotal=pendingTransfers.reduce((s,t)=>s+Number(t.amount||0),0);
+  const pendingRepaymentTotal=pendingRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
+
+  const confirmedRepaymentIds=new Set(
+    repayments.filter(r=>r.status==="confirmed").map(r=>r.investment_id)
+  );
+  const unpaidInvestments=investments.filter(i=>!confirmedRepaymentIds.has(i.id));
+  const obligationTotal=unpaidInvestments.reduce((s,i)=>s+Number(i.target_amount||0),0);
+  const futureProfit=unpaidInvestments.reduce((s,i)=>s+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+
+  document.getElementById("currentAccountBalances").innerHTML=`
+    <div class="metric-grid">
+      ${balances.map(b=>`
+        <div class="metric-box balance-card ${b.initialized?"success-soft":"warning"}">
+          <div class="metric-label">Saldo atual • ${esc(b.account_name)}</div>
+          <div class="metric-value">${money(b.current_balance)}</div>
+          <div class="balance-status">${b.initialized
+            ? `Controle iniciado em ${new Date(b.tracking_started_at).toLocaleString("pt-BR")}`
+            : `<b>Configure o saldo inicial para começar a conciliar com o banco.</b>`}</div>
+          <div class="actions">
+            ${!b.initialized
+              ? `<button class="btn smallbtn" onclick="openSetOpeningBalance('${b.account_code}','${esc(b.account_name)}')">Definir saldo inicial</button>`
+              : `<button class="btn secondary smallbtn" onclick="openReconcileAccount('${b.account_code}','${esc(b.account_name)}',${Number(b.current_balance||0)})">Conciliar</button>`}
+          </div>
+        </div>
+      `).join("")}
+      <div class="metric-box warning"><div class="metric-label">Transferir CATinvestimentos → Cat Encantus</div><div class="metric-value">${money(pendingTransferTotal)}</div><div class="muted">Investimentos aguardando sua confirmação</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Repassar Cat Encantus → CATinvestimentos</div><div class="metric-value">${money(pendingRepaymentTotal)}</div><div class="muted">Investimentos concluídos aguardando repasse</div></div>
+    </div>
+  `;
+
+  document.getElementById("resultsDashboard").innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Entradas • Cat Encantus</div><div class="metric-value">${money(ceIn)}</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Saídas • Cat Encantus</div><div class="metric-value">${money(ceOut)}</div></div>
+      <div class="metric-box"><div class="metric-label">Saldo líquido de caixa</div><div class="metric-value">${money(ceIn-ceOut)}</div><div class="muted">Entradas - saídas do período</div></div>
+      <div class="metric-box success-soft"><div class="metric-label">Receitas / resultado positivo</div><div class="metric-value">${money(revenue)}</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Despesas da operação</div><div class="metric-value">${money(expenses)}</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Custo dos investidores</div><div class="metric-value">${money(investorCost)}</div><div class="muted">Somente o lucro/retorno pago — não inclui principal</div></div>
+      <div class="metric-box ${result>=0?"success-soft":"danger-soft"}"><div class="metric-label">Resultado da empresa</div><div class="metric-value">${money(result)}</div><div class="muted">Receitas - despesas - custo dos investidores</div></div>
+      <div class="metric-box"><div class="metric-label">Entradas • CATinvestimentos</div><div class="metric-value">${money(ciIn)}</div></div>
+      <div class="metric-box"><div class="metric-label">Saídas • CATinvestimentos</div><div class="metric-value">${money(ciOut)}</div></div>
+      <div class="metric-box obligation-card"><div class="metric-label">Obrigação atual da Cat Encantus</div><div class="metric-value">${money(obligationTotal)}</div><div class="muted">Principal + retorno ainda não repassados</div></div>
+      <div class="metric-box warning"><div class="metric-label">Retorno futuro comprometido</div><div class="metric-value">${money(futureProfit)}</div><div class="muted">Somente a parcela de lucro dos investidores ainda não repassada</div></div>
+    </div>
+  `;
+
+  renderPendingFinancialActions();
+  renderInvestorObligations();
+  renderFinancialExtract(filtered);
+}
+
+function renderPendingFinancialActions(){
+  const target=document.getElementById("pendingFinancialActions");
+  if(!target||!window._resultsData)return;
+
+  const {pendingTransfers,pendingRepayments}=window._resultsData;
+
+  target.innerHTML=`
+    <div class="history-section">
+      <h3>CATinvestimentos → Cat Encantus</h3>
+      ${pendingTransfers.map(t=>`
+        <div class="pending-action">
+          <b>${esc(t.profiles?.name||"Investidor")}</b> • ${money(t.amount)}
+          <div class="muted">Faça a transferência entre os bancos e confirme aqui.</div>
+          <button class="btn smallbtn" style="margin-top:8px" onclick="confirmInvestmentTransfer(${t.id})">Confirmar transferência</button>
+        </div>
+      `).join("")||`<div class="muted">Nenhuma transferência pendente.</div>`}
+    </div>
+
+    <div class="history-section">
+      <h3>Cat Encantus → CATinvestimentos</h3>
+      ${pendingRepayments.map(r=>`
+        <div class="pending-action">
+          <b>${esc(r.profiles?.name||"Investidor")}</b> • ${money(r.total_amount)}
+          <div class="muted">Principal: ${money(r.principal_amount)} • Retorno: ${money(r.profit_amount)}</div>
+          <div class="muted">Faça o repasse para a CATinvestimentos. Só depois o valor será liberado ao investidor.</div>
+          <button class="btn smallbtn" style="margin-top:8px" onclick="confirmInvestmentRepayment(${r.id})">Confirmar repasse</button>
+        </div>
+      `).join("")||`<div class="muted">Nenhum repasse pendente.</div>`}
+    </div>
+  `;
+}
+
+function renderInvestorObligations(){
+  const target=document.getElementById("investorObligations");
+  if(!target||!window._resultsData)return;
+
+  const {investments,repayments}=window._resultsData;
+  const confirmed=new Set(repayments.filter(x=>x.status==="confirmed").map(x=>x.investment_id));
+  const rows=investments.filter(i=>!confirmed.has(i.id));
+
+  target.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Investidor</th><th>Opção</th><th>Principal</th><th>Retorno</th><th>Total devido</th><th>Situação</th></tr></thead>
+      <tbody>${rows.map(i=>{
+        const label=i.option
+          ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
+          : "Investimento antigo";
+        const profit=Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0));
+        const situation=i.status==="completed"?"Concluído • repasse pendente":"Em andamento";
+        return `<tr>
+          <td>${esc(i.profiles?.name||"-")}</td>
+          <td>${esc(label)}</td>
+          <td>${money(i.invested_amount)}</td>
+          <td>${money(profit)}</td>
+          <td><b>${money(i.target_amount)}</b></td>
+          <td>${esc(situation)}</td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="6">Nenhuma obrigação pendente.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+function renderFinancialExtract(entries){
+  const target=document.getElementById("financialExtract");
+  if(!target)return;
+
+  target.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Destino / Origem</th><th>Valor</th><th>Efeito no resultado</th></tr></thead>
+      <tbody>${entries.map(e=>`
+        <tr>
+          <td>${new Date(e.occurred_at).toLocaleString("pt-BR")}</td>
+          <td>${e.account_code==="cat_encantus"?"Cat Encantus":"CATinvestimentos"}</td>
+          <td>${e.direction==="in"?"Entrada":"Saída"}</td>
+          <td>${esc(e.category||"-")}</td>
+          <td>${esc(e.description||"-")}</td>
+          <td>${esc(e.counterparty||"-")}</td>
+          <td class="${e.direction==="in"?"flow-positive":"flow-negative"}">${e.direction==="in"?"+":"-"} ${money(e.amount)}</td>
+          <td>${Number(e.result_amount||0)===0
+            ? `<span class="flow-neutral">Patrimonial</span>`
+            : Number(e.result_amount)>0
+              ? `<span class="flow-positive">+ ${money(e.result_amount)}</span>`
+              : `<span class="flow-negative">- ${money(Math.abs(Number(e.result_amount)))}</span>`}</td>
+        </tr>
+      `).join("")||`<tr><td colspan="8">Nenhuma movimentação neste período.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+async function saveManualFinancialEntry(){
+  const date=document.getElementById("financeDate").value;
+  const occurred=date?new Date(date+"T12:00:00").toISOString():null;
+
+  const {error}=await sb.rpc("admin_add_financial_entry",{
+    p_account_code:document.getElementById("financeAccount").value,
+    p_direction:document.getElementById("financeDirection").value,
+    p_amount:Number(document.getElementById("financeAmount").value),
+    p_category:document.getElementById("financeCategory").value,
+    p_description:document.getElementById("financeDescription").value,
+    p_counterparty:document.getElementById("financeCounterparty").value||null,
+    p_notes:document.getElementById("financeNotes").value||null,
+    p_occurred_at:occurred
+  });
+
+  if(error){toast(error.message);return}
+  toast("Movimentação registrada.");
+  await loadAdminResults();
+}
+
+function openSetOpeningBalance(code,name){
+  openModal(`
+    <div class="title-row"><h2>Saldo inicial • ${esc(name)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="notice">Digite exatamente o saldo que existe no banco desta conta neste momento. A partir daqui, o aplicativo acompanhará as novas movimentações.</div>
+    <label>Saldo atual no banco</label>
+    <input id="openingBalanceValue" type="number" step="0.01">
+    <button class="btn" style="width:100%;margin-top:14px" onclick="saveOpeningBalance('${code}')">Confirmar saldo inicial</button>
+  `);
+}
+
+async function saveOpeningBalance(code){
+  const value=Number(document.getElementById("openingBalanceValue").value);
+  if(!confirm("Confirma que este é o saldo que existe no banco agora?"))return;
+
+  const {error}=await sb.rpc("admin_set_account_opening_balance",{
+    p_account_code:code,
+    p_balance:value
+  });
+
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Saldo inicial configurado.");
+  await loadAdminResults();
+}
+
+function openReconcileAccount(code,name,current){
+  openModal(`
+    <div class="title-row"><h2>Conciliar • ${esc(name)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="muted">Saldo que o sistema calcula hoje: <b>${money(current)}</b></div>
+    <label>Saldo que aparece no banco</label>
+    <input id="reconcileBalanceValue" type="number" step="0.01" value="${Number(current||0).toFixed(2)}">
+    <label>Motivo / observação</label>
+    <input id="reconcileDescription" value="Ajuste de conciliação">
+    <button class="btn" style="width:100%;margin-top:14px" onclick="saveReconcileAccount('${code}')">Conciliar saldo</button>
+  `);
+}
+
+async function saveReconcileAccount(code){
+  const {error}=await sb.rpc("admin_reconcile_account",{
+    p_account_code:code,
+    p_actual_balance:Number(document.getElementById("reconcileBalanceValue").value),
+    p_description:document.getElementById("reconcileDescription").value
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Saldo conciliado.");
+  await loadAdminResults();
+}
+
+async function confirmInvestmentTransfer(id){
+  if(!confirm("Você já transferiu fisicamente este valor da conta CATinvestimentos para a conta Cat Encantus?"))return;
+  const {error}=await sb.rpc("admin_confirm_investment_transfer",{p_transfer_id:id});
+  if(error){toast(error.message);return}
+  toast("Transferência confirmada.");
+  await loadAdminResults();
+}
+
+async function confirmInvestmentRepayment(id){
+  if(!confirm("Você já transferiu fisicamente este valor da conta Cat Encantus para a conta CATinvestimentos? Ao confirmar, o retorno será liberado no saldo do investidor."))return;
+  const {error}=await sb.rpc("admin_confirm_investment_repayment",{p_repayment_id:id});
+  if(error){toast(error.message);return}
+  toast("Repasse confirmado e retorno liberado.");
+  await loadAdminResults();
+}
+
+
+async function loadAdminCashboxes(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("theme_cashboxes").select("*,themes(name)").order("balance",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Caixinhas</h2><span class="muted">Visível somente para o administrador</span></div></div><div class="notice">As caixinhas somam <b>100% das vendas por tema</b>. Agora você pode clicar no valor de cada caixinha para descobrir quanto foi vendido em cada categoria e ver as vendas que formaram aquele total.</div><div class="grid" style="margin-top:14px">${(data||[]).map(c=>`<div class="item"><h3>${esc(c.themes?.name||"Tema")}</h3><button class="cashbox-value-btn" onclick="openCashboxBreakdown(${c.theme_id},'${esc(c.themes?.name||"Tema").replace(/'/g,"&#39;")}')">${money(c.balance)}</button><div class="muted">Clique no valor para detalhar por categoria</div></div>`).join("")||`<div class="muted">Nenhuma caixinha ainda.</div>`}</div></div>`;
+}
+
+async function openCashboxBreakdown(themeId,themeName){
+  openModal(`<div class="title-row"><h2>${esc(themeName)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando detalhamento...</div>`,true);
+  const {data,error}=await sb.from("sales").select("*,category:categories(name)").eq("theme_id",themeId).order("sold_at",{ascending:false});
+  if(error){openModal(`<div class="title-row"><h2>${esc(themeName)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="msg error">${esc(error.message)}</div>`,true);return}
+  const sales=data||[];
+  const breakdown={};
+  let total=0;
+  sales.forEach(s=>{
+    const name=s.category?.name||"Sem categoria / registro antigo";
+    breakdown[name]=(breakdown[name]||0)+Number(s.amount||0);
+    total+=Number(s.amount||0);
+  });
+  const rows=Object.entries(breakdown).sort((a,b)=>b[1]-a[1]);
+  openModal(`
+    <div class="title-row"><div><h2>${esc(themeName)}</h2><div class="muted">Detalhamento completo da caixinha por categoria</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="metric-grid"><div class="metric-box"><div class="metric-label">Total da caixinha</div><div class="metric-value">${money(total)}</div></div><div class="metric-box"><div class="metric-label">Vendas registradas</div><div class="metric-value">${sales.length}</div></div><div class="metric-box"><div class="metric-label">Categorias com vendas</div><div class="metric-value">${rows.length}</div></div></div>
+    <div class="history-section"><h3>Quanto vendeu por categoria</h3><div class="item">${rows.map(([name,value])=>`<div class="cashbox-breakdown-row"><div><b>${esc(name)}</b><div class="muted">${total?((value/total)*100).toLocaleString("pt-BR",{maximumFractionDigits:1}):0}% do tema</div></div><div class="stat-value" style="font-size:21px">${money(value)}</div></div>`).join("")||`<div class="muted">Nenhuma venda.</div>`}</div></div>
+    <div class="history-section"><h3>Vendas que formam esta caixinha</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Categoria</th><th>Produto</th><th>Valor</th></tr></thead><tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="4">Nenhuma venda.</td></tr>`}</tbody></table></div></div>
+  `,true);
+}
+
+async function loadAdminQueues(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("investments").select(`
+    *,profiles(name),themes(name),
+    option:investment_options(id,category:categories(name),theme:themes(name))
+  `).eq("status","active").order("created_at",{ascending:true});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  box.innerHTML=`<div class="card">
+    <div class="title-row"><div><h2>Fila inteligente</h2><span class="muted">Ordem cronológica geral dos investimentos ativos</span></div></div>
+    <div class="notice">Na hora de registrar uma venda, o sistema começa pelo investimento compatível mais antigo. “Todos os temas” combina com qualquer tema e “Todas as categorias” combina com qualquer categoria. Investimentos incompatíveis são pulados automaticamente.</div>
+    <div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Ordem</th><th>Horário</th><th>Investidor</th><th>Escopo</th><th>Progresso</th></tr></thead><tbody>${(data||[]).map((i,idx)=>{
+      const label=i.option?`${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`:`Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
+      return `<tr><td><b>${idx+1}º</b></td><td>${new Date(i.created_at).toLocaleString("pt-BR")}</td><td>${esc(i.profiles?.name||"-")}</td><td>${esc(label)}</td><td>${money(i.sold_amount)} / ${money(i.target_amount)}</td></tr>`;
+    }).join("")||`<tr><td colspan="5">Nenhum investimento ativo.</td></tr>`}</tbody></table></div>
+  </div>`;
+}
+
+async function loadAdminDeposits(){
+  const box=document.getElementById("adminContent");
+  const [{data:deps,error},{data:investors}]=await Promise.all([
+    sb.from("deposits").select("*,profiles(name,email)").order("created_at",{ascending:false}).limit(50),
+    sb.from("profiles").select("id,name").eq("role","investor").eq("status","active").order("name")
+  ]);
+
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div>
+          <h2>Depósitos</h2>
+          <div class="muted">Solicitações feitas pelos investidores e depósitos adicionados manualmente.</div>
+        </div>
+        <button class="btn" onclick="openDepositSelector()">+ Adicionar saldo manualmente</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Investidor</th><th>Valor</th><th>Status</th><th>Ação</th></tr>
+          </thead>
+          <tbody>
+            ${(deps||[]).map(d=>`
+              <tr>
+                <td>${new Date(d.created_at).toLocaleString("pt-BR")}</td>
+                <td>${esc(d.profiles?.name||"-")}<br><span class="muted">${esc(d.profiles?.email||"")}</span></td>
+                <td><b>${money(d.amount)}</b></td>
+                <td><span class="badge ${d.status==="confirmed"?"green":d.status==="rejected"?"red":""}">
+                  ${d.status==="pending"?"PENDENTE":d.status==="confirmed"?"CONFIRMADO":d.status==="rejected"?"REJEITADO":esc(d.status)}
+                </span></td>
+                <td>
+                  ${d.status==="pending" ? `
+                    <div class="actions">
+                      <button class="btn success smallbtn" onclick="processDepositRequest(${d.id},'confirmed')">Confirmar PIX</button>
+                      <button class="btn danger smallbtn" onclick="processDepositRequest(${d.id},'rejected')">Rejeitar</button>
+                    </div>
+                  ` : "-"}
+                </td>
+              </tr>
+            `).join("")||`<tr><td colspan="5">Nenhum depósito.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  window._activeInvestors=investors||[];
+}
+
+async function processDepositRequest(id,status){
+  const question=status==="confirmed"
+    ?"Confirmar que este PIX foi recebido? O valor será adicionado ao saldo do investidor."
+    :"Rejeitar esta solicitação de depósito?";
+
+  if(!confirm(question))return;
+
+  const {error}=await sb.rpc("admin_process_deposit",{
+    p_deposit_id:id,
+    p_status:status
+  });
+
+  if(error){toast(error.message);return}
+
+  toast(status==="confirmed"?"Depósito confirmado e saldo liberado.":"Solicitação rejeitada.");
+  await loadAdminDeposits();
+}
+
+function openDepositSelector(){
+  const inv=window._activeInvestors||[];
+  openModal(`<div class="title-row"><h2>Confirmar depósito manual</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><label>Investidor</label><select id="depInvestor">${inv.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("")}</select><label>Valor</label><input id="depAmount" type="number" min="${settings.minimum_deposit||40}" step="0.01"><button class="btn" style="width:100%;margin-top:15px" onclick="saveDepositFromSection()">Confirmar</button>`)
+}
+
+async function saveDepositFromSection(){
+  const id=document.getElementById("depInvestor").value;
+  const amount=Number(document.getElementById("depAmount").value);
+  const {error}=await sb.rpc("admin_add_deposit",{p_investor_id:id,p_amount:amount});
+  if(error){toast(error.message);return}
+  closeModal();
+  await loadAdminDeposits();
+}
+
+async function loadAdminWithdrawals(){
+  const box=document.getElementById("adminContent");
+  const {data,error}=await sb.from("withdrawals").select("*,profiles(name,email)").order("created_at",{ascending:false});
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+  box.innerHTML=`<div class="card"><div class="title-row"><h2>Saques</h2></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Investidor</th><th>PIX</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(w=>`<tr><td>${new Date(w.created_at).toLocaleString("pt-BR")}</td><td>${esc(w.profiles?.name||"-")}</td><td>${esc(w.pix||"-")}</td><td><b>${money(w.amount)}</b></td><td>${w.status}</td><td>${w.status==="pending"?`<div class="actions"><button class="btn success smallbtn" onclick="processWithdrawal(${w.id},'paid')">Pago</button><button class="btn danger smallbtn" onclick="processWithdrawal(${w.id},'rejected')">Rejeitar</button></div>`:"-"}</td></tr>`).join("")||`<tr><td colspan="6">Nenhum saque.</td></tr>`}</tbody></table></div></div>`;
+}
+async function processWithdrawal(id,status){if(!confirm(status==="paid"?"Confirmar que o PIX foi pago?":"Rejeitar e devolver o valor ao saldo?"))return;const {error}=await sb.rpc("admin_process_withdrawal",{p_withdrawal_id:id,p_status:status});if(error){toast(error.message);return}await loadAdminWithdrawals()}
+
+
+async function loadAdminNotifications(){
+  const box=document.getElementById("adminContent");
+
+  const {data,error}=await sb
+    .from("notifications")
+    .select("id,investor_id,title,message,read,created_at,profiles!notifications_investor_id_fkey(name,email,role)")
+    .order("created_at",{ascending:false})
+    .limit(100);
+
+  if(error){
+    // Fallback sem relacionamento, caso o nome da FK seja diferente.
+    const fallback=await sb
+      .from("notifications")
+      .select("id,investor_id,title,message,read,created_at")
+      .order("created_at",{ascending:false})
+      .limit(100);
+
+    if(fallback.error){
+      box.innerHTML=`<div class="card error">${esc(fallback.error.message)}</div>`;
+      return;
+    }
+
+    box.innerHTML=`
+      <div class="card">
+        <div class="title-row">
+          <h2>Notificações</h2>
+          <span class="muted">Avisos da sua conta administrativa</span>
+        </div>
+
+        ${(fallback.data||[]).map(n=>`
+          <div class="item" style="margin-bottom:10px">
+            <div class="title-row">
+              <h3>${esc(n.title)}</h3>
+              <span class="muted">${new Date(n.created_at).toLocaleString("pt-BR")}</span>
+            </div>
+            <div class="muted">${esc(n.message)}</div>
+          </div>
+        `).join("")||`<div class="muted">Nenhuma notificação.</div>`}
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <h2>Notificações</h2>
+        <span class="muted">Avisos da sua conta administrativa</span>
+      </div>
+
+      ${(data||[]).map(n=>`
+        <div class="item" style="margin-bottom:10px">
+          <div class="title-row">
+            <h3>${esc(n.title)}</h3>
+            <span class="muted">${new Date(n.created_at).toLocaleString("pt-BR")}</span>
+          </div>
+          <div class="muted">${esc(n.message)}</div>
+        </div>
+      `).join("")||`<div class="muted">Nenhuma notificação.</div>`}
+    </div>
+  `;
+}
+
+async function loadAdminSettings(){
+  const box=document.getElementById("adminContent");
+  await loadSettings();
+
+  const {data:adminProfile}=await sb
+    .from("profiles")
+    .select("pix")
+    .eq("id",currentProfile.id)
+    .single();
+
+  const storePix=adminProfile?.pix||"";
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row"><h2>Configurações</h2></div>
+
+      <div class="row">
+        <div><label>Nome da plataforma</label><input id="setPlatform" value="${esc(settings.platform_name||"CATinvestimentos")}"></div>
+        <div><label>Nome da loja</label><input id="setStore" value="${esc(settings.store_name||"Cat Encantus")}"></div>
+      </div>
+
+      <label>PIX da loja para depósitos</label>
+      <input id="setStorePix" value="${esc(storePix)}" placeholder="CPF, e-mail, telefone ou chave aleatória">
+      <div class="muted" style="margin-top:6px">
+        Esta chave será exibida apenas para investidores autenticados quando clicarem em “Adicionar saldo”.
+      </div>
+
+      <label>URL da logo (opcional; se vazio usa logo.png)</label>
+      <input id="setLogo" value="${esc(settings.logo_url||"")}">
+
+      <div class="row">
+        <div><label>Cor principal</label><input id="setPrimary" type="color" value="${settings.primary_color||"#a94366"}"></div>
+        <div><label>Cor secundária</label><input id="setSecondary" type="color" value="${settings.secondary_color||"#f7dfe6"}"></div>
+      </div>
+
+      <div class="row3">
+        <div><label>Retorno padrão para novas opções (%)</label><input id="setReturn" type="number" min="0.01" max="100" step="0.01" value="${settings.target_return_rate||15}"></div>
+        <div><label>Depósito mínimo</label><input id="setMinDeposit" type="number" step="0.01" value="${settings.minimum_deposit||40}"></div>
+        <div><label>Investimento mínimo</label><input id="setMinInvest" type="number" step="0.01" value="${settings.minimum_investment||10}"></div>
+      </div>
+
+      <div class="row">
+        <div><label>Investimento máximo</label><input id="setMaxInvest" type="number" step="0.01" value="${settings.maximum_investment||100}"></div>
+        <div><label>Máximo padrão de investidores por opção</label><input id="setMaxPeople" type="number" value="${settings.maximum_investors_per_theme||3}"></div>
+      </div>
+
+      <button class="btn" style="margin-top:15px" onclick="saveSettings()">Salvar configurações</button>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row">
+        <div>
+          <h3>Modo de testes</h3>
+          <div class="muted">${settings.test_mode!==false?"ATIVO — exclusões de investimentos e vendas de teste estão liberadas somente para o administrador.":"ENCERRADO — exclusões de teste estão bloqueadas."}</div>
+        </div>
+      </div>
+
+      ${settings.test_mode!==false?`
+        <div class="notice">
+          Quando você terminar todos os testes, primeiro use <b>“Limpar TODOS os testes”</b> na tela de Investimentos.
+          Depois volte aqui e encerre o modo de testes. Depois de encerrado, os botões de exclusão somem.
+        </div>
+        <button class="btn danger" style="margin-top:12px" onclick="endTestMode()">Encerrar modo de testes definitivamente</button>
+      `:`<div class="notice"><b>Produção:</b> o sistema está com as exclusões de teste bloqueadas.</div>`}
+    </div>
+  `;
+}
+
+async function endTestMode(){
+  const confirmation=prompt(
+    "Só faça isso quando for começar a usar o sistema de verdade.\n\n" +
+    "Antes, todos os investimentos e vendas fake devem estar apagados.\n\n" +
+    "Para confirmar, digite exatamente: ENCERRAR TESTES"
+  );
+  if(confirmation!=="ENCERRAR TESTES"){
+    if(confirmation!==null)toast("Confirmação incorreta. O modo de testes continua ativo.");
+    return;
+  }
+
+  const {error}=await sb.rpc("admin_end_test_mode",{p_confirmation:confirmation});
+  if(error){toast(error.message);return}
+
+  await loadSettings();
+  toast("Modo de testes encerrado. Exclusões de teste foram bloqueadas.");
+  await loadAdminSettings();
+}
+
+async function saveSettings(){
+  const args={
+    p_platform_name:document.getElementById("setPlatform").value,
+    p_store_name:document.getElementById("setStore").value,
+    p_logo_url:document.getElementById("setLogo").value,
+    p_primary_color:document.getElementById("setPrimary").value,
+    p_secondary_color:document.getElementById("setSecondary").value,
+    p_return_rate:Number(document.getElementById("setReturn").value),
+    p_minimum_deposit:Number(document.getElementById("setMinDeposit").value),
+    p_minimum_investment:Number(document.getElementById("setMinInvest").value),
+    p_maximum_investment:Number(document.getElementById("setMaxInvest").value),
+    p_maximum_investors:Number(document.getElementById("setMaxPeople").value)
+  };
+
+  const {error}=await sb.rpc("admin_update_settings",args);
+  if(error){toast(error.message);return}
+
+  const {error:pixError}=await sb.rpc("admin_set_store_pix",{
+    p_pix:document.getElementById("setStorePix").value
+  });
+  if(pixError){toast(pixError.message);return}
+
+  await loadSettings();
+  toast("Configurações salvas.");
+  await loadAdminSettings();
+}
+
+
+let deferredInstallPrompt=null;
+
+window.addEventListener("beforeinstallprompt",(event)=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+});
+
+window.addEventListener("appinstalled",()=>{
+  deferredInstallPrompt=null;
+  toast("CATinvestimentos instalado no celular.");
+});
+
+function isStandaloneApp(){
+  return window.matchMedia("(display-mode: standalone)").matches ||
+         window.navigator.standalone===true;
+}
+
+function showInstallInstructions(){
+  const ua=navigator.userAgent||"";
+  const isIOS=/iPad|iPhone|iPod/.test(ua);
+  const isSamsung=/SamsungBrowser/i.test(ua);
+
+  let instructions="";
+  if(isIOS){
+    instructions=`No iPhone/iPad:<br><br>
+      1. Abra este site no <b>Safari</b>.<br>
+      2. Toque em <b>Compartilhar</b>.<br>
+      3. Escolha <b>Adicionar à Tela de Início</b>.<br>
+      4. Confirme em <b>Adicionar</b>.`;
+  }else if(isSamsung){
+    instructions=`No Samsung Internet:<br><br>
+      1. Toque no menu do navegador.<br>
+      2. Procure <b>Adicionar página a</b> ou <b>Instalar aplicativo</b>.<br>
+      3. Escolha <b>Tela inicial</b> e confirme.<br><br>
+      Se aparecer a opção <b>Instalar</b> na barra do navegador, você também pode usá-la.`;
+  }else{
+    instructions=`No Android:<br><br>
+      1. Abra o menu do navegador.<br>
+      2. Procure <b>Instalar app</b>, <b>Adicionar à tela inicial</b> ou opção semelhante.<br>
+      3. Confirme a instalação.<br><br>
+      Se a opção ainda não aparecer, atualize a página e tente novamente.`;
+  }
+
+  openModal(`
+    <div class="title-row">
+      <h2>Instalar CATinvestimentos</h2>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+    <div class="notice">${instructions}</div>
+    <div class="muted" style="margin-top:12px">
+      O aplicativo continua usando internet para login, saldo, investimentos e atualizações.
+    </div>
+  `);
+}
+
+async function installCATApp(){
+  if(isStandaloneApp()){
+    toast("O CATinvestimentos já está instalado neste aparelho.");
+    return;
+  }
+
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    const result=await deferredInstallPrompt.userChoice;
+    if(result.outcome==="accepted") toast("Instalação iniciada.");
+    deferredInstallPrompt=null;
+    return;
+  }
+
+  showInstallInstructions();
+}
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
+      console.warn("Service Worker não registrado:",err);
+    });
+  });
+}
+
+
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==="PASSWORD_RECOVERY"){
+    setTimeout(()=>openNewPasswordModal(),50);
+  }
+});
+
+// Fallback para alguns navegadores móveis.
+if(
+  window.location.hash.includes("type=recovery") ||
+  window.location.search.includes("type=recovery")
+){
+  setTimeout(()=>openNewPasswordModal(),350);
+}
+
+(async()=>{await loadSettings();await loadUser()})();
+</script>
+</body>
+</html>
