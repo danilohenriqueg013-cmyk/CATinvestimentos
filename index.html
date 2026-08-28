@@ -2825,8 +2825,8 @@ async function loadAdminResults(){
   const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes]=await Promise.all([
     sb.rpc("admin_get_account_balances"),
     fetchAllPaged(()=>sb.from("financial_entries").select("*").order("occurred_at",{ascending:false})),
-    sb.from("investment_transfers").select("*,profiles(name,email)").eq("status","pending").order("created_at"),
-    sb.from("investment_repayments").select("*,profiles(name,email)").eq("status","pending").order("created_at"),
+    sb.from("investment_transfers").select("*,profiles:profiles!investment_transfers_investor_id_fkey(name,email)").eq("status","pending").order("created_at"),
+    sb.from("investment_repayments").select("*,profiles:profiles!investment_repayments_investor_id_fkey(name,email)").eq("status","pending").order("created_at"),
     sb.from("investment_repayments").select("investment_id,status,total_amount,profit_amount,principal_amount,confirmed_at,created_at"),
     fetchAllPaged(()=>sb.from("investments").select(`
       id,investor_id,invested_amount,target_amount,status,created_at,
