@@ -2992,7 +2992,7 @@ function renderResultsDashboard(){
           <div class="actions">
             ${!b.initialized
               ? `<button class="btn smallbtn" onclick="openSetOpeningBalance('${b.account_code}','${esc(b.account_name)}')">Definir saldo inicial</button>`
-              : `<button class="btn secondary smallbtn" onclick="openReconcileAccount('${b.account_code}','${esc(b.account_name)}',${Number(b.current_balance||0)})">Conciliar</button>`}
+              : `${settings.test_mode!==false?`<button class="btn smallbtn" onclick="openSetOpeningBalance('${b.account_code}','${esc(b.account_name)}')">Corrigir saldo inicial</button>`:""}<button class="btn secondary smallbtn" onclick="openReconcileAccount('${b.account_code}','${esc(b.account_name)}',${Number(b.current_balance||0)})">Conciliar</button>`}
           </div>
         </div>
       `).join("")}
