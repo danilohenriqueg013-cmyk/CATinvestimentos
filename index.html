@@ -1713,7 +1713,21 @@ async function loadAdminInvestors(){
   const box=document.getElementById("adminContent");
   const {data,error}=await sb.from("profiles").select("*").eq("role","investor").order("created_at",{ascending:false});
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Investidores</h2><span class="muted">Clique no nome ou em “Ver histórico” para abrir a visão completa da vida do investidor na CATinvestimentos.</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Contato</th><th>PIX</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(data||[]).map(p=>`<tr><td><button class="investor-name-link" onclick="openInvestorHistory('${p.id}')">${esc(p.name)}</button><br><span class="muted">${esc(p.email)}</span></td><td>${esc(p.phone||"-")}</td><td>${esc(p.pix||"-")}</td><td><b>${money(p.balance)}</b></td><td><span class="badge ${p.status==="active"?"green":"red"}">${p.status==="active"?"ATIVO":"BLOQUEADO"}</span></td><td><div class="actions"><button class="btn smallbtn" onclick="openInvestorHistory('${p.id}')">Ver histórico</button><button class="btn secondary smallbtn" onclick='openInvestorEdit(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Editar</button><button class="btn secondary smallbtn" onclick="openDeposit('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Adicionar saldo</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum investidor.</td></tr>`}</tbody></table></div></div>`;
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Investidores</h2><span class="muted">Clique no nome ou em “Ver histórico” para abrir a visão completa da vida do investidor na CATinvestimentos.${settings.test_mode!==false?" No modo de testes, o botão Excluir teste apaga também o login e todos os dados desse investidor.":""}</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Contato</th><th>PIX</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(data||[]).map(p=>`<tr><td><button class="investor-name-link" onclick="openInvestorHistory('${p.id}')">${esc(p.name)}</button><br><span class="muted">${esc(p.email)}</span></td><td>${esc(p.phone||"-")}</td><td>${esc(p.pix||"-")}</td><td><b>${money(p.balance)}</b></td><td><span class="badge ${p.status==="active"?"green":"red"}">${p.status==="active"?"ATIVO":"BLOQUEADO"}</span></td><td><div class="actions"><button class="btn smallbtn" onclick="openInvestorHistory('${p.id}')">Ver histórico</button><button class="btn secondary smallbtn" onclick='openInvestorEdit(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Editar</button><button class="btn secondary smallbtn" onclick="openDeposit('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Adicionar saldo</button>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteTestInvestor('${p.id}','${esc(p.name).replace(/'/g,"&#39;")}')">Excluir teste</button>`:""}</div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum investidor.</td></tr>`}</tbody></table></div></div>`;
+}
+
+async function deleteTestInvestor(id,name){
+  const confirmation=prompt(
+    `ATENÇÃO: isso vai apagar o investidor "${name}", o login e TODOS os dados de teste dele (depósitos, saques, investimentos, movimentações e notificações).\n\nPara confirmar, digite exatamente: EXCLUIR INVESTIDOR`
+  );
+  if(confirmation!=="EXCLUIR INVESTIDOR"){
+    if(confirmation!==null)toast("Exclusão cancelada: confirmação incorreta.");
+    return;
+  }
+  const {error}=await sb.rpc("admin_delete_test_investor",{p_investor_id:id});
+  if(error){toast(error.message);return}
+  toast("Investidor de teste excluído completamente.");
+  await loadAdminInvestors();
 }
 
 function investorOptionLabel(i){
@@ -3243,7 +3257,7 @@ async function loadAdminDeposits(){
       <div class="title-row">
         <div>
           <h2>Depósitos</h2>
-          <div class="muted">Solicitações feitas pelos investidores e depósitos adicionados manualmente.</div>
+          <div class="muted">Solicitações feitas pelos investidores e depósitos adicionados manualmente.${settings.test_mode!==false?" No modo de testes, você pode excluir registros e desfazer o efeito no saldo/extrato.":""}</div>
         </div>
         <button class="btn" onclick="openDepositSelector()">+ Adicionar saldo manualmente</button>
       </div>
@@ -3263,12 +3277,13 @@ async function loadAdminDeposits(){
                   ${d.status==="pending"?"PENDENTE":d.status==="confirmed"?"CONFIRMADO":d.status==="rejected"?"REJEITADO":esc(d.status)}
                 </span></td>
                 <td>
-                  ${d.status==="pending" ? `
-                    <div class="actions">
+                  <div class="actions">
+                    ${d.status==="pending" ? `
                       <button class="btn success smallbtn" onclick="processDepositRequest(${d.id},'confirmed')">Confirmar PIX</button>
                       <button class="btn danger smallbtn" onclick="processDepositRequest(${d.id},'rejected')">Rejeitar</button>
-                    </div>
-                  ` : "-"}
+                    ` : ""}
+                    ${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteTestDeposit(${d.id})">Excluir teste</button>`:(d.status!=="pending"?"-":"")}
+                  </div>
                 </td>
               </tr>
             `).join("")||`<tr><td colspan="5">Nenhum depósito.</td></tr>`}
@@ -3279,6 +3294,14 @@ async function loadAdminDeposits(){
   `;
 
   window._activeInvestors=investors||[];
+}
+
+async function deleteTestDeposit(id){
+  if(!confirm("Excluir este depósito de teste? Se ele foi confirmado, o crédito será retirado do saldo do investidor e a entrada também sairá do extrato financeiro."))return;
+  const {error}=await sb.rpc("admin_delete_test_deposit",{p_deposit_id:id});
+  if(error){toast(error.message);return}
+  toast("Depósito de teste excluído.");
+  await loadAdminDeposits();
 }
 
 async function processDepositRequest(id,status){
@@ -3317,7 +3340,14 @@ async function loadAdminWithdrawals(){
   const box=document.getElementById("adminContent");
   const {data,error}=await sb.from("withdrawals").select("*,profiles(name,email)").order("created_at",{ascending:false});
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><h2>Saques</h2></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Investidor</th><th>PIX</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(w=>`<tr><td>${new Date(w.created_at).toLocaleString("pt-BR")}</td><td>${esc(w.profiles?.name||"-")}</td><td>${esc(w.pix||"-")}</td><td><b>${money(w.amount)}</b></td><td>${w.status}</td><td>${w.status==="pending"?`<div class="actions"><button class="btn success smallbtn" onclick="processWithdrawal(${w.id},'paid')">Pago</button><button class="btn danger smallbtn" onclick="processWithdrawal(${w.id},'rejected')">Rejeitar</button></div>`:"-"}</td></tr>`).join("")||`<tr><td colspan="6">Nenhum saque.</td></tr>`}</tbody></table></div></div>`;
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Saques</h2><div class="muted">Solicitações de saque dos investidores.${settings.test_mode!==false?" No modo de testes, você pode excluir o registro e desfazer o efeito no saldo/extrato.":""}</div></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Investidor</th><th>PIX</th><th>Valor</th><th>Status</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(w=>`<tr><td>${new Date(w.created_at).toLocaleString("pt-BR")}</td><td>${esc(w.profiles?.name||"-")}</td><td>${esc(w.pix||"-")}</td><td><b>${money(w.amount)}</b></td><td>${statusPt(w.status)}</td><td><div class="actions">${w.status==="pending"?`<button class="btn success smallbtn" onclick="processWithdrawal(${w.id},'paid')">Pago</button><button class="btn danger smallbtn" onclick="processWithdrawal(${w.id},'rejected')">Rejeitar</button>`:""}${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteTestWithdrawal(${w.id})">Excluir teste</button>`:(w.status!=="pending"?"-":"")}</div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum saque.</td></tr>`}</tbody></table></div></div>`;
+}
+async function deleteTestWithdrawal(id){
+  if(!confirm("Excluir este saque de teste? O sistema também vai corrigir o saldo do investidor e remover a saída do extrato financeiro, quando houver."))return;
+  const {error}=await sb.rpc("admin_delete_test_withdrawal",{p_withdrawal_id:id});
+  if(error){toast(error.message);return}
+  toast("Saque de teste excluído.");
+  await loadAdminWithdrawals();
 }
 async function processWithdrawal(id,status){if(!confirm(status==="paid"?"Confirmar que o PIX foi pago?":"Rejeitar e devolver o valor ao saldo?"))return;const {error}=await sb.rpc("admin_process_withdrawal",{p_withdrawal_id:id,p_status:status});if(error){toast(error.message);return}await loadAdminWithdrawals()}
 
@@ -3438,7 +3468,7 @@ async function loadAdminSettings(){
       <div class="title-row">
         <div>
           <h3>Modo de testes</h3>
-          <div class="muted">${settings.test_mode!==false?"ATIVO — exclusões de investimentos e vendas de teste estão liberadas somente para o administrador.":"ENCERRADO — exclusões de teste estão bloqueadas."}</div>
+          <div class="muted">${settings.test_mode!==false?"ATIVO — exclusões de investimentos, vendas, depósitos, saques e investidores de teste estão liberadas somente para o administrador.":"ENCERRADO — exclusões de teste estão bloqueadas."}</div>
         </div>
       </div>
 
