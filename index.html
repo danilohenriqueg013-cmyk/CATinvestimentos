@@ -236,6 +236,32 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
   .header-actions{gap:6px}
 }
 
+
+/* ===== V32: GESTÃO COMPLETA ===== */
+.filter-bar{display:grid;grid-template-columns:repeat(2,minmax(150px,1fr)) auto auto;gap:10px;align-items:end;margin-top:12px}
+.report-subtitle{font-size:12px;color:var(--muted);margin-top:5px}
+.metric-box.warning{background:#fff8e8;border-color:#ead9a2}
+.metric-box.danger-soft{background:#fff0f3;border-color:#efc6d0}
+.metric-box.success-soft{background:#effaf4;border-color:#c9e8d6}
+.metric-box.neutral-soft{background:#f7f7f8;border-color:#dedee2}
+.dashboard-group{margin-top:18px}
+.dashboard-group-title{font-weight:800;color:var(--primary);margin:0 0 9px}
+.mini-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}
+.mini-metric{border:1px solid var(--border);border-radius:13px;padding:12px;background:#fff}
+.mini-metric b{display:block;font-size:19px;color:var(--primary);margin-top:4px}
+.customer-new-fields{margin-top:10px;padding:12px;border:1px dashed var(--border);border-radius:13px;background:#fffafb}
+.flow-positive{color:#25734b;font-weight:800}
+.flow-negative{color:#a32645;font-weight:800}
+.flow-neutral{color:#725563;font-weight:800}
+.pending-action{border:1px solid #ead9a2;background:#fff9e9;border-radius:14px;padding:14px;margin-top:10px}
+.balance-card{position:relative}
+.balance-card .balance-status{font-size:11px;margin-top:6px}
+.obligation-card{border-left:4px solid var(--primary)}
+@media(max-width:760px){
+  .filter-bar{grid-template-columns:1fr 1fr}
+  .filter-bar .btn{width:100%}
+}
+
 </style>
 </head>
 <body>
@@ -381,7 +407,9 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
     <button class="admin-item" onclick="adminSection('categories')">🏷️<br><br>Categorias</button>
     <button class="admin-item" onclick="adminSection('options')">🧩<br><br>Opções de investimento</button>
     <button class="admin-item" onclick="adminSection('investments')">💰<br><br>Investimentos</button>
-    <button class="admin-item" onclick="adminSection('sales')">🧾<br><br>Registrar Venda</button>
+    <button class="admin-item" onclick="adminSection('sales')">🧾<br><br>Vendas</button>
+    <button class="admin-item" onclick="adminSection('results')">📊<br><br>Resultados</button>
+    <button class="admin-item" onclick="adminSection('customers')">🤝<br><br>Clientes</button>
     <button class="admin-item" onclick="adminSection('cashboxes')">📦<br><br>Caixinhas</button>
     <button class="admin-item" onclick="adminSection('queues')">🔄<br><br>Filas</button>
     <button class="admin-item" onclick="adminSection('deposits')">➕<br><br>Depósitos</button>
@@ -798,31 +826,23 @@ async function loadUser(){
 async function loadInvestorDashboard(){
   document.getElementById("helloInvestor").textContent="Olá, "+currentProfile.name+"!";
 
-  const {data:investments,error}=await sb
-    .from("investments")
-    .select("invested_amount,target_amount,status");
+  const [{data:investments,error},{data:repayments}]=await Promise.all([
+    sb.from("investments").select("invested_amount,target_amount,status"),
+    sb.from("investment_repayments").select("total_amount,status")
+  ]);
 
   if(error){
     console.warn("Não foi possível carregar o resumo financeiro:",error);
   }
 
   const rows=investments||[];
-
-  // 1) Saldo disponível = dinheiro realmente parado na conta do investidor.
-  // Não inclui dinheiro que já está aplicado em investimentos.
   const availableBalance=Number(currentProfile.balance||0);
-
-  // 2) Investimentos pendentes = principal atualmente aplicado em investimentos ativos.
   const pendingTotal=rows
     .filter(i=>i.status==="active")
     .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
-
-  // 3) Faturamento Total = todo o valor que já RETORNOU ao investidor
-  // em investimentos concluídos (principal + lucro/retorno).
-  // Ex.: investiu R$ 100 e recebeu R$ 130 no total -> mostra R$ 130.
-  const returnedTotal=rows
-    .filter(i=>i.status==="completed")
-    .reduce((sum,i)=>sum+Number(i.target_amount||0),0);
+  const returnedTotal=(repayments||[])
+    .filter(r=>r.status==="confirmed")
+    .reduce((sum,r)=>sum+Number(r.total_amount||0),0);
 
   document.getElementById("investorAvailableBalance").textContent=money(availableBalance);
   document.getElementById("investorPendingTotal").textContent=money(pendingTotal);
@@ -848,18 +868,19 @@ async function loadInvestorDashboard(){
 async function refreshInvestorSummary(){
   await refreshProfile();
 
-  const {data:investments}=await sb
-    .from("investments")
-    .select("invested_amount,target_amount,status");
+  const [{data:investments},{data:repayments}]=await Promise.all([
+    sb.from("investments").select("invested_amount,target_amount,status"),
+    sb.from("investment_repayments").select("total_amount,status")
+  ]);
 
   const rows=investments||[];
   const availableBalance=Number(currentProfile.balance||0);
   const pendingTotal=rows
     .filter(i=>i.status==="active")
     .reduce((sum,i)=>sum+Number(i.invested_amount||0),0);
-  const returnedTotal=rows
-    .filter(i=>i.status==="completed")
-    .reduce((sum,i)=>sum+Number(i.target_amount||0),0);
+  const returnedTotal=(repayments||[])
+    .filter(r=>r.status==="confirmed")
+    .reduce((sum,r)=>sum+Number(r.total_amount||0),0);
 
   const availableEl=document.getElementById("investorAvailableBalance");
   const pendingEl=document.getElementById("investorPendingTotal");
@@ -1333,14 +1354,19 @@ async function makeInvestment(optionId){
 
 async function loadMyInvestments(){
   const box=document.getElementById("myInvestments");
-  const {data,error}=await sb.from("investments").select(`
-    id,invested_amount,target_amount,sold_amount,status,created_at,
-    themes(name),
-    option:investment_options(id,return_rate,category:categories(name),theme:themes(name))
-  `).order("created_at",{ascending:false});
+  const [{data,error},{data:repayments}]=await Promise.all([
+    sb.from("investments").select(`
+      id,invested_amount,target_amount,sold_amount,status,created_at,
+      themes(name),
+      option:investment_options(id,return_rate,category:categories(name),theme:themes(name))
+    `).order("created_at",{ascending:false}),
+    sb.from("investment_repayments").select("investment_id,status,total_amount,profit_amount")
+  ]);
 
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
   if(!data?.length){box.innerHTML=`<div class="card muted">Você ainda não possui investimentos.</div>`;return}
+
+  const repaymentMap=Object.fromEntries((repayments||[]).map(r=>[r.investment_id,r]));
 
   box.innerHTML=data.map(i=>{
     const pct=Math.min(100,Number(i.sold_amount)/Number(i.target_amount)*100);
@@ -1350,8 +1376,20 @@ async function loadMyInvestments(){
       ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
       : `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
 
+    const repayment=repaymentMap[i.id];
+    let badge="EM ANDAMENTO",badgeClass="";
+    if(i.status==="completed"&&repayment?.status==="pending"){
+      badge="AGUARDANDO REPASSE";
+    }else if(i.status==="completed"&&repayment?.status==="confirmed"){
+      badge="RETORNO LIBERADO";
+      badgeClass="green";
+    }else if(i.status==="completed"){
+      badge="CONCLUÍDO";
+      badgeClass="green";
+    }
+
     return `<div class="card item">
-      <div class="title-row"><h3>${esc(label)}</h3><span class="badge ${i.status==="completed"?"green":""}">${i.status==="completed"?"CONCLUÍDO":"EM ANDAMENTO"}</span></div>
+      <div class="title-row"><h3>${esc(label)}</h3><span class="badge ${badgeClass}">${badge}</span></div>
       <div class="muted">
         Investido: <b>${money(i.invested_amount)}</b><br>
         Retorno-alvo contratado: <b>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</b><br>
@@ -1360,6 +1398,9 @@ async function loadMyInvestments(){
       </div>
       <div class="progress"><div style="width:${pct}%"></div></div>
       <div class="muted">Vendido atribuído: <b>${money(i.sold_amount)}</b><br>Falta: <b>${money(remain)}</b></div>
+      ${i.status==="completed"&&repayment?.status==="pending"
+        ? `<div class="notice" style="margin-top:10px"><b>Investimento concluído.</b> O retorno aguarda o repasse da Cat Encantus para a CATinvestimentos antes de entrar no seu saldo disponível.</div>`
+        : ""}
     </div>`;
   }).join("");
 }
@@ -1605,6 +1646,51 @@ async function requestWithdrawal(){
   }
 }
 
+
+function reportDateRange(prefix){
+  const from=document.getElementById(prefix+"From")?.value||"";
+  const to=document.getElementById(prefix+"To")?.value||"";
+  return {
+    from,
+    to,
+    fromDate:from?new Date(from+"T00:00:00"):null,
+    toDate:to?new Date(to+"T23:59:59.999"):null
+  };
+}
+function inReportRange(value,range){
+  if(!value)return true;
+  const d=new Date(value);
+  if(range.fromDate&&d<range.fromDate)return false;
+  if(range.toDate&&d>range.toDate)return false;
+  return true;
+}
+function clearReportRange(prefix,renderFn){
+  const a=document.getElementById(prefix+"From");
+  const b=document.getElementById(prefix+"To");
+  if(a)a.value="";
+  if(b)b.value="";
+  renderFn();
+}
+async function fetchAllPaged(makeQuery,pageSize=1000){
+  let out=[],from=0;
+  while(true){
+    const {data,error}=await makeQuery().range(from,from+pageSize-1);
+    if(error)return {data:out,error};
+    const rows=data||[];
+    out=out.concat(rows);
+    if(rows.length<pageSize)break;
+    from+=pageSize;
+  }
+  return {data:out,error:null};
+}
+function statusPt(status){
+  return ({
+    pending:"Pendente",confirmed:"Confirmado",paid:"Pago",
+    rejected:"Rejeitado",active:"Ativo",completed:"Concluído",
+    cancelled:"Cancelado"
+  })[status]||status||"-";
+}
+
 async function adminSection(section){
   const box=document.getElementById("adminContent");box.innerHTML=`<div class="card">Carregando...</div>`;
   if(section==="investors")return loadAdminInvestors();
@@ -1613,6 +1699,8 @@ async function adminSection(section){
   if(section==="options")return loadAdminOptions();
   if(section==="investments")return loadAdminInvestments();
   if(section==="sales")return loadAdminSales();
+  if(section==="results")return loadAdminResults();
+  if(section==="customers")return loadAdminCustomers();
   if(section==="cashboxes")return loadAdminCashboxes();
   if(section==="queues")return loadAdminQueues();
   if(section==="deposits")return loadAdminDeposits();
@@ -1636,16 +1724,17 @@ function investorOptionLabel(i){
 async function openInvestorHistory(id){
   openModal(`<div class="title-row"><h2>Histórico do investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando todas as informações...</div>`,true);
 
-  const [profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes]=await Promise.all([
+  const [profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes,repaymentsRes]=await Promise.all([
     sb.from("profiles").select("*").eq("id",id).single(),
     sb.from("deposits").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
     sb.from("withdrawals").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
     sb.from("investments").select(`*,themes(name),option:investment_options(id,return_rate,category:categories(name),theme:themes(name))`).eq("investor_id",id).order("created_at",{ascending:false}),
     sb.from("transactions").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
-    sb.from("notifications").select("*").eq("investor_id",id).order("created_at",{ascending:false})
+    sb.from("notifications").select("*").eq("investor_id",id).order("created_at",{ascending:false}),
+    sb.from("investment_repayments").select("*").eq("investor_id",id).order("created_at",{ascending:false})
   ]);
 
-  const firstError=[profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes].find(r=>r.error)?.error;
+  const firstError=[profileRes,depositsRes,withdrawalsRes,investmentsRes,transactionsRes,notificationsRes,repaymentsRes].find(r=>r.error)?.error;
   if(firstError){openModal(`<div class="title-row"><h2>Histórico do investidor</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="msg error">${esc(firstError.message)}</div>`,true);return}
 
   const p=profileRes.data;
@@ -1654,6 +1743,7 @@ async function openInvestorHistory(id){
   const investments=investmentsRes.data||[];
   const transactions=transactionsRes.data||[];
   const notifications=notificationsRes.data||[];
+  const repayments=repaymentsRes.data||[];
 
   let allocations=[];
   let salesById={};
@@ -1676,8 +1766,11 @@ async function openInvestorHistory(id){
   const totalDeposited=deposits.filter(d=>d.status==="confirmed").reduce((s,d)=>s+Number(d.amount||0),0);
   const totalInvested=validInvestments.reduce((s,i)=>s+Number(i.invested_amount||0),0);
   const activeInvested=active.reduce((s,i)=>s+Number(i.invested_amount||0),0);
-  const totalProfit=completed.reduce((s,i)=>s+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
-  const totalReturnReleased=completed.reduce((s,i)=>s+Number(i.target_amount||0),0);
+  const confirmedRepayments=repayments.filter(r=>r.status==="confirmed");
+  const pendingRepayments=repayments.filter(r=>r.status==="pending");
+  const totalProfit=confirmedRepayments.reduce((s,r)=>s+Number(r.profit_amount||0),0);
+  const totalReturnReleased=confirmedRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
+  const totalReturnPending=pendingRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
   const totalWithdrawn=withdrawals.filter(w=>w.status==="paid").reduce((s,w)=>s+Number(w.amount||0),0);
   const pendingWithdrawal=withdrawals.filter(w=>w.status==="pending").reduce((s,w)=>s+Number(w.amount||0),0);
   const allocatedTotal=allocations.reduce((s,a)=>s+Number(a.amount||0),0);
@@ -1709,6 +1802,7 @@ async function openInvestorHistory(id){
       <div class="metric-box"><div class="metric-label">Vendas atribuídas</div><div class="metric-value">${money(allocatedTotal)}</div></div>
       <div class="metric-box"><div class="metric-label">Lucro realizado</div><div class="metric-value">${money(totalProfit)}</div></div>
       <div class="metric-box"><div class="metric-label">Retorno total liberado</div><div class="metric-value">${money(totalReturnReleased)}</div></div>
+      <div class="metric-box warning"><div class="metric-label">Retorno aguardando repasse</div><div class="metric-value">${money(totalReturnPending)}</div></div>
       <div class="metric-box"><div class="metric-label">Total sacado</div><div class="metric-value">${money(totalWithdrawn)}</div></div>
       <div class="metric-box"><div class="metric-label">Saque pendente</div><div class="metric-value">${money(pendingWithdrawal)}</div></div>
     </div>
@@ -2236,39 +2330,136 @@ async function applyAdminBatchRate(){
 
 async function loadAdminInvestments(){
   const box=document.getElementById("adminContent");
-  const {data,error}=await sb.from("investments").select(`
-    *,profiles(name,email),themes(name),
-    option:investment_options(id,return_rate,category:categories(name),theme:themes(name))
-  `).order("created_at",{ascending:false});
+
+  const [invRes,profilesRes,transferRes,repaymentRes]=await Promise.all([
+    fetchAllPaged(()=>sb.from("investments").select(`
+      *,profiles(name,email),themes(name),
+      option:investment_options(id,return_rate,category:categories(name),theme:themes(name))
+    `).order("created_at",{ascending:false})),
+    sb.from("profiles").select("id,name,email,created_at,status").eq("role","investor"),
+    sb.from("investment_transfers").select("*"),
+    sb.from("investment_repayments").select("*")
+  ]);
+
+  const error=invRes.error||profilesRes.error||transferRes.error||repaymentRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  window._adminInvestmentReport={
+    investments:invRes.data||[],
+    profiles:profilesRes.data||[],
+    transfers:transferRes.data||[],
+    repayments:repaymentRes.data||[]
+  };
 
   const testMode=settings.test_mode!==false;
 
-  box.innerHTML=`<div class="card">
-    <div class="title-row">
-      <div>
-        <h2>Investimentos</h2>
-        ${testMode?`<div class="muted">Modo de testes ativo: somente o administrador pode excluir registros de teste.</div>`:""}
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div>
+          <h2>Investimentos</h2>
+          <div class="muted">Visão completa do capital dos investidores e das obrigações atuais da Cat Encantus.</div>
+        </div>
+        ${testMode?`<button class="btn danger" onclick="resetAllTestData()">Limpar TODOS os testes</button>`:""}
       </div>
-      ${testMode?`<button class="btn danger" onclick="resetAllTestData()">Limpar TODOS os testes</button>`:""}
+
+      <div class="filter-bar">
+        <div><label>Data inicial</label><input id="investReportFrom" type="date"></div>
+        <div><label>Data final</label><input id="investReportTo" type="date"></div>
+        <button class="btn" onclick="renderAdminInvestmentDashboard()">Filtrar</button>
+        <button class="btn secondary" onclick="clearReportRange('investReport',renderAdminInvestmentDashboard)">Limpar filtro</button>
+      </div>
+      <div class="report-subtitle">Indicadores históricos respeitam o período. Indicadores “atuais” mostram a situação de hoje.</div>
+      <div id="investmentDashboard"></div>
     </div>
-    ${testMode?`<div class="notice"><b>Modo de testes:</b> você pode excluir qualquer investimento de teste. O sistema recalcula automaticamente as filas, vendas atribuídas, retornos e saldos dos registros que permanecerem.</div>`:""}
-    <div class="table-wrap"><table class="table"><thead><tr><th>Investidor</th><th>Categoria + Tema</th><th>Investido</th><th>Retorno</th><th>Alvo</th><th>Vendido</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>${(data||[]).map(i=>{
-      const label=i.option?`${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`:`Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
-      const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
-      const canDelete=testMode;
-      return `<tr>
-        <td>${esc(i.profiles?.name||"-")}<br><span class="muted">${esc(i.profiles?.email||"")}</span></td>
-        <td><b>${esc(label)}</b></td>
-        <td>${money(i.invested_amount)}</td>
-        <td>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td>
-        <td>${money(i.target_amount)}</td>
-        <td>${money(i.sold_amount)}</td>
-        <td>${i.status}</td>
-        <td>${new Date(i.created_at).toLocaleString("pt-BR")}</td>
-        <td>${canDelete?`<button class="btn danger smallbtn" onclick="deleteAdminInvestment(${i.id})">Excluir</button>`:"-"}</td>
-      </tr>`;
-    }).join("")||`<tr><td colspan="9">Nenhum investimento.</td></tr>`}</tbody></table></div></div>`;
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Histórico de investimentos</h3><div class="muted">Extrato do período selecionado.</div></div></div>
+      <div id="investmentHistoryTable"></div>
+    </div>
+  `;
+
+  renderAdminInvestmentDashboard();
+}
+
+function renderAdminInvestmentDashboard(){
+  const target=document.getElementById("investmentDashboard");
+  const tableTarget=document.getElementById("investmentHistoryTable");
+  if(!target||!window._adminInvestmentReport)return;
+
+  const {investments,profiles,transfers,repayments}=window._adminInvestmentReport;
+  const range=reportDateRange("investReport");
+
+  const filteredInv=investments.filter(i=>inReportRange(i.created_at,range));
+  const filteredTransfers=transfers.filter(t=>t.status==="confirmed"&&inReportRange(t.confirmed_at||t.created_at,range));
+  const filteredRepayments=repayments.filter(r=>r.status==="confirmed"&&inReportRange(r.confirmed_at||r.created_at,range));
+
+  const totalHistorical=filteredInv.filter(i=>i.status!=="cancelled").reduce((s,i)=>s+Number(i.invested_amount||0),0);
+  const capitalReceived=filteredTransfers.reduce((s,t)=>s+Number(t.amount||0),0);
+  const profitPaid=filteredRepayments.reduce((s,r)=>s+Number(r.profit_amount||0),0);
+  const currentActive=investments.filter(i=>i.status==="active").reduce((s,i)=>s+Number(i.invested_amount||0),0);
+
+  const repaymentMap=Object.fromEntries(repayments.map(r=>[r.investment_id,r]));
+  const unpaid=investments.filter(i=>i.status!=="cancelled"&&repaymentMap[i.id]?.status!=="confirmed");
+  const currentObligation=unpaid.reduce((s,i)=>s+Number(i.target_amount||0),0);
+  const committedProfit=unpaid.reduce((s,i)=>s+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+
+  const cutoff=Date.now()-30*24*60*60*1000;
+  const last30ByInvestor={};
+  investments.filter(i=>i.status!=="cancelled"&&new Date(i.created_at).getTime()>=cutoff).forEach(i=>{
+    last30ByInvestor[i.investor_id]=(last30ByInvestor[i.investor_id]||0)+Number(i.invested_amount||0);
+  });
+
+  let activeCount=0,lowCount=0,stoppedCount=0;
+  profiles.forEach(p=>{
+    const v=Number(last30ByInvestor[p.id]||0);
+    if(v>=50)activeCount++;
+    else if(v>0)lowCount++;
+    else stoppedCount++;
+  });
+
+  target.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Capital recebido na Cat Encantus</div><div class="metric-value">${money(capitalReceived)}</div><div class="muted">Transferências confirmadas no período</div></div>
+      <div class="metric-box"><div class="metric-label">Investimento histórico</div><div class="metric-value">${money(totalHistorical)}</div><div class="muted">Investimentos criados no período</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Retorno pago aos investidores</div><div class="metric-value">${money(profitPaid)}</div><div class="muted">Somente o lucro/custo do capital</div></div>
+      <div class="metric-box"><div class="metric-label">Investidores cadastrados</div><div class="metric-value">${profiles.length}</div><div class="muted">Total atual</div></div>
+      <div class="metric-box success-soft"><div class="metric-label">Investidores ativos</div><div class="metric-value">${activeCount}</div><div class="muted">≥ R$ 50 nos últimos 30 dias</div></div>
+      <div class="metric-box warning"><div class="metric-label">Baixa atividade</div><div class="metric-value">${lowCount}</div><div class="muted">R$ 0,01 a R$ 49,99 nos últimos 30 dias</div></div>
+      <div class="metric-box neutral-soft"><div class="metric-label">Investidores parados</div><div class="metric-value">${stoppedCount}</div><div class="muted">R$ 0 nos últimos 30 dias</div></div>
+      <div class="metric-box"><div class="metric-label">Investimento acontecendo agora</div><div class="metric-value">${money(currentActive)}</div><div class="muted">Principal dos investimentos ativos</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Obrigação atual da Cat Encantus</div><div class="metric-value">${money(currentObligation)}</div><div class="muted">Principal + retorno ainda não repassados</div></div>
+      <div class="metric-box warning"><div class="metric-label">Retorno ainda comprometido</div><div class="metric-value">${money(committedProfit)}</div><div class="muted">Lucro futuro ainda não repassado</div></div>
+    </div>
+  `;
+
+  const testMode=settings.test_mode!==false;
+  tableTarget.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Investidor</th><th>Categoria + Tema</th><th>Investido</th><th>Retorno</th><th>Alvo</th><th>Vendido</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead>
+      <tbody>${filteredInv.map(i=>{
+        const label=i.option
+          ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
+          : `Categoria não registrada - ${i.themes?.name||"Tema não identificado"}`;
+        const rate=Number(i.invested_amount)>0?((Number(i.target_amount)/Number(i.invested_amount)-1)*100):0;
+        const rep=repaymentMap[i.id];
+        let status=i.status;
+        if(i.status==="completed"&&rep?.status==="pending")status="Concluído • repasse pendente";
+        if(i.status==="completed"&&rep?.status==="confirmed")status="Concluído • repassado";
+        return `<tr>
+          <td>${esc(i.profiles?.name||"-")}<br><span class="muted">${esc(i.profiles?.email||"")}</span></td>
+          <td><b>${esc(label)}</b></td>
+          <td>${money(i.invested_amount)}</td>
+          <td>${rate.toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td>
+          <td>${money(i.target_amount)}</td>
+          <td>${money(i.sold_amount)}</td>
+          <td>${esc(status)}</td>
+          <td>${new Date(i.created_at).toLocaleString("pt-BR")}</td>
+          <td>${testMode?`<button class="btn danger smallbtn" onclick="deleteAdminInvestment(${i.id})">Excluir</button>`:"-"}</td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="9">Nenhum investimento neste período.</td></tr>`}</tbody>
+    </table></div>
+  `;
 }
 
 async function deleteAdminInvestment(id){
@@ -2300,40 +2491,79 @@ async function resetAllTestData(){
 
 async function loadAdminSales(){
   const box=document.getElementById("adminContent");
-  const [{data:themes},{data:categories},{data:sales,error}]=await Promise.all([
+
+  const [themesRes,categoriesRes,customersRes,salesRes]=await Promise.all([
     sb.from("themes").select("id,name").eq("active",true).order("name"),
     sb.from("categories").select("id,name").eq("active",true).order("name"),
-    sb.from("sales").select("*,themes(name),category:categories(name)").order("sold_at",{ascending:false}).limit(30)
+    sb.from("customers").select("*").eq("active",true).order("name"),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      *,themes(name),category:categories(name),
+      customer:customers(id,name,whatsapp,instagram)
+    `).order("sold_at",{ascending:false}))
   ]);
 
+  const error=themesRes.error||categoriesRes.error||customersRes.error||salesRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
 
-  box.innerHTML=`<div class="card">
-    <div class="title-row"><div><h2>Registrar Venda</h2><div class="muted">Marque a categoria e o tema reais do produto vendido.</div></div></div>
-    <div class="row">
-      <div><label>Categoria vendida</label><select id="saleCategory">${(categories||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
-      <div><label>Tema vendido</label><select id="saleTheme">${(themes||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+  window._adminSalesData=salesRes.data||[];
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row"><div><h2>Vendas</h2><div class="muted">Registre uma venda e acompanhe o desempenho completo da loja.</div></div></div>
+
+      <div class="row">
+        <div><label>Categoria vendida</label><select id="saleCategory">${(categoriesRes.data||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+        <div><label>Tema vendido</label><select id="saleTheme">${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+      </div>
+
+      <div class="row">
+        <div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div>
+        <div><label>Valor da venda</label><input id="saleAmount" type="number" min="0.01" step="0.01"></div>
+      </div>
+
+      <label>Cliente</label>
+      <select id="saleCustomer" onchange="toggleNewSaleCustomer()">
+        <option value="">Cliente não identificado</option>
+        ${(customersRes.data||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+        <option value="__new__">+ Cadastrar novo cliente nesta venda</option>
+      </select>
+
+      <div id="newSaleCustomerFields" class="customer-new-fields hidden">
+        <div class="row">
+          <div><label>Nome do cliente</label><input id="newSaleCustomerName" placeholder="Nome"></div>
+          <div><label>WhatsApp (opcional)</label><input id="newSaleCustomerWhatsapp" placeholder="(31) 99999-9999"></div>
+        </div>
+        <label>Instagram (opcional)</label>
+        <input id="newSaleCustomerInstagram" placeholder="@cliente">
+      </div>
+
+      <div class="notice" style="margin-top:12px"><b>Fila inteligente:</b> a venda continua sendo distribuída para o investimento compatível mais antigo.</div>
+      <button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button>
     </div>
-    <div class="row">
-      <div><label>Produto</label><input id="saleProduct" placeholder="Ex.: Chaveiro Naruto"></div>
-      <div><label>Valor da venda</label><input id="saleAmount" type="number" min="0.01" step="0.01"></div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Relatório de vendas</h3><div class="muted">Sem filtro, mostra toda a história registrada.</div></div></div>
+      <div class="filter-bar">
+        <div><label>Data inicial</label><input id="salesReportFrom" type="date"></div>
+        <div><label>Data final</label><input id="salesReportTo" type="date"></div>
+        <button class="btn" onclick="renderSalesDashboard()">Filtrar</button>
+        <button class="btn secondary" onclick="clearReportRange('salesReport',renderSalesDashboard)">Limpar filtro</button>
+      </div>
+      <div id="salesDashboard"></div>
     </div>
-    <div class="notice"><b>Fila inteligente:</b> o sistema procura o investimento ativo mais antigo compatível com a venda. “Todos os temas” aceita qualquer tema e “Todas as categorias” aceita qualquer categoria. Investimentos incompatíveis são pulados automaticamente.</div>
-    <button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button>
-  </div>
-  <div class="card" style="margin-top:14px">
-    <div class="title-row">
-      <div><h3>Últimas vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, qualquer venda pode ser excluída. O sistema recalcula a fila automaticamente.":""}</div></div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">${settings.test_mode!==false?"No modo de testes, vendas podem ser excluídas.":""}</div></div></div>
+      <div id="salesExtract"></div>
     </div>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>${(sales||[]).map((s,idx)=>`<tr>
-      <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
-      <td>${esc(s.category?.name||"Categoria não registrada")}</td>
-      <td>${esc(s.themes?.name||"-")}</td>
-      <td>${esc(s.product_name||"-")}</td>
-      <td><b>${money(s.amount)}</b></td>
-      <td>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:"-"}</td>
-    </tr>`).join("")||`<tr><td colspan="6">Nenhuma venda.</td></tr>`}</tbody></table></div>
-  </div>`;
+  `;
+
+  renderSalesDashboard();
+}
+
+function toggleNewSaleCustomer(){
+  const value=document.getElementById("saleCustomer")?.value;
+  document.getElementById("newSaleCustomerFields")?.classList.toggle("hidden",value!=="__new__");
 }
 
 async function saveSale(){
@@ -2341,17 +2571,100 @@ async function saveSale(){
   const category=Number(document.getElementById("saleCategory").value);
   const amount=Number(document.getElementById("saleAmount").value);
   const product=document.getElementById("saleProduct").value;
+  const customerChoice=document.getElementById("saleCustomer").value;
+
+  let customerId=null;
+
+  if(customerChoice==="__new__"){
+    const name=document.getElementById("newSaleCustomerName").value.trim();
+    const whatsapp=document.getElementById("newSaleCustomerWhatsapp").value.trim();
+    const instagram=document.getElementById("newSaleCustomerInstagram").value.trim();
+
+    if(!name){toast("Informe o nome do novo cliente.");return}
+
+    const {data,error}=await sb.rpc("admin_save_customer",{
+      p_customer_id:null,
+      p_name:name,
+      p_whatsapp:whatsapp||null,
+      p_instagram:instagram||null
+    });
+
+    if(error){toast(error.message);return}
+    customerId=data?.id||null;
+  }else if(customerChoice){
+    customerId=Number(customerChoice);
+  }
 
   const {error}=await sb.rpc("register_sale",{
     p_theme_id:theme,
     p_category_id:category,
     p_amount:amount,
-    p_product_name:product
+    p_product_name:product,
+    p_customer_id:customerId
   });
 
   if(error){toast(error.message);return}
-  toast("Venda registrada e distribuída pela fila inteligente.");
+  toast("Venda registrada.");
   await loadAdminSales();
+}
+
+function renderSalesDashboard(){
+  const dash=document.getElementById("salesDashboard");
+  const extract=document.getElementById("salesExtract");
+  if(!dash||!extract)return;
+
+  const range=reportDateRange("salesReport");
+  const sales=(window._adminSalesData||[]).filter(s=>inReportRange(s.sold_at,range));
+  const total=sales.reduce((a,s)=>a+Number(s.amount||0),0);
+  const count=sales.length;
+  const ticket=count?total/count:0;
+  const identified=sales.filter(s=>s.customer_id!=null).length;
+  const byCategory={},byTheme={};
+
+  sales.forEach(s=>{
+    const category=s.category?.name||"Categoria não registrada";
+    const theme=s.themes?.name||"Tema não registrado";
+    if(!byCategory[category])byCategory[category]={value:0,count:0};
+    if(!byTheme[theme])byTheme[theme]={value:0,count:0};
+    byCategory[category].value+=Number(s.amount||0);
+    byCategory[category].count++;
+    byTheme[theme].value+=Number(s.amount||0);
+    byTheme[theme].count++;
+  });
+
+  dash.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Faturamento em vendas</div><div class="metric-value">${money(total)}</div></div>
+      <div class="metric-box"><div class="metric-label">Quantidade de vendas</div><div class="metric-value">${count}</div></div>
+      <div class="metric-box"><div class="metric-label">Ticket médio</div><div class="metric-value">${money(ticket)}</div></div>
+      <div class="metric-box"><div class="metric-label">Vendas com cliente identificado</div><div class="metric-value">${identified}</div></div>
+    </div>
+
+    <div class="dashboard-group">
+      <div class="dashboard-group-title">Categorias</div>
+      <div class="mini-metrics">${Object.entries(byCategory).sort((a,b)=>b[1].value-a[1].value).map(([name,v])=>`<div class="mini-metric"><span class="muted">${esc(name)}</span><b>${money(v.value)}</b><span class="muted">${v.count} venda(s)</span></div>`).join("")||`<div class="muted">Nenhuma venda no período.</div>`}</div>
+    </div>
+
+    <div class="dashboard-group">
+      <div class="dashboard-group-title">Temas</div>
+      <div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1].value-a[1].value).map(([name,v])=>`<div class="mini-metric"><span class="muted">${esc(name)}</span><b>${money(v.value)}</b><span class="muted">${v.count} venda(s)</span></div>`).join("")||`<div class="muted">Nenhuma venda no período.</div>`}</div>
+    </div>
+  `;
+
+  extract.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th><th>Ação</th></tr></thead>
+      <tbody>${sales.map(s=>`<tr>
+        <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
+        <td>${esc(s.customer?.name||"Cliente não identificado")}</td>
+        <td>${esc(s.category?.name||"Categoria não registrada")}</td>
+        <td>${esc(s.themes?.name||"-")}</td>
+        <td>${esc(s.product_name||"-")}</td>
+        <td><b>${money(s.amount)}</b></td>
+        <td>${settings.test_mode!==false?`<button class="btn danger smallbtn" onclick="deleteAdminSale(${s.id})">Excluir</button>`:"-"}</td>
+      </tr>`).join("")||`<tr><td colspan="7">Nenhuma venda neste período.</td></tr>`}</tbody>
+    </table></div>
+  `;
 }
 
 async function deleteAdminSale(id){
@@ -2363,6 +2676,512 @@ async function deleteAdminSale(id){
   toast("Venda de teste excluída. Caixinhas, filas, progresso e saldos foram recalculados.");
   await loadAdminSales();
 }
+
+
+async function loadAdminCustomers(){
+  const box=document.getElementById("adminContent");
+  const [customersRes,salesRes]=await Promise.all([
+    sb.from("customers").select("*").eq("active",true).order("name"),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      id,customer_id,amount,sold_at,product_name,
+      category:categories(name),themes(name)
+    `).not("customer_id","is",null).order("sold_at",{ascending:false}))
+  ]);
+
+  const error=customersRes.error||salesRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  const customers=customersRes.data||[];
+  const sales=salesRes.data||[];
+  const stats={};
+  customers.forEach(c=>stats[c.id]={total:0,count:0,last:null});
+
+  sales.forEach(s=>{
+    if(!stats[s.customer_id])return;
+    stats[s.customer_id].total+=Number(s.amount||0);
+    stats[s.customer_id].count++;
+    if(!stats[s.customer_id].last||new Date(s.sold_at)>new Date(stats[s.customer_id].last)){
+      stats[s.customer_id].last=s.sold_at;
+    }
+  });
+
+  const now=Date.now();
+  const inactive30=customers.filter(c=>{
+    const last=stats[c.id]?.last;
+    return last&&(now-new Date(last).getTime())>=30*24*60*60*1000;
+  }).length;
+  const customerRevenue=customers.reduce((s,c)=>s+Number(stats[c.id]?.total||0),0);
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div><h2>Clientes</h2><div class="muted">Histórico de relacionamento e compras dos clientes identificados.</div></div>
+        <button class="btn" onclick="openCustomerEditor(null)">+ Novo cliente</button>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-box"><div class="metric-label">Clientes cadastrados</div><div class="metric-value">${customers.length}</div></div>
+        <div class="metric-box success-soft"><div class="metric-label">Faturamento identificado</div><div class="metric-value">${money(customerRevenue)}</div></div>
+        <div class="metric-box warning"><div class="metric-label">30+ dias sem comprar</div><div class="metric-value">${inactive30}</div></div>
+      </div>
+
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Cliente</th><th>WhatsApp</th><th>Instagram</th><th>Última compra</th><th>Compras</th><th>Total comprado</th><th>Ação</th></tr></thead>
+        <tbody>${customers.map(c=>{
+          const st=stats[c.id]||{};
+          return `<tr>
+            <td><button class="investor-name-link" onclick="openCustomerHistory(${c.id})">${esc(c.name)}</button></td>
+            <td>${esc(c.whatsapp||"-")}</td>
+            <td>${esc(c.instagram||"-")}</td>
+            <td>${st.last?new Date(st.last).toLocaleString("pt-BR"):"Nunca"}</td>
+            <td>${st.count||0}</td>
+            <td><b>${money(st.total||0)}</b></td>
+            <td><div class="actions"><button class="btn smallbtn" onclick="openCustomerHistory(${c.id})">Ver histórico</button><button class="btn secondary smallbtn" onclick='openCustomerEditor(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Editar</button></div></td>
+          </tr>`;
+        }).join("")||`<tr><td colspan="7">Nenhum cliente cadastrado.</td></tr>`}</tbody>
+      </table></div>
+    </div>
+  `;
+}
+
+function openCustomerEditor(customer){
+  const c=customer||{};
+  openModal(`
+    <div class="title-row"><h2>${c.id?"Editar cliente":"Novo cliente"}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome</label><input id="customerEditName" value="${esc(c.name||"")}">
+    <label>WhatsApp (opcional)</label><input id="customerEditWhatsapp" value="${esc(c.whatsapp||"")}">
+    <label>Instagram (opcional)</label><input id="customerEditInstagram" value="${esc(c.instagram||"")}">
+    <button class="btn" style="width:100%;margin-top:14px" onclick="saveCustomerEditor(${c.id||"null"})">Salvar cliente</button>
+  `);
+}
+
+async function saveCustomerEditor(id){
+  const {error}=await sb.rpc("admin_save_customer",{
+    p_customer_id:id,
+    p_name:document.getElementById("customerEditName").value,
+    p_whatsapp:document.getElementById("customerEditWhatsapp").value||null,
+    p_instagram:document.getElementById("customerEditInstagram").value||null
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Cliente salvo.");
+  await loadAdminCustomers();
+}
+
+async function openCustomerHistory(id){
+  openModal(`<div class="title-row"><h2>Cliente</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando...</div>`,true);
+
+  const [customerRes,salesRes]=await Promise.all([
+    sb.from("customers").select("*").eq("id",id).single(),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      *,category:categories(name),themes(name)
+    `).eq("customer_id",id).order("sold_at",{ascending:false}))
+  ]);
+
+  const error=customerRes.error||salesRes.error;
+  if(error){
+    openModal(`<div class="msg error">${esc(error.message)}</div>`,true);
+    return;
+  }
+
+  const c=customerRes.data;
+  const sales=salesRes.data||[];
+  const total=sales.reduce((s,x)=>s+Number(x.amount||0),0);
+  const ticket=sales.length?total/sales.length:0;
+  const byCategory={},byTheme={};
+
+  sales.forEach(s=>{
+    const cat=s.category?.name||"Categoria não registrada";
+    const theme=s.themes?.name||"Tema não registrado";
+    byCategory[cat]=(byCategory[cat]||0)+Number(s.amount||0);
+    byTheme[theme]=(byTheme[theme]||0)+Number(s.amount||0);
+  });
+
+  openModal(`
+    <div class="title-row"><div><h2>${esc(c.name)}</h2><div class="muted">${esc(c.whatsapp||"Sem WhatsApp")} • ${esc(c.instagram||"Sem Instagram")}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Total comprado</div><div class="metric-value">${money(total)}</div></div>
+      <div class="metric-box"><div class="metric-label">Compras</div><div class="metric-value">${sales.length}</div></div>
+      <div class="metric-box"><div class="metric-label">Ticket médio</div><div class="metric-value">${money(ticket)}</div></div>
+      <div class="metric-box"><div class="metric-label">Primeira compra</div><div class="metric-value" style="font-size:15px">${sales.length?new Date(sales[sales.length-1].sold_at).toLocaleDateString("pt-BR"):"-"}</div></div>
+      <div class="metric-box"><div class="metric-label">Última compra</div><div class="metric-value" style="font-size:15px">${sales.length?new Date(sales[0].sold_at).toLocaleDateString("pt-BR"):"-"}</div></div>
+    </div>
+
+    <div class="history-section"><h3>Por categoria</h3><div class="mini-metrics">${Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
+    <div class="history-section"><h3>Por tema</h3><div class="mini-metrics">${Object.entries(byTheme).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<div class="mini-metric"><span class="muted">${esc(n)}</span><b>${money(v)}</b></div>`).join("")||`<div class="muted">Sem compras.</div>`}</div></div>
+
+    <div class="history-section"><h3>Histórico de compras</h3><div class="table-wrap"><table class="table">
+      <thead><tr><th>Data</th><th>Categoria</th><th>Tema</th><th>Produto</th><th>Valor</th></tr></thead>
+      <tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.themes?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="5">Nenhuma compra.</td></tr>`}</tbody>
+    </table></div></div>
+  `,true);
+}
+
+
+async function loadAdminResults(){
+  const box=document.getElementById("adminContent");
+
+  const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes]=await Promise.all([
+    sb.rpc("admin_get_account_balances"),
+    fetchAllPaged(()=>sb.from("financial_entries").select("*").order("occurred_at",{ascending:false})),
+    sb.from("investment_transfers").select("*,profiles(name,email)").eq("status","pending").order("created_at"),
+    sb.from("investment_repayments").select("*,profiles(name,email)").eq("status","pending").order("created_at"),
+    sb.from("investment_repayments").select("investment_id,status,total_amount,profit_amount,principal_amount,confirmed_at,created_at"),
+    fetchAllPaged(()=>sb.from("investments").select(`
+      id,investor_id,invested_amount,target_amount,status,created_at,
+      profiles(name,email),
+      option:investment_options(id,category:categories(name),theme:themes(name))
+    `).neq("status","cancelled").order("created_at",{ascending:false}))
+  ]);
+
+  const error=balancesRes.error||entriesRes.error||transferRes.error||repaymentRes.error||allRepaymentRes.error||investmentsRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  window._resultsData={
+    balances:balancesRes.data||[],
+    entries:entriesRes.data||[],
+    pendingTransfers:transferRes.data||[],
+    pendingRepayments:repaymentRes.data||[],
+    repayments:allRepaymentRes.data||[],
+    investments:investmentsRes.data||[]
+  };
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row"><div><h2>Resultados</h2><div class="muted">Vida financeira da Cat Encantus e controle do dinheiro da CATinvestimentos.</div></div></div>
+
+      <div id="currentAccountBalances"></div>
+
+      <div class="filter-bar" style="margin-top:20px">
+        <div><label>Data inicial</label><input id="resultsReportFrom" type="date"></div>
+        <div><label>Data final</label><input id="resultsReportTo" type="date"></div>
+        <button class="btn" onclick="renderResultsDashboard()">Filtrar</button>
+        <button class="btn secondary" onclick="clearReportRange('resultsReport',renderResultsDashboard)">Limpar filtro</button>
+      </div>
+      <div class="report-subtitle">Sem filtro, os resultados mostram toda a história registrada. Os saldos bancários são sempre atuais.</div>
+
+      <div id="resultsDashboard"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Registrar entrada ou saída manual</h3><div class="muted">Use para movimentos que o aplicativo não reconhece sozinho.</div></div></div>
+
+      <div class="row">
+        <div><label>Conta</label><select id="financeAccount"><option value="cat_encantus">Cat Encantus</option><option value="cat_investimentos">CATinvestimentos</option></select></div>
+        <div><label>Tipo</label><select id="financeDirection" onchange="updateFinancialCategoryOptions()"><option value="out">Saída</option><option value="in">Entrada</option></select></div>
+      </div>
+
+      <div class="row">
+        <div><label>Categoria</label><select id="financeCategory"></select></div>
+        <div><label>Valor</label><input id="financeAmount" type="number" min="0.01" step="0.01"></div>
+      </div>
+
+      <div class="row">
+        <div><label>Descrição</label><input id="financeDescription" placeholder="Ex.: Compra de Hama Beads"></div>
+        <div><label>Local / Destino / Origem</label><input id="financeCounterparty" placeholder="Shopee, Mercado Livre, vendedor..."></div>
+      </div>
+
+      <div class="row">
+        <div><label>Data</label><input id="financeDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div><label>Observação (opcional)</label><input id="financeNotes"></div>
+      </div>
+
+      <button class="btn" style="margin-top:14px" onclick="saveManualFinancialEntry()">Registrar movimentação</button>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><h3>Ações financeiras pendentes</h3></div>
+      <div id="pendingFinancialActions"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><h3>Contas a pagar / obrigações com investidores</h3></div>
+      <div id="investorObligations"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="title-row"><h3>Extrato financeiro</h3></div>
+      <div id="financialExtract"></div>
+    </div>
+  `;
+
+  updateFinancialCategoryOptions();
+  renderResultsDashboard();
+}
+
+function updateFinancialCategoryOptions(){
+  const direction=document.getElementById("financeDirection")?.value||"out";
+  const select=document.getElementById("financeCategory");
+  if(!select)return;
+
+  const outgoing=[
+    "Materiais","Embalagens","Fretes","Feiras / Eventos",
+    "Equipamentos","Marketing","Taxas","Serviços",
+    "Comissão de vendedores","Aluguel","Outras saídas"
+  ];
+
+  const incoming=[
+    "Aporte dos sócios","Venda fora do sistema",
+    "Reembolso recebido","Outras entradas"
+  ];
+
+  const list=direction==="out"?outgoing:incoming;
+  select.innerHTML=list.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+}
+
+function renderResultsDashboard(){
+  if(!window._resultsData)return;
+
+  const {balances,entries,pendingTransfers,pendingRepayments,repayments,investments}=window._resultsData;
+  const range=reportDateRange("resultsReport");
+  const filtered=entries.filter(e=>inReportRange(e.occurred_at,range));
+
+  const ce=filtered.filter(e=>e.account_code==="cat_encantus");
+  const ci=filtered.filter(e=>e.account_code==="cat_investimentos");
+
+  const ceIn=ce.filter(e=>e.direction==="in").reduce((s,e)=>s+Number(e.amount||0),0);
+  const ceOut=ce.filter(e=>e.direction==="out").reduce((s,e)=>s+Number(e.amount||0),0);
+  const ciIn=ci.filter(e=>e.direction==="in").reduce((s,e)=>s+Number(e.amount||0),0);
+  const ciOut=ci.filter(e=>e.direction==="out").reduce((s,e)=>s+Number(e.amount||0),0);
+
+  const result=ce.reduce((s,e)=>s+Number(e.result_amount||0),0);
+  const investorCost=ce
+    .filter(e=>e.category==="Retorno de investidores")
+    .reduce((s,e)=>s+Math.abs(Number(e.result_amount||0)),0);
+  const expenses=ce
+    .filter(e=>Number(e.result_amount||0)<0&&e.category!=="Retorno de investidores")
+    .reduce((s,e)=>s+Math.abs(Number(e.result_amount||0)),0);
+  const revenue=ce
+    .filter(e=>Number(e.result_amount||0)>0)
+    .reduce((s,e)=>s+Number(e.result_amount||0),0);
+
+  const pendingTransferTotal=pendingTransfers.reduce((s,t)=>s+Number(t.amount||0),0);
+  const pendingRepaymentTotal=pendingRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
+
+  const confirmedRepaymentIds=new Set(
+    repayments.filter(r=>r.status==="confirmed").map(r=>r.investment_id)
+  );
+  const unpaidInvestments=investments.filter(i=>!confirmedRepaymentIds.has(i.id));
+  const obligationTotal=unpaidInvestments.reduce((s,i)=>s+Number(i.target_amount||0),0);
+  const futureProfit=unpaidInvestments.reduce((s,i)=>s+Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0)),0);
+
+  document.getElementById("currentAccountBalances").innerHTML=`
+    <div class="metric-grid">
+      ${balances.map(b=>`
+        <div class="metric-box balance-card ${b.initialized?"success-soft":"warning"}">
+          <div class="metric-label">Saldo atual • ${esc(b.account_name)}</div>
+          <div class="metric-value">${money(b.current_balance)}</div>
+          <div class="balance-status">${b.initialized
+            ? `Controle iniciado em ${new Date(b.tracking_started_at).toLocaleString("pt-BR")}`
+            : `<b>Configure o saldo inicial para começar a conciliar com o banco.</b>`}</div>
+          <div class="actions">
+            ${!b.initialized
+              ? `<button class="btn smallbtn" onclick="openSetOpeningBalance('${b.account_code}','${esc(b.account_name)}')">Definir saldo inicial</button>`
+              : `<button class="btn secondary smallbtn" onclick="openReconcileAccount('${b.account_code}','${esc(b.account_name)}',${Number(b.current_balance||0)})">Conciliar</button>`}
+          </div>
+        </div>
+      `).join("")}
+      <div class="metric-box warning"><div class="metric-label">Transferir CATinvestimentos → Cat Encantus</div><div class="metric-value">${money(pendingTransferTotal)}</div><div class="muted">Investimentos aguardando sua confirmação</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Repassar Cat Encantus → CATinvestimentos</div><div class="metric-value">${money(pendingRepaymentTotal)}</div><div class="muted">Investimentos concluídos aguardando repasse</div></div>
+    </div>
+  `;
+
+  document.getElementById("resultsDashboard").innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Entradas • Cat Encantus</div><div class="metric-value">${money(ceIn)}</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Saídas • Cat Encantus</div><div class="metric-value">${money(ceOut)}</div></div>
+      <div class="metric-box"><div class="metric-label">Saldo líquido de caixa</div><div class="metric-value">${money(ceIn-ceOut)}</div><div class="muted">Entradas - saídas do período</div></div>
+      <div class="metric-box success-soft"><div class="metric-label">Receitas / resultado positivo</div><div class="metric-value">${money(revenue)}</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Despesas da operação</div><div class="metric-value">${money(expenses)}</div></div>
+      <div class="metric-box danger-soft"><div class="metric-label">Custo dos investidores</div><div class="metric-value">${money(investorCost)}</div><div class="muted">Somente o lucro/retorno pago — não inclui principal</div></div>
+      <div class="metric-box ${result>=0?"success-soft":"danger-soft"}"><div class="metric-label">Resultado da empresa</div><div class="metric-value">${money(result)}</div><div class="muted">Receitas - despesas - custo dos investidores</div></div>
+      <div class="metric-box"><div class="metric-label">Entradas • CATinvestimentos</div><div class="metric-value">${money(ciIn)}</div></div>
+      <div class="metric-box"><div class="metric-label">Saídas • CATinvestimentos</div><div class="metric-value">${money(ciOut)}</div></div>
+      <div class="metric-box obligation-card"><div class="metric-label">Obrigação atual da Cat Encantus</div><div class="metric-value">${money(obligationTotal)}</div><div class="muted">Principal + retorno ainda não repassados</div></div>
+      <div class="metric-box warning"><div class="metric-label">Retorno futuro comprometido</div><div class="metric-value">${money(futureProfit)}</div><div class="muted">Somente a parcela de lucro dos investidores ainda não repassada</div></div>
+    </div>
+  `;
+
+  renderPendingFinancialActions();
+  renderInvestorObligations();
+  renderFinancialExtract(filtered);
+}
+
+function renderPendingFinancialActions(){
+  const target=document.getElementById("pendingFinancialActions");
+  if(!target||!window._resultsData)return;
+
+  const {pendingTransfers,pendingRepayments}=window._resultsData;
+
+  target.innerHTML=`
+    <div class="history-section">
+      <h3>CATinvestimentos → Cat Encantus</h3>
+      ${pendingTransfers.map(t=>`
+        <div class="pending-action">
+          <b>${esc(t.profiles?.name||"Investidor")}</b> • ${money(t.amount)}
+          <div class="muted">Faça a transferência entre os bancos e confirme aqui.</div>
+          <button class="btn smallbtn" style="margin-top:8px" onclick="confirmInvestmentTransfer(${t.id})">Confirmar transferência</button>
+        </div>
+      `).join("")||`<div class="muted">Nenhuma transferência pendente.</div>`}
+    </div>
+
+    <div class="history-section">
+      <h3>Cat Encantus → CATinvestimentos</h3>
+      ${pendingRepayments.map(r=>`
+        <div class="pending-action">
+          <b>${esc(r.profiles?.name||"Investidor")}</b> • ${money(r.total_amount)}
+          <div class="muted">Principal: ${money(r.principal_amount)} • Retorno: ${money(r.profit_amount)}</div>
+          <div class="muted">Faça o repasse para a CATinvestimentos. Só depois o valor será liberado ao investidor.</div>
+          <button class="btn smallbtn" style="margin-top:8px" onclick="confirmInvestmentRepayment(${r.id})">Confirmar repasse</button>
+        </div>
+      `).join("")||`<div class="muted">Nenhum repasse pendente.</div>`}
+    </div>
+  `;
+}
+
+function renderInvestorObligations(){
+  const target=document.getElementById("investorObligations");
+  if(!target||!window._resultsData)return;
+
+  const {investments,repayments}=window._resultsData;
+  const confirmed=new Set(repayments.filter(x=>x.status==="confirmed").map(x=>x.investment_id));
+  const rows=investments.filter(i=>!confirmed.has(i.id));
+
+  target.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Investidor</th><th>Opção</th><th>Principal</th><th>Retorno</th><th>Total devido</th><th>Situação</th></tr></thead>
+      <tbody>${rows.map(i=>{
+        const label=i.option
+          ? `${i.option.category?.name||"Todas as categorias"} - ${i.option.theme?.name||"Todos os temas"}`
+          : "Investimento antigo";
+        const profit=Math.max(0,Number(i.target_amount||0)-Number(i.invested_amount||0));
+        const situation=i.status==="completed"?"Concluído • repasse pendente":"Em andamento";
+        return `<tr>
+          <td>${esc(i.profiles?.name||"-")}</td>
+          <td>${esc(label)}</td>
+          <td>${money(i.invested_amount)}</td>
+          <td>${money(profit)}</td>
+          <td><b>${money(i.target_amount)}</b></td>
+          <td>${esc(situation)}</td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="6">Nenhuma obrigação pendente.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+function renderFinancialExtract(entries){
+  const target=document.getElementById("financialExtract");
+  if(!target)return;
+
+  target.innerHTML=`
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Destino / Origem</th><th>Valor</th><th>Efeito no resultado</th></tr></thead>
+      <tbody>${entries.map(e=>`
+        <tr>
+          <td>${new Date(e.occurred_at).toLocaleString("pt-BR")}</td>
+          <td>${e.account_code==="cat_encantus"?"Cat Encantus":"CATinvestimentos"}</td>
+          <td>${e.direction==="in"?"Entrada":"Saída"}</td>
+          <td>${esc(e.category||"-")}</td>
+          <td>${esc(e.description||"-")}</td>
+          <td>${esc(e.counterparty||"-")}</td>
+          <td class="${e.direction==="in"?"flow-positive":"flow-negative"}">${e.direction==="in"?"+":"-"} ${money(e.amount)}</td>
+          <td>${Number(e.result_amount||0)===0
+            ? `<span class="flow-neutral">Patrimonial</span>`
+            : Number(e.result_amount)>0
+              ? `<span class="flow-positive">+ ${money(e.result_amount)}</span>`
+              : `<span class="flow-negative">- ${money(Math.abs(Number(e.result_amount)))}</span>`}</td>
+        </tr>
+      `).join("")||`<tr><td colspan="8">Nenhuma movimentação neste período.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+async function saveManualFinancialEntry(){
+  const date=document.getElementById("financeDate").value;
+  const occurred=date?new Date(date+"T12:00:00").toISOString():null;
+
+  const {error}=await sb.rpc("admin_add_financial_entry",{
+    p_account_code:document.getElementById("financeAccount").value,
+    p_direction:document.getElementById("financeDirection").value,
+    p_amount:Number(document.getElementById("financeAmount").value),
+    p_category:document.getElementById("financeCategory").value,
+    p_description:document.getElementById("financeDescription").value,
+    p_counterparty:document.getElementById("financeCounterparty").value||null,
+    p_notes:document.getElementById("financeNotes").value||null,
+    p_occurred_at:occurred
+  });
+
+  if(error){toast(error.message);return}
+  toast("Movimentação registrada.");
+  await loadAdminResults();
+}
+
+function openSetOpeningBalance(code,name){
+  openModal(`
+    <div class="title-row"><h2>Saldo inicial • ${esc(name)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="notice">Digite exatamente o saldo que existe no banco desta conta neste momento. A partir daqui, o aplicativo acompanhará as novas movimentações.</div>
+    <label>Saldo atual no banco</label>
+    <input id="openingBalanceValue" type="number" step="0.01">
+    <button class="btn" style="width:100%;margin-top:14px" onclick="saveOpeningBalance('${code}')">Confirmar saldo inicial</button>
+  `);
+}
+
+async function saveOpeningBalance(code){
+  const value=Number(document.getElementById("openingBalanceValue").value);
+  if(!confirm("Confirma que este é o saldo que existe no banco agora?"))return;
+
+  const {error}=await sb.rpc("admin_set_account_opening_balance",{
+    p_account_code:code,
+    p_balance:value
+  });
+
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Saldo inicial configurado.");
+  await loadAdminResults();
+}
+
+function openReconcileAccount(code,name,current){
+  openModal(`
+    <div class="title-row"><h2>Conciliar • ${esc(name)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="muted">Saldo que o sistema calcula hoje: <b>${money(current)}</b></div>
+    <label>Saldo que aparece no banco</label>
+    <input id="reconcileBalanceValue" type="number" step="0.01" value="${Number(current||0).toFixed(2)}">
+    <label>Motivo / observação</label>
+    <input id="reconcileDescription" value="Ajuste de conciliação">
+    <button class="btn" style="width:100%;margin-top:14px" onclick="saveReconcileAccount('${code}')">Conciliar saldo</button>
+  `);
+}
+
+async function saveReconcileAccount(code){
+  const {error}=await sb.rpc("admin_reconcile_account",{
+    p_account_code:code,
+    p_actual_balance:Number(document.getElementById("reconcileBalanceValue").value),
+    p_description:document.getElementById("reconcileDescription").value
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Saldo conciliado.");
+  await loadAdminResults();
+}
+
+async function confirmInvestmentTransfer(id){
+  if(!confirm("Você já transferiu fisicamente este valor da conta CATinvestimentos para a conta Cat Encantus?"))return;
+  const {error}=await sb.rpc("admin_confirm_investment_transfer",{p_transfer_id:id});
+  if(error){toast(error.message);return}
+  toast("Transferência confirmada.");
+  await loadAdminResults();
+}
+
+async function confirmInvestmentRepayment(id){
+  if(!confirm("Você já transferiu fisicamente este valor da conta Cat Encantus para a conta CATinvestimentos? Ao confirmar, o retorno será liberado no saldo do investidor."))return;
+  const {error}=await sb.rpc("admin_confirm_investment_repayment",{p_repayment_id:id});
+  if(error){toast(error.message);return}
+  toast("Repasse confirmado e retorno liberado.");
+  await loadAdminResults();
+}
+
 
 async function loadAdminCashboxes(){
   const box=document.getElementById("adminContent");
