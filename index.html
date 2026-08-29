@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#a94366">
+  <meta name="catinvestimentos-version" content="V32O">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CATinvestimentos">
@@ -410,6 +411,7 @@ footer{text-align:center;padding:28px;color:var(--muted);font-size:12px}
     <button class="admin-item" onclick="adminSection('sales')">🧾<br><br>Vendas</button>
     <button class="admin-item" onclick="adminSection('results')">📊<br><br>Resultados</button>
     <button class="admin-item" onclick="adminSection('customers')">🤝<br><br>Clientes</button>
+    <button class="admin-item" onclick="adminSection('sellers')">🧑‍💼<br><br>Vendedores</button>
     <button class="admin-item" onclick="adminSection('cashboxes')">📦<br><br>Caixinhas</button>
     <button class="admin-item" onclick="adminSection('queues')">🔄<br><br>Filas</button>
     <button class="admin-item" onclick="adminSection('deposits')">➕<br><br>Depósitos</button>
@@ -1738,6 +1740,7 @@ async function adminSection(section){
   if(section==="sales")return loadAdminSales();
   if(section==="results")return loadAdminResults();
   if(section==="customers")return loadAdminCustomers();
+  if(section==="sellers")return loadAdminSellers();
   if(section==="cashboxes")return loadAdminCashboxes();
   if(section==="queues")return loadAdminQueues();
   if(section==="deposits")return loadAdminDeposits();
@@ -2597,26 +2600,32 @@ async function resetAllTestData(){
 async function loadAdminSales(){
   const box=document.getElementById("adminContent");
 
-  const [themesRes,subthemesRes,categoriesRes,customersRes,salesRes]=await Promise.all([
+  const [themesRes,subthemesRes,categoriesRes,customersRes,sellersRes,salesRes]=await Promise.all([
     sb.from("themes").select("id,name").eq("active",true).order("name"),
-    sb.from("subthemes").select("id,theme_id,name,active").eq("active",true).order("name"),
+    sb.from("subthemes").select("id,theme_id,name,active").order("name"),
     sb.from("categories").select("id,name").eq("active",true).order("name"),
     sb.from("customers").select("*").eq("active",true).order("name"),
+    sb.from("sellers").select("*").eq("active",true).order("name"),
     fetchAllPaged(()=>sb.from("sales").select(`
       *,themes(name),subtheme:subthemes(name),category:categories(name),
-      customer:customers(id,name,whatsapp,instagram)
+      customer:customers(id,name,whatsapp,instagram),
+      seller:sellers(id,name,phone,instagram)
     `).order("sold_at",{ascending:false}))
   ]);
 
-  const error=themesRes.error||subthemesRes.error||categoriesRes.error||customersRes.error||salesRes.error;
+  const error=themesRes.error||subthemesRes.error||categoriesRes.error||customersRes.error||sellersRes.error||salesRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
 
   window._adminSalesData=salesRes.data||[];
+  window._saleThemes=themesRes.data||[];
   window._saleSubthemes=subthemesRes.data||[];
+  window._saleCategories=categoriesRes.data||[];
+  window._saleCustomers=customersRes.data||[];
+  window._saleSellers=sellersRes.data||[];
 
   box.innerHTML=`
     <div class="card">
-      <div class="title-row"><div><h2>Vendas</h2><div class="muted">Registre uma venda e acompanhe o desempenho completo da loja.</div></div></div>
+      <div class="title-row"><div><h2>Vendas</h2><div class="muted">Registre a venda, pagamento, entrega e comissão sem alterar a lógica dos investimentos.</div></div></div>
 
       <div class="row">
         <div><label>Categoria vendida</label><select id="saleCategory">${(categoriesRes.data||[]).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
@@ -2648,6 +2657,53 @@ async function loadAdminSales(){
       </div>
       <div class="muted" style="font-size:11px;margin-top:6px">Somente valores efetivamente recebidos entram no caixa, no resultado e no progresso dos investimentos. O restante fica em Receitas a receber.</div>
 
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>Entrega</label>
+          <select id="saleDelivered" onchange="toggleSaleDeliveryFields()">
+            <option value="true">Entregue</option>
+            <option value="false">Não entregue</option>
+          </select>
+        </div>
+        <div id="saleExpectedDeliveryField" class="hidden">
+          <label>Data prevista de entrega</label>
+          <input id="saleExpectedDeliveryDate" type="date">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>Comissão da venda</label>
+          <select id="saleHasCommission" onchange="toggleSaleCommissionFields()">
+            <option value="false" selected>Sem comissão</option>
+            <option value="true">Com comissão</option>
+          </select>
+        </div>
+        <div id="saleCommissionRateField" class="hidden">
+          <label>Comissão (%)</label>
+          <input id="saleCommissionRate" type="number" min="0.01" max="100" step="0.01" value="${Number(settings.default_sales_commission_rate||15)}">
+        </div>
+      </div>
+
+      <div id="saleCommissionFields" class="hidden">
+        <label>Vendedor</label>
+        <select id="saleSeller" onchange="toggleNewSaleSeller()">
+          <option value="">Selecione o vendedor</option>
+          ${(sellersRes.data||[]).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}
+          <option value="__new__">+ Cadastrar novo vendedor nesta venda</option>
+        </select>
+
+        <div id="newSaleSellerFields" class="customer-new-fields hidden">
+          <div class="row">
+            <div><label>Nome do vendedor</label><input id="newSaleSellerName" placeholder="Nome"></div>
+            <div><label>Número</label><input id="newSaleSellerPhone" placeholder="(31) 99999-9999"></div>
+          </div>
+          <label>Instagram (opcional)</label>
+          <input id="newSaleSellerInstagram" placeholder="@vendedor">
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:6px">A comissão gera uma conta a pagar para o dia 01 do mês seguinte. Ela só vira saída/despesa quando o pagamento for confirmado.</div>
+      </div>
+
       <label>Cliente</label>
       <select id="saleCustomer" onchange="toggleNewSaleCustomer()">
         <option value="">Cliente não identificado</option>
@@ -2664,7 +2720,7 @@ async function loadAdminSales(){
         <input id="newSaleCustomerInstagram" placeholder="@cliente">
       </div>
 
-      <div class="notice" style="margin-top:12px"><b>Importante:</b> o subtema serve para detalhamento e relatórios. A fila dos investimentos continua considerando apenas <b>categoria + tema global</b>.</div>
+      <div class="notice" style="margin-top:12px"><b>Investimentos:</b> subtema, entrega e vendedor são controles internos. A fila continua considerando somente <b>categoria + tema global + valor efetivamente recebido</b>.</div>
       <button class="btn" style="margin-top:14px" onclick="saveSale()">Registrar venda</button>
     </div>
 
@@ -2680,6 +2736,11 @@ async function loadAdminSales(){
     </div>
 
     <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Produtos ainda não entregues</h3><div class="muted">Controle interno da loja. Esta informação não aparece na área do investidor.</div></div></div>
+      <div id="deliveryReport"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
       <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Vendas totalmente não pagas podem ser excluídas em caso de cancelamento. Vendas com qualquer valor recebido ficam protegidas.</div></div></div>
       <div id="salesExtract"></div>
     </div>
@@ -2687,6 +2748,8 @@ async function loadAdminSales(){
 
   renderSaleSubthemes();
   toggleSalePaymentFields();
+  toggleSaleDeliveryFields();
+  toggleSaleCommissionFields();
   renderSalesDashboard();
 }
 
@@ -2722,6 +2785,31 @@ function toggleNewSaleCustomer(){
   document.getElementById("newSaleCustomerFields")?.classList.toggle("hidden",value!=="__new__");
 }
 
+function toggleSaleDeliveryFields(){
+  const delivered=document.getElementById("saleDelivered")?.value!=="false";
+  document.getElementById("saleExpectedDeliveryField")?.classList.toggle("hidden",delivered);
+  if(delivered){
+    const input=document.getElementById("saleExpectedDeliveryDate");
+    if(input)input.value="";
+  }
+}
+
+function toggleSaleCommissionFields(){
+  const enabled=document.getElementById("saleHasCommission")?.value==="true";
+  document.getElementById("saleCommissionFields")?.classList.toggle("hidden",!enabled);
+  document.getElementById("saleCommissionRateField")?.classList.toggle("hidden",!enabled);
+  if(!enabled){
+    const seller=document.getElementById("saleSeller");
+    if(seller)seller.value="";
+    document.getElementById("newSaleSellerFields")?.classList.add("hidden");
+  }
+}
+
+function toggleNewSaleSeller(){
+  const value=document.getElementById("saleSeller")?.value;
+  document.getElementById("newSaleSellerFields")?.classList.toggle("hidden",value!=="__new__");
+}
+
 async function saveSale(){
   const theme=Number(document.getElementById("saleTheme").value);
   const category=Number(document.getElementById("saleCategory").value);
@@ -2734,15 +2822,26 @@ async function saveSale(){
   const availableSubs=(window._saleSubthemes||[]).filter(s=>Number(s.theme_id)===theme && s.active!==false);
   const subthemeId=subthemeSelect?.value?Number(subthemeSelect.value):null;
 
+  const delivered=document.getElementById("saleDelivered")?.value!=="false";
+  const expectedDeliveryDate=delivered?null:(document.getElementById("saleExpectedDeliveryDate")?.value||null);
+
+  const hasCommission=document.getElementById("saleHasCommission")?.value==="true";
+  const sellerChoice=document.getElementById("saleSeller")?.value||"";
+  const commissionRate=hasCommission?Number(document.getElementById("saleCommissionRate")?.value||0):null;
+
   if(availableSubs.length && !subthemeId){toast("Escolha o subtema desta venda.");return}
   if(!amount||amount<=0){toast("Informe o valor da venda.");return}
   if(paymentStatus==="partial"&&(!paidAmount||paidAmount<=0||paidAmount>=amount)){
     toast("No pagamento parcial, informe quanto já foi pago. O valor deve ser maior que zero e menor que o total da venda.");
     return;
   }
+  if(!delivered&&!expectedDeliveryDate){toast("Informe a data prevista de entrega.");return}
+  if(hasCommission&&(!commissionRate||commissionRate<=0||commissionRate>100)){
+    toast("Informe uma comissão válida, maior que zero e no máximo 100%.");
+    return;
+  }
 
   let customerId=null;
-
   if(customerChoice==="__new__"){
     const name=document.getElementById("newSaleCustomerName").value.trim();
     const whatsapp=document.getElementById("newSaleCustomerWhatsapp").value.trim();
@@ -2763,6 +2862,32 @@ async function saveSale(){
     customerId=Number(customerChoice);
   }
 
+  let sellerId=null;
+  if(hasCommission){
+    if(sellerChoice==="__new__"){
+      const name=document.getElementById("newSaleSellerName")?.value.trim()||"";
+      const phone=document.getElementById("newSaleSellerPhone")?.value.trim()||"";
+      const instagram=document.getElementById("newSaleSellerInstagram")?.value.trim()||"";
+
+      if(!name){toast("Informe o nome do vendedor.");return}
+      if(!phone){toast("Informe o número do vendedor.");return}
+
+      const {data,error}=await sb.rpc("admin_save_seller",{
+        p_id:null,
+        p_name:name,
+        p_phone:phone,
+        p_instagram:instagram||null,
+        p_active:true
+      });
+      if(error){toast(error.message);return}
+      sellerId=data?.id||null;
+    }else if(sellerChoice){
+      sellerId=Number(sellerChoice);
+    }
+
+    if(!sellerId){toast("Escolha ou cadastre o vendedor.");return}
+  }
+
   const {error}=await sb.rpc("register_sale",{
     p_theme_id:theme,
     p_category_id:category,
@@ -2771,7 +2896,12 @@ async function saveSale(){
     p_customer_id:customerId,
     p_subtheme_id:subthemeId,
     p_payment_status:paymentStatus,
-    p_paid_amount:paidAmount
+    p_paid_amount:paidAmount,
+    p_delivered:delivered,
+    p_expected_delivery_date:expectedDeliveryDate,
+    p_has_commission:hasCommission,
+    p_seller_id:sellerId,
+    p_commission_rate:commissionRate
   });
 
   if(error){toast(error.message);return}
@@ -2838,9 +2968,12 @@ function renderSalesDashboard(){
 
   extract.innerHTML=`
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Venda</th><th>Recebido</th><th>A receber</th><th>Pagamento</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Venda</th><th>Recebido</th><th>A receber</th><th>Pagamento</th><th>Entrega</th><th>Comissão</th><th>Ação</th></tr></thead>
       <tbody>${sales.map(s=>{
         const remaining=Math.max(0,Number(s.amount||0)-Number(s.paid_amount||0));
+        const commission=s.has_commission
+          ? `${esc(s.seller?.name||"Vendedor")}<br><span class="muted">${Number(s.commission_rate||0).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</span>`
+          : `<span class="muted">Sem comissão</span>`;
         return `<tr>
           <td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td>
           <td>${esc(s.customer?.name||"Cliente não identificado")}</td>
@@ -2852,15 +2985,408 @@ function renderSalesDashboard(){
           <td class="flow-positive"><b>${money(s.paid_amount||0)}</b></td>
           <td class="${remaining>0?"flow-negative":"flow-neutral"}"><b>${money(remaining)}</b></td>
           <td><span class="badge ${s.payment_status==="paid"?"green":s.payment_status==="partial"?"":"red"}">${salePaymentStatusPt(s.payment_status)}</span></td>
+          <td><span class="badge ${s.delivered?"green":"red"}">${s.delivered?"ENTREGUE":"NÃO ENTREGUE"}</span>${!s.delivered&&s.expected_delivery_date?`<br><span class="muted">${dateOnlyPt(s.expected_delivery_date)}</span>`:""}</td>
+          <td>${commission}</td>
           <td><div class="actions">
-            <button class="btn secondary smallbtn" onclick="openEditSaleSubtheme(${s.id})">Editar subtema</button>
+            <button class="btn secondary smallbtn" onclick="openEditSale(${s.id})">Editar venda</button>
             ${remaining>0?`<button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Receber</button>`:""}
             ${s.payment_status==="unpaid" && Number(s.paid_amount||0)===0?`<button class="btn danger smallbtn" onclick="deleteUnpaidSale(${s.id})">Excluir não paga</button>`:""}
           </div></td>
         </tr>`;
-      }).join("")||`<tr><td colspan="11">Nenhuma venda neste período.</td></tr>`}</tbody>
+      }).join("")||`<tr><td colspan="13">Nenhuma venda neste período.</td></tr>`}</tbody>
     </table></div>
   `;
+
+  renderDeliveryReport();
+}
+
+function dateOnlyPt(value){
+  if(!value)return "-";
+  const parts=String(value).slice(0,10).split("-");
+  if(parts.length!==3)return String(value);
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function renderDeliveryReport(){
+  const target=document.getElementById("deliveryReport");
+  if(!target)return;
+  const rows=(window._adminSalesData||[])
+    .filter(s=>s.delivered===false)
+    .sort((a,b)=>String(a.expected_delivery_date||"9999-12-31").localeCompare(String(b.expected_delivery_date||"9999-12-31")));
+  const today=new Date().toISOString().slice(0,10);
+  const overdue=rows.filter(s=>s.expected_delivery_date&&String(s.expected_delivery_date).slice(0,10)<=today);
+  const totalValue=rows.reduce((sum,s)=>sum+Number(s.amount||0),0);
+
+  target.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box warning"><div class="metric-label">Ainda não entregues</div><div class="metric-value">${rows.length}</div></div>
+      <div class="metric-box ${overdue.length?"danger-soft":""}"><div class="metric-label">Prazo atingido / atrasadas</div><div class="metric-value">${overdue.length}</div></div>
+      <div class="metric-box"><div class="metric-label">Valor das vendas pendentes de entrega</div><div class="metric-value">${money(totalValue)}</div></div>
+    </div>
+    <div class="table-wrap" style="margin-top:14px"><table class="table">
+      <thead><tr><th>Previsão</th><th>Cliente</th><th>Produto</th><th>Tema / Subtema</th><th>Valor</th><th>Pagamento</th><th>Ação</th></tr></thead>
+      <tbody>${rows.map(s=>`
+        <tr>
+          <td><b>${dateOnlyPt(s.expected_delivery_date)}</b>${s.expected_delivery_date&&String(s.expected_delivery_date).slice(0,10)<=today?`<br><span class="badge red">PRAZO ATINGIDO</span>`:""}</td>
+          <td>${esc(s.customer?.name||"Cliente não identificado")}</td>
+          <td>${esc(s.product_name||"-")}</td>
+          <td>${esc(s.themes?.name||"-")}${s.subtheme?.name?`<br><span class="muted">${esc(s.subtheme.name)}</span>`:""}</td>
+          <td>${money(s.amount)}</td>
+          <td>${salePaymentStatusPt(s.payment_status)}</td>
+          <td><button class="btn smallbtn" onclick="openEditSale(${s.id})">Editar venda</button></td>
+        </tr>
+      `).join("")||`<tr><td colspan="7">Nenhum produto pendente de entrega.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
+
+function toDateTimeLocalValue(value){
+  if(!value)return "";
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return "";
+  const local=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16);
+}
+
+function renderEditSaleSubthemes(selectedId=null){
+  const themeId=Number(document.getElementById("editSaleTheme")?.value||0);
+  const select=document.getElementById("editSaleSubthemeFull");
+  if(!select)return;
+  const subs=(window._saleSubthemes||[])
+    .filter(s=>Number(s.theme_id)===themeId && (s.active!==false || Number(s.id)===Number(selectedId)))
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR"));
+  select.innerHTML=`<option value="">Sem subtema</option>${subs.map(st=>`<option value="${st.id}" ${Number(selectedId)===Number(st.id)?"selected":""}>${esc(st.name)}</option>`).join("")}`;
+}
+
+function toggleEditSaleDeliveryFull(){
+  const delivered=document.getElementById("editSaleDeliveredFull")?.value!=="false";
+  document.getElementById("editSaleExpectedDeliveryWrap")?.classList.toggle("hidden",delivered);
+}
+
+function toggleEditSaleCustomerFull(){
+  const value=document.getElementById("editSaleCustomerFull")?.value||"";
+  document.getElementById("editSaleNewCustomerWrap")?.classList.toggle("hidden",value!=="__new__");
+}
+
+function toggleEditSaleCommissionFull(){
+  const enabled=document.getElementById("editSaleCommissionFull")?.value==="true";
+  document.getElementById("editSaleCommissionWrap")?.classList.toggle("hidden",!enabled);
+}
+
+function toggleEditSaleNewSellerFull(){
+  const value=document.getElementById("editSaleSellerFull")?.value||"";
+  document.getElementById("editSaleNewSellerWrap")?.classList.toggle("hidden",value!=="__new__");
+}
+
+async function openEditSale(id){
+  const sale=(window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
+  if(!sale){toast("Venda não encontrada.");return}
+
+  const {data:commission,error:commissionError}=await sb.from("seller_commissions")
+    .select("*").eq("sale_id",id).maybeSingle();
+  if(commissionError){toast(commissionError.message);return}
+
+  window._editingSaleId=id;
+  window._editingSaleCommission=commission||null;
+
+  const received=Number(sale.paid_amount||0);
+  const remaining=Math.max(0,Number(sale.amount||0)-received);
+  const financialLocked=received>0;
+  const commissionPaid=commission?.status==="paid";
+
+  const themes=[...(window._saleThemes||[])];
+  if(sale.theme_id&&!themes.some(t=>Number(t.id)===Number(sale.theme_id))){
+    themes.push({id:sale.theme_id,name:sale.themes?.name||"Tema atual"});
+  }
+  const categories=[...(window._saleCategories||[])];
+  if(sale.category_id&&!categories.some(c=>Number(c.id)===Number(sale.category_id))){
+    categories.push({id:sale.category_id,name:sale.category?.name||"Categoria atual"});
+  }
+  const customers=[...(window._saleCustomers||[])];
+  if(sale.customer_id&&!customers.some(c=>Number(c.id)===Number(sale.customer_id))){
+    customers.push(sale.customer||{id:sale.customer_id,name:"Cliente atual"});
+  }
+  const sellers=[...(window._saleSellers||[])];
+  if(sale.seller_id&&!sellers.some(s=>Number(s.id)===Number(sale.seller_id))){
+    sellers.push(sale.seller||{id:sale.seller_id,name:"Vendedor atual",phone:""});
+  }
+
+  openModal(`
+    <div class="title-row">
+      <div>
+        <h2>Editar venda #${sale.id}</h2>
+        <div class="muted">Você pode corrigir os dados operacionais sempre. Campos que já afetaram caixa/investimentos ficam protegidos quando necessário.</div>
+      </div>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Produto</label>
+        <input id="editSaleProductFull" value="${esc(sale.product_name||"")}" placeholder="Nome do produto">
+      </div>
+      <div>
+        <label>Valor da venda</label>
+        <input id="editSaleAmountFull" type="number" min="${Math.max(received,0.01)}" step="0.01" value="${Number(sale.amount||0).toFixed(2)}" ${commissionPaid?"disabled":""}>
+        <div class="muted" style="font-size:11px;margin-top:4px">${commissionPaid?"Valor bloqueado porque a comissão desta venda já foi paga.":`Nunca pode ficar abaixo do que já foi recebido: ${money(received)}.`}</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Categoria</label>
+        <select id="editSaleCategoryFull" ${financialLocked?"disabled":""}>
+          ${categories.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR")).map(c=>`<option value="${c.id}" ${Number(c.id)===Number(sale.category_id)?"selected":""}>${esc(c.name)}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label>Tema global</label>
+        <select id="editSaleTheme" onchange="renderEditSaleSubthemes()" ${financialLocked?"disabled":""}>
+          ${themes.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR")).map(t=>`<option value="${t.id}" ${Number(t.id)===Number(sale.theme_id)?"selected":""}>${esc(t.name)}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    ${financialLocked?`<div class="muted" style="font-size:11px">Categoria, tema global e data ficam protegidos depois que algum valor já entrou no caixa/investimentos. Isso evita mudar retroativamente a fila dos investidores.</div>`:""}
+
+    <label>Subtema</label>
+    <select id="editSaleSubthemeFull"></select>
+
+    <div class="row">
+      <div>
+        <label>Data da venda</label>
+        <input id="editSaleDateFull" type="datetime-local" value="${toDateTimeLocalValue(sale.sold_at)}" ${financialLocked?"disabled":""}>
+      </div>
+      <div>
+        <label>Pagamento</label>
+        <div class="item" style="padding:11px">
+          <b>${salePaymentStatusPt(sale.payment_status)}</b><br>
+          <span class="muted">Recebido: ${money(received)} • A receber: ${money(remaining)}</span>
+        </div>
+      </div>
+    </div>
+
+    <label>Cliente</label>
+    <select id="editSaleCustomerFull" onchange="toggleEditSaleCustomerFull()">
+      <option value="" ${sale.customer_id==null?"selected":""}>Cliente não identificado</option>
+      ${customers.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR")).map(c=>`<option value="${c.id}" ${Number(c.id)===Number(sale.customer_id)?"selected":""}>${esc(c.name)}</option>`).join("")}
+      <option value="__new__">+ Cadastrar novo cliente</option>
+    </select>
+    <div id="editSaleNewCustomerWrap" class="customer-new-fields hidden">
+      <div class="row">
+        <div><label>Nome do cliente</label><input id="editSaleNewCustomerName"></div>
+        <div><label>WhatsApp (opcional)</label><input id="editSaleNewCustomerWhatsapp"></div>
+      </div>
+      <label>Instagram (opcional)</label><input id="editSaleNewCustomerInstagram">
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <div>
+        <label>Entrega</label>
+        <select id="editSaleDeliveredFull" onchange="toggleEditSaleDeliveryFull()">
+          <option value="true" ${sale.delivered?"selected":""}>Entregue</option>
+          <option value="false" ${!sale.delivered?"selected":""}>Não entregue</option>
+        </select>
+      </div>
+      <div id="editSaleExpectedDeliveryWrap" class="${sale.delivered?"hidden":""}">
+        <label>Data prevista de entrega</label>
+        <input id="editSaleExpectedDeliveryFull" type="date" value="${esc(sale.expected_delivery_date||"")}">
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <div>
+        <label>Comissão</label>
+        <select id="editSaleCommissionFull" onchange="toggleEditSaleCommissionFull()" ${commissionPaid?"disabled":""}>
+          <option value="false" ${!sale.has_commission?"selected":""}>Sem comissão</option>
+          <option value="true" ${sale.has_commission?"selected":""}>Com comissão</option>
+        </select>
+      </div>
+      <div>
+        ${commissionPaid?`<div class="notice"><b>Comissão já paga.</b><br>Vendedor, taxa e valor ficam fechados no histórico. Produto, cliente, subtema e entrega continuam editáveis.</div>`:""}
+      </div>
+    </div>
+
+    <div id="editSaleCommissionWrap" class="${sale.has_commission?"":"hidden"}">
+      <div class="row">
+        <div>
+          <label>Vendedor</label>
+          <select id="editSaleSellerFull" onchange="toggleEditSaleNewSellerFull()" ${commissionPaid?"disabled":""}>
+            <option value="">Selecione</option>
+            ${sellers.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR")).map(s=>`<option value="${s.id}" ${Number(s.id)===Number(sale.seller_id)?"selected":""}>${esc(s.name)}</option>`).join("")}
+            ${commissionPaid?"":`<option value="__new__">+ Cadastrar novo vendedor</option>`}
+          </select>
+        </div>
+        <div>
+          <label>Comissão (%)</label>
+          <input id="editSaleCommissionRateFull" type="number" min="0.01" max="100" step="0.01" value="${Number(sale.commission_rate||settings.default_sales_commission_rate||15)}" ${commissionPaid?"disabled":""}>
+        </div>
+      </div>
+      <div id="editSaleNewSellerWrap" class="customer-new-fields hidden">
+        <div class="row">
+          <div><label>Nome do vendedor</label><input id="editSaleNewSellerName"></div>
+          <div><label>Número</label><input id="editSaleNewSellerPhone"></div>
+        </div>
+        <label>Instagram (opcional)</label><input id="editSaleNewSellerInstagram">
+      </div>
+    </div>
+
+    <div class="notice" style="margin-top:14px">
+      O status de pagamento não é digitado manualmente: ele é calculado pelo que já foi recebido. Para receber valores pendentes, use o botão <b>Receber</b>.
+    </div>
+
+    <div class="actions" style="margin-top:14px">
+      <button class="btn" onclick="saveEditSaleFull(${sale.id})">Salvar alterações</button>
+    </div>
+  `,true);
+
+  renderEditSaleSubthemes(sale.subtheme_id);
+  toggleEditSaleDeliveryFull();
+  toggleEditSaleCommissionFull();
+}
+
+async function saveEditSaleFull(id){
+  const sale=(window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
+  if(!sale){toast("Venda não encontrada.");return}
+
+  let customerId=null;
+  const customerChoice=document.getElementById("editSaleCustomerFull")?.value||"";
+  if(customerChoice==="__new__"){
+    const name=document.getElementById("editSaleNewCustomerName")?.value.trim()||"";
+    const whatsapp=document.getElementById("editSaleNewCustomerWhatsapp")?.value.trim()||"";
+    const instagram=document.getElementById("editSaleNewCustomerInstagram")?.value.trim()||"";
+    if(!name){toast("Informe o nome do novo cliente.");return}
+    const {data,error}=await sb.rpc("admin_save_customer",{
+      p_customer_id:null,p_name:name,p_whatsapp:whatsapp||null,p_instagram:instagram||null
+    });
+    if(error){toast(error.message);return}
+    customerId=data?.id||null;
+  }else if(customerChoice){
+    customerId=Number(customerChoice);
+  }
+
+  const hasCommission=document.getElementById("editSaleCommissionFull")?.value==="true";
+  let sellerId=null;
+  let commissionRate=null;
+  if(hasCommission){
+    const sellerChoice=document.getElementById("editSaleSellerFull")?.value||"";
+    if(sellerChoice==="__new__"){
+      const name=document.getElementById("editSaleNewSellerName")?.value.trim()||"";
+      const phone=document.getElementById("editSaleNewSellerPhone")?.value.trim()||"";
+      const instagram=document.getElementById("editSaleNewSellerInstagram")?.value.trim()||"";
+      if(!name){toast("Informe o nome do vendedor.");return}
+      if(!phone){toast("Informe o número do vendedor.");return}
+      const {data,error}=await sb.rpc("admin_save_seller",{
+        p_id:null,p_name:name,p_phone:phone,p_instagram:instagram||null,p_active:true
+      });
+      if(error){toast(error.message);return}
+      sellerId=data?.id||null;
+    }else if(sellerChoice){
+      sellerId=Number(sellerChoice);
+    }
+    if(!sellerId){toast("Escolha o vendedor.");return}
+    commissionRate=Number(document.getElementById("editSaleCommissionRateFull")?.value||0);
+    if(!commissionRate||commissionRate<=0||commissionRate>100){toast("Informe uma comissão válida.");return}
+  }
+
+  const delivered=document.getElementById("editSaleDeliveredFull")?.value!=="false";
+  const expected=delivered?null:(document.getElementById("editSaleExpectedDeliveryFull")?.value||null);
+  if(!delivered&&!expected){toast("Informe a data prevista de entrega.");return}
+
+  const amountInput=document.getElementById("editSaleAmountFull");
+  const amount=amountInput?.disabled?Number(sale.amount||0):Number(amountInput?.value||0);
+  if(!amount||amount<=0){toast("Informe o valor da venda.");return}
+
+  const themeEl=document.getElementById("editSaleTheme");
+  const categoryEl=document.getElementById("editSaleCategoryFull");
+  const dateEl=document.getElementById("editSaleDateFull");
+
+  const themeId=themeEl?.disabled?Number(sale.theme_id):Number(themeEl?.value||0);
+  const categoryId=categoryEl?.disabled?Number(sale.category_id):Number(categoryEl?.value||0);
+  const soldAt=dateEl?.disabled
+    ? sale.sold_at
+    : (dateEl?.value?new Date(dateEl.value).toISOString():sale.sold_at);
+
+  const subthemeValue=document.getElementById("editSaleSubthemeFull")?.value||"";
+  const subthemeId=subthemeValue?Number(subthemeValue):null;
+
+  if(!confirm("Salvar as alterações desta venda?"))return;
+
+  const {error}=await sb.rpc("admin_update_sale_details",{
+    p_sale_id:id,
+    p_theme_id:themeId,
+    p_category_id:categoryId,
+    p_amount:amount,
+    p_product_name:document.getElementById("editSaleProductFull")?.value||null,
+    p_customer_id:customerId,
+    p_subtheme_id:subthemeId,
+    p_sold_at:soldAt,
+    p_delivered:delivered,
+    p_expected_delivery_date:expected,
+    p_has_commission:hasCommission,
+    p_seller_id:sellerId,
+    p_commission_rate:commissionRate
+  });
+
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Venda atualizada.");
+  await loadAdminSales();
+}
+
+async function openLinkedSaleEditor(id){
+  await adminSection("sales");
+  const sale=(window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
+  if(!sale){toast("Venda não encontrada.");return}
+  await openEditSale(id);
+}
+
+
+async function openSaleDelivery(id){
+  const sale=(window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
+  if(!sale){toast("Venda não encontrada.");return}
+
+  openModal(`
+    <div class="title-row"><div><h2>Gerenciar entrega</h2><div class="muted">Venda #${sale.id} • ${esc(sale.product_name||"Produto")}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="item" style="margin-top:12px">
+      <b>${esc(sale.customer?.name||"Cliente não identificado")}</b>
+      <div class="muted">${esc(sale.themes?.name||"Tema")}${sale.subtheme?.name?` • ${esc(sale.subtheme.name)}`:""} • ${money(sale.amount)}</div>
+    </div>
+    <label>Situação da entrega</label>
+    <select id="editDeliveryStatus" onchange="toggleEditDeliveryDate()">
+      <option value="true" ${sale.delivered?"selected":""}>Entregue</option>
+      <option value="false" ${!sale.delivered?"selected":""}>Não entregue</option>
+    </select>
+    <div id="editDeliveryDateField" class="${sale.delivered?"hidden":""}">
+      <label>Data prevista de entrega</label>
+      <input id="editExpectedDeliveryDate" type="date" value="${esc(sale.expected_delivery_date||"")}">
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn success" onclick="saveSaleDelivery(${sale.id})">${sale.delivered?"Salvar entrega":"Marcar / atualizar entrega"}</button>
+    </div>
+  `,true);
+}
+
+function toggleEditDeliveryDate(){
+  const delivered=document.getElementById("editDeliveryStatus")?.value!=="false";
+  document.getElementById("editDeliveryDateField")?.classList.toggle("hidden",delivered);
+}
+
+async function saveSaleDelivery(id){
+  const delivered=document.getElementById("editDeliveryStatus")?.value!=="false";
+  const expected=delivered?null:(document.getElementById("editExpectedDeliveryDate")?.value||null);
+  if(!delivered&&!expected){toast("Informe a data prevista de entrega.");return}
+
+  const {error}=await sb.rpc("admin_update_sale_delivery",{
+    p_sale_id:id,
+    p_delivered:delivered,
+    p_expected_delivery_date:expected
+  });
+  if(error){toast(error.message);return}
+
+  closeModal();
+  toast(delivered?"Venda marcada como entregue.":"Previsão de entrega atualizada.");
+  await loadAdminSales();
 }
 
 function salePaymentStatusPt(status){
@@ -3153,7 +3679,7 @@ async function openCustomerHistory(id){
 async function loadAdminResults(){
   const box=document.getElementById("adminContent");
 
-  const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes,receivablesRes]=await Promise.all([
+  const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes,receivablesRes,sellerCommissionsRes]=await Promise.all([
     sb.rpc("admin_get_account_balances"),
     fetchAllPaged(()=>sb.from("financial_entries").select("*").order("occurred_at",{ascending:false})),
     sb.from("investment_transfers").select("*,profiles:profiles!investment_transfers_investor_id_fkey(name,email)").eq("status","pending").order("created_at"),
@@ -3167,10 +3693,15 @@ async function loadAdminResults(){
     fetchAllPaged(()=>sb.from("sales").select(`
       *,themes(name),subtheme:subthemes(name),category:categories(name),
       customer:customers(id,name,whatsapp,instagram)
-    `).neq("payment_status","paid").order("sold_at",{ascending:true}))
+    `).neq("payment_status","paid").order("sold_at",{ascending:true})),
+    fetchAllPaged(()=>sb.from("seller_commissions").select(`
+      *,seller:sellers(id,name,phone,instagram),
+      sale:sales(id,product_name,sold_at,amount,
+        customer:customers(name),themes(name),subtheme:subthemes(name))
+    `).eq("status","pending").order("due_date",{ascending:true}))
   ]);
 
-  const error=balancesRes.error||entriesRes.error||transferRes.error||repaymentRes.error||allRepaymentRes.error||investmentsRes.error||receivablesRes.error;
+  const error=balancesRes.error||entriesRes.error||transferRes.error||repaymentRes.error||allRepaymentRes.error||investmentsRes.error||receivablesRes.error||sellerCommissionsRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
 
   window._resultsData={
@@ -3180,7 +3711,8 @@ async function loadAdminResults(){
     pendingRepayments:repaymentRes.data||[],
     repayments:allRepaymentRes.data||[],
     investments:investmentsRes.data||[],
-    receivables:receivablesRes.data||[]
+    receivables:receivablesRes.data||[],
+    sellerCommissions:sellerCommissionsRes.data||[]
   };
 
   box.innerHTML=`
@@ -3242,6 +3774,11 @@ async function loadAdminResults(){
     </div>
 
     <div class="card" style="margin-top:14px">
+      <div class="title-row"><div><h3>Comissões de vendedores a pagar</h3><div class="muted">A comissão só entra como saída/despesa quando o pagamento for confirmado.</div></div></div>
+      <div id="sellerCommissionsPanel"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
       <div class="title-row"><h3>Extrato financeiro</h3></div>
       <div id="financialExtract"></div>
     </div>
@@ -3251,30 +3788,30 @@ async function loadAdminResults(){
   renderResultsDashboard();
 }
 
-function updateFinancialCategoryOptions(){
-  const direction=document.getElementById("financeDirection")?.value||"out";
-  const select=document.getElementById("financeCategory");
-  if(!select)return;
-
+function financialCategoriesFor(direction){
   const outgoing=[
     "Materiais","Embalagens","Fretes","Feiras / Eventos",
     "Equipamentos","Marketing","Taxas","Serviços",
     "Comissão de vendedores","Aluguel","Outras saídas"
   ];
-
   const incoming=[
     "Aporte dos sócios","Venda fora do sistema",
     "Reembolso recebido","Outras entradas"
   ];
+  return direction==="out"?outgoing:incoming;
+}
 
-  const list=direction==="out"?outgoing:incoming;
-  select.innerHTML=list.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+function updateFinancialCategoryOptions(){
+  const direction=document.getElementById("financeDirection")?.value||"out";
+  const select=document.getElementById("financeCategory");
+  if(!select)return;
+  select.innerHTML=financialCategoriesFor(direction).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
 }
 
 function renderResultsDashboard(){
   if(!window._resultsData)return;
 
-  const {balances,entries,pendingTransfers,pendingRepayments,repayments,investments,receivables}=window._resultsData;
+  const {balances,entries,pendingTransfers,pendingRepayments,repayments,investments,receivables,sellerCommissions}=window._resultsData;
   const range=reportDateRange("resultsReport");
   const filtered=entries.filter(e=>inReportRange(e.occurred_at,range));
 
@@ -3300,6 +3837,11 @@ function renderResultsDashboard(){
   const pendingTransferTotal=pendingTransfers.reduce((s,t)=>s+Number(t.amount||0),0);
   const pendingRepaymentTotal=pendingRepayments.reduce((s,r)=>s+Number(r.total_amount||0),0);
   const receivableTotal=(receivables||[]).reduce((s,v)=>s+Math.max(0,Number(v.amount||0)-Number(v.paid_amount||0)),0);
+  const sellerCommissionPending=(sellerCommissions||[]).reduce((s,c)=>s+Number(c.commission_amount||0),0);
+  const todayDate=new Date().toISOString().slice(0,10);
+  const sellerCommissionDue=(sellerCommissions||[])
+    .filter(c=>String(c.due_date||"").slice(0,10)<=todayDate)
+    .reduce((s,c)=>s+Number(c.commission_amount||0),0);
 
   const confirmedRepaymentIds=new Set(
     repayments.filter(r=>r.status==="confirmed").map(r=>r.investment_id)
@@ -3327,6 +3869,7 @@ function renderResultsDashboard(){
       <div class="metric-box warning"><div class="metric-label">Transferir CATinvestimentos → Cat Encantus</div><div class="metric-value">${money(pendingTransferTotal)}</div><div class="muted">Investimentos aguardando sua confirmação</div></div>
       <div class="metric-box danger-soft"><div class="metric-label">Repassar Cat Encantus → CATinvestimentos</div><div class="metric-value">${money(pendingRepaymentTotal)}</div><div class="muted">Investimentos concluídos aguardando repasse</div></div>
       <div class="metric-box warning"><div class="metric-label">Receitas a receber</div><div class="metric-value">${money(receivableTotal)}</div><div class="muted">${(receivables||[]).length} venda(s) em aberto • ainda não entram no caixa nem nos investimentos</div></div>
+      <div class="metric-box warning"><div class="metric-label">Comissões de vendedores a pagar</div><div class="metric-value">${money(sellerCommissionPending)}</div><div class="muted">${sellerCommissionDue>0?`${money(sellerCommissionDue)} já vencido`:"Nenhuma comissão vencida"}</div></div>
     </div>
   `;
 
@@ -3349,6 +3892,7 @@ function renderResultsDashboard(){
   renderReceivablesPanel();
   renderPendingFinancialActions();
   renderInvestorObligations();
+  renderSellerCommissionsPanel();
   renderFinancialExtract(filtered);
 }
 
@@ -3449,14 +3993,84 @@ function renderInvestorObligations(){
   `;
 }
 
+function getCommissionRowsAll(){
+  // Usa prioritariamente o conjunto da tela atual para evitar dados antigos
+  // caso o ADM tenha acabado de confirmar um pagamento em outra seção.
+  if(document.getElementById("sellerCommissionsPanel") && window._resultsData?.sellerCommissions){
+    return window._resultsData.sellerCommissions||[];
+  }
+  return window._sellerCommissions||[];
+}
+
+function groupPendingCommissionMonths(rows){
+  const groups={};
+  for(const c of (rows||[]).filter(c=>c.status==="pending")){
+    const due=String(c.due_date||"").slice(0,10);
+    const key=`${Number(c.seller_id)}|${due}`;
+    if(!groups[key])groups[key]={
+      seller_id:Number(c.seller_id),
+      seller:c.seller,
+      due_date:due,
+      rows:[],
+      total:0
+    };
+    groups[key].rows.push(c);
+    groups[key].total+=Number(c.commission_amount||0);
+  }
+  return Object.values(groups).sort((a,b)=>
+    String(a.due_date).localeCompare(String(b.due_date)) ||
+    String(a.seller?.name||"").localeCompare(String(b.seller?.name||""),"pt-BR")
+  );
+}
+
+function renderSellerCommissionsPanel(){
+  const target=document.getElementById("sellerCommissionsPanel");
+  if(!target||!window._resultsData)return;
+  const rows=window._resultsData.sellerCommissions||[];
+  const today=new Date().toISOString().slice(0,10);
+  const groups=groupPendingCommissionMonths(rows);
+  const total=rows.reduce((s,c)=>s+Number(c.commission_amount||0),0);
+  const dueTotal=rows.filter(c=>String(c.due_date||"").slice(0,10)<=today)
+    .reduce((s,c)=>s+Number(c.commission_amount||0),0);
+
+  target.innerHTML=`
+    <div class="metric-grid">
+      <div class="metric-box warning"><div class="metric-label">Total a pagar</div><div class="metric-value">${money(total)}</div></div>
+      <div class="metric-box ${dueTotal>0?"danger-soft":""}"><div class="metric-label">Vencido / pagar agora</div><div class="metric-value">${money(dueTotal)}</div></div>
+    </div>
+    <div class="notice" style="margin-top:12px">Cada linha abaixo é <b>um pagamento mensal por vendedor</b>. Abra o detalhamento para conferir todas as vendas incluídas e só então confirme o pagamento total.</div>
+    <div class="table-wrap" style="margin-top:14px"><table class="table">
+      <thead><tr><th>Vendedor</th><th>Vencimento</th><th>Vendas</th><th>Total mensal</th><th>Situação</th><th>Ação</th></tr></thead>
+      <tbody>${groups.map(g=>{
+        const due=g.due_date&&g.due_date<=today;
+        return `<tr>
+          <td><b>${esc(g.seller?.name||"Vendedor")}</b><br><span class="muted">${esc(g.seller?.phone||"")}</span></td>
+          <td>${dateOnlyPt(g.due_date)}</td>
+          <td>${g.rows.length}</td>
+          <td><b>${money(g.total)}</b></td>
+          <td><span class="badge ${due?"red":""}">${due?"PAGAR AGORA":"AGUARDANDO VENCIMENTO"}</span></td>
+          <td><button class="btn ${due?"success":"secondary"} smallbtn" onclick="openCommissionBatch(${g.seller_id},'${g.due_date}',true)">Ver detalhamento</button></td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="6">Nenhuma comissão pendente.</td></tr>`}</tbody>
+    </table></div>
+  `;
+}
+
 function renderFinancialExtract(entries){
   const target=document.getElementById("financialExtract");
   if(!target)return;
 
   target.innerHTML=`
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Destino / Origem</th><th>Valor</th><th>Efeito no resultado</th></tr></thead>
-      <tbody>${entries.map(e=>`
+      <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Destino / Origem</th><th>Valor</th><th>Efeito no resultado</th><th>Ação</th></tr></thead>
+      <tbody>${entries.map(e=>{
+        const manual=["manual_income","manual_expense"].includes(e.entry_type);
+        const action=manual
+          ? `<button class="btn secondary smallbtn" onclick="openEditFinancialEntry(${e.id})">Editar movimentação</button>`
+          : e.sale_id
+            ? `<button class="btn secondary smallbtn" onclick="openLinkedSaleEditor(${e.sale_id})">Editar venda</button>`
+            : `<span class="muted">Automática</span>`;
+        return `
         <tr>
           <td>${new Date(e.occurred_at).toLocaleString("pt-BR")}</td>
           <td>${e.account_code==="cat_encantus"?"Cat Encantus":"CATinvestimentos"}</td>
@@ -3470,10 +4084,76 @@ function renderFinancialExtract(entries){
             : Number(e.result_amount)>0
               ? `<span class="flow-positive">+ ${money(e.result_amount)}</span>`
               : `<span class="flow-negative">- ${money(Math.abs(Number(e.result_amount)))}</span>`}</td>
-        </tr>
-      `).join("")||`<tr><td colspan="8">Nenhuma movimentação neste período.</td></tr>`}</tbody>
+          <td>${action}</td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="9">Nenhuma movimentação neste período.</td></tr>`}</tbody>
     </table></div>
   `;
+}
+
+function renderEditFinancialCategories(selected=null){
+  const direction=document.getElementById("editFinanceDirection")?.value||"out";
+  const select=document.getElementById("editFinanceCategory");
+  if(!select)return;
+  const list=financialCategoriesFor(direction);
+  if(selected&&!list.includes(selected))list.push(selected);
+  select.innerHTML=list.map(x=>`<option value="${esc(x)}" ${x===selected?"selected":""}>${esc(x)}</option>`).join("");
+}
+
+function openEditFinancialEntry(id){
+  const entry=(window._resultsData?.entries||[]).find(e=>Number(e.id)===Number(id));
+  if(!entry){toast("Movimentação não encontrada.");return}
+  if(!["manual_income","manual_expense"].includes(entry.entry_type)){
+    toast("Esta movimentação é automática. Edite a operação de origem.");
+    return;
+  }
+
+  openModal(`
+    <div class="title-row"><div><h2>Editar movimentação</h2><div class="muted">Lançamento manual #${entry.id}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="row">
+      <div><label>Conta</label><select id="editFinanceAccount"><option value="cat_encantus" ${entry.account_code==="cat_encantus"?"selected":""}>Cat Encantus</option><option value="cat_investimentos" ${entry.account_code==="cat_investimentos"?"selected":""}>CATinvestimentos</option></select></div>
+      <div><label>Tipo</label><select id="editFinanceDirection" onchange="renderEditFinancialCategories()"><option value="in" ${entry.direction==="in"?"selected":""}>Entrada</option><option value="out" ${entry.direction==="out"?"selected":""}>Saída</option></select></div>
+    </div>
+    <div class="row">
+      <div><label>Categoria</label><select id="editFinanceCategory"></select></div>
+      <div><label>Valor</label><input id="editFinanceAmount" type="number" min="0.01" step="0.01" value="${Number(entry.amount||0).toFixed(2)}"></div>
+    </div>
+    <div class="row">
+      <div><label>Descrição</label><input id="editFinanceDescription" value="${esc(entry.description||"")}"></div>
+      <div><label>Local / Destino / Origem</label><input id="editFinanceCounterparty" value="${esc(entry.counterparty||"")}"></div>
+    </div>
+    <div class="row">
+      <div><label>Data e hora</label><input id="editFinanceDate" type="datetime-local" value="${toDateTimeLocalValue(entry.occurred_at)}"></div>
+      <div><label>Observação</label><input id="editFinanceNotes" value="${esc(entry.notes||"")}"></div>
+    </div>
+    <div class="notice" style="margin-top:12px">Entradas/saídas automáticas não são alteradas diretamente aqui; elas são editadas na venda/operação de origem para não quebrar o caixa.</div>
+    <button class="btn" style="margin-top:14px" onclick="saveEditFinancialEntry(${entry.id})">Salvar movimentação</button>
+  `,true);
+  renderEditFinancialCategories(entry.category||null);
+}
+
+async function saveEditFinancialEntry(id){
+  const occurredValue=document.getElementById("editFinanceDate")?.value||"";
+  const occurred=occurredValue?new Date(occurredValue).toISOString():null;
+  const amount=Number(document.getElementById("editFinanceAmount")?.value||0);
+  if(!amount||amount<=0){toast("Informe um valor válido.");return}
+  if(!confirm("Salvar as alterações desta movimentação? O saldo e o resultado serão recalculados automaticamente."))return;
+
+  const {error}=await sb.rpc("admin_update_manual_financial_entry",{
+    p_entry_id:id,
+    p_account_code:document.getElementById("editFinanceAccount")?.value,
+    p_direction:document.getElementById("editFinanceDirection")?.value,
+    p_amount:amount,
+    p_category:document.getElementById("editFinanceCategory")?.value||null,
+    p_description:document.getElementById("editFinanceDescription")?.value||"",
+    p_counterparty:document.getElementById("editFinanceCounterparty")?.value||null,
+    p_notes:document.getElementById("editFinanceNotes")?.value||null,
+    p_occurred_at:occurred
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast("Movimentação atualizada.");
+  await loadAdminResults();
 }
 
 async function saveManualFinancialEntry(){
@@ -3562,31 +4242,315 @@ async function confirmInvestmentRepayment(id){
 }
 
 
+
+async function loadAdminSellers(){
+  const box=document.getElementById("adminContent");
+  await loadSettings();
+
+  const [sellersRes,salesRes,commRes]=await Promise.all([
+    sb.from("sellers").select("*").order("active",{ascending:false}).order("name"),
+    fetchAllPaged(()=>sb.from("sales").select(`
+      id,seller_id,amount,sold_at,product_name,has_commission,commission_rate,
+      themes(name),subtheme:subthemes(name),customer:customers(name)
+    `).eq("has_commission",true).not("seller_id","is",null).order("sold_at",{ascending:false})),
+    fetchAllPaged(()=>sb.from("seller_commissions").select(`
+      *,seller:sellers(id,name,phone,instagram),
+      sale:sales(id,product_name,sold_at,amount,customer:customers(name),themes(name),subtheme:subthemes(name))
+    `).order("due_date",{ascending:true}))
+  ]);
+
+  const error=sellersRes.error||salesRes.error||commRes.error;
+  if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
+
+  const sellers=sellersRes.data||[];
+  const sales=salesRes.data||[];
+  const commissions=commRes.data||[];
+  window._adminSellers=sellers;
+  window._sellerSales=sales;
+  window._sellerCommissions=commissions;
+
+  const stats={};
+  sellers.forEach(s=>stats[s.id]={salesCount:0,sold:0,paid:0,pending:0,due:0,nextDue:null});
+  sales.forEach(s=>{
+    if(!stats[s.seller_id])return;
+    stats[s.seller_id].salesCount++;
+    stats[s.seller_id].sold+=Number(s.amount||0);
+  });
+
+  const today=new Date().toISOString().slice(0,10);
+  commissions.forEach(c=>{
+    if(!stats[c.seller_id])return;
+    if(c.status==="paid")stats[c.seller_id].paid+=Number(c.commission_amount||0);
+    if(c.status==="pending"){
+      stats[c.seller_id].pending+=Number(c.commission_amount||0);
+      const due=String(c.due_date||"").slice(0,10);
+      if(due&&due<=today)stats[c.seller_id].due+=Number(c.commission_amount||0);
+      if(due&&(!stats[c.seller_id].nextDue||due<stats[c.seller_id].nextDue))stats[c.seller_id].nextDue=due;
+    }
+  });
+
+  const totalSold=sales.reduce((sum,s)=>sum+Number(s.amount||0),0);
+  const totalPaid=commissions.filter(c=>c.status==="paid").reduce((sum,c)=>sum+Number(c.commission_amount||0),0);
+  const totalPending=commissions.filter(c=>c.status==="pending").reduce((sum,c)=>sum+Number(c.commission_amount||0),0);
+  const totalDue=commissions.filter(c=>c.status==="pending"&&String(c.due_date||"").slice(0,10)<=today).reduce((sum,c)=>sum+Number(c.commission_amount||0),0);
+
+  box.innerHTML=`
+    <div class="card">
+      <div class="title-row">
+        <div><h2>Vendedores</h2><div class="muted">Cadastro, vendas e controle completo das comissões.</div></div>
+        <button class="btn" onclick="openSellerForm()">+ Novo vendedor</button>
+      </div>
+
+      <div class="row" style="align-items:end">
+        <div>
+          <label>Comissão padrão para novas vendas (%)</label>
+          <input id="defaultSellerCommissionRate" type="number" min="0.01" max="100" step="0.01" value="${Number(settings.default_sales_commission_rate||15)}">
+        </div>
+        <div><button class="btn secondary" onclick="saveDefaultSellerCommissionRate()">Salvar comissão padrão</button></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:6px">A alteração vale para vendas futuras. Cada venda já registrada mantém a porcentagem usada no momento do registro.</div>
+
+      <div class="metric-grid" style="margin-top:16px">
+        <div class="metric-box"><div class="metric-label">Vendedores ativos</div><div class="metric-value">${sellers.filter(s=>s.active).length}</div></div>
+        <div class="metric-box success-soft"><div class="metric-label">Valor vendido por vendedores</div><div class="metric-value">${money(totalSold)}</div></div>
+        <div class="metric-box"><div class="metric-label">Comissões já pagas</div><div class="metric-value">${money(totalPaid)}</div></div>
+        <div class="metric-box warning"><div class="metric-label">Comissões ainda a pagar</div><div class="metric-value">${money(totalPending)}</div></div>
+        <div class="metric-box ${totalDue>0?"danger-soft":""}"><div class="metric-label">Comissões vencidas</div><div class="metric-value">${money(totalDue)}</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Vendedor</th><th>Contato</th><th>Vendas</th><th>Valor vendido</th><th>Comissão paga</th><th>A receber</th><th>Próximo vencimento</th><th>Ações</th></tr></thead>
+        <tbody>${sellers.map(s=>{
+          const st=stats[s.id]||{};
+          return `<tr>
+            <td><b>${esc(s.name)}</b><br><span class="badge ${s.active?"green":"red"}">${s.active?"ATIVO":"INATIVO"}</span></td>
+            <td>${esc(s.phone||"-")}${s.instagram?`<br><span class="muted">${esc(s.instagram)}</span>`:""}</td>
+            <td>${st.salesCount||0}</td>
+            <td><b>${money(st.sold||0)}</b></td>
+            <td class="flow-positive">${money(st.paid||0)}</td>
+            <td class="${Number(st.pending||0)>0?"flow-negative":""}"><b>${money(st.pending||0)}</b>${Number(st.due||0)>0?`<br><span class="badge red">${money(st.due)} vencido</span>`:""}</td>
+            <td>${st.nextDue?dateOnlyPt(st.nextDue):"-"}</td>
+            <td><div class="actions">
+              <button class="btn smallbtn" onclick="openSellerHistory(${s.id})">Ver histórico</button>
+              <button class="btn secondary smallbtn" onclick='openSellerForm(${JSON.stringify(s).replace(/'/g,"&#39;")})'>Editar</button>
+              ${Number(st.due||0)>0?`<button class="btn success smallbtn" onclick="openNextCommissionBatch(${s.id},false)">Pagamento mensal</button>`:""}
+            </div></td>
+          </tr>`;
+        }).join("")||`<tr><td colspan="8">Nenhum vendedor cadastrado.</td></tr>`}</tbody>
+      </table></div>
+    </div>
+  `;
+}
+
+function openSellerForm(seller=null){
+  openModal(`
+    <div class="title-row"><div><h2>${seller?"Editar":"Novo"} vendedor</h2></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <label>Nome</label><input id="sellerName" value="${esc(seller?.name||"")}">
+    <label>Número</label><input id="sellerPhone" value="${esc(seller?.phone||"")}" placeholder="(31) 99999-9999">
+    <label>Instagram (opcional)</label><input id="sellerInstagram" value="${esc(seller?.instagram||"")}" placeholder="@vendedor">
+    <label>Status</label>
+    <select id="sellerActive"><option value="true" ${seller?.active!==false?"selected":""}>Ativo</option><option value="false" ${seller?.active===false?"selected":""}>Inativo</option></select>
+    <button class="btn" style="width:100%;margin-top:15px" onclick="saveSeller(${seller?.id??"null"})">Salvar vendedor</button>
+  `);
+}
+
+async function saveSeller(id){
+  const name=document.getElementById("sellerName")?.value.trim()||"";
+  const phone=document.getElementById("sellerPhone")?.value.trim()||"";
+  const instagram=document.getElementById("sellerInstagram")?.value.trim()||"";
+  const active=document.getElementById("sellerActive")?.value!=="false";
+  if(!name){toast("Informe o nome do vendedor.");return}
+  if(!phone){toast("Informe o número do vendedor.");return}
+
+  const {error}=await sb.rpc("admin_save_seller",{
+    p_id:id,
+    p_name:name,
+    p_phone:phone,
+    p_instagram:instagram||null,
+    p_active:active
+  });
+  if(error){toast(error.message);return}
+  closeModal();toast("Vendedor salvo.");await loadAdminSellers();
+}
+
+async function saveDefaultSellerCommissionRate(){
+  const rate=Number(document.getElementById("defaultSellerCommissionRate")?.value||0);
+  if(!rate||rate<=0||rate>100){toast("Informe uma comissão válida.");return}
+  const {error}=await sb.rpc("admin_set_default_sales_commission_rate",{p_rate:rate});
+  if(error){toast(error.message);return}
+  await loadSettings();
+  toast("Comissão padrão atualizada.");
+  await loadAdminSellers();
+}
+
+async function openSellerHistory(id){
+  const seller=(window._adminSellers||[]).find(s=>Number(s.id)===Number(id));
+  if(!seller){toast("Vendedor não encontrado.");return}
+  const sales=(window._sellerSales||[]).filter(s=>Number(s.seller_id)===Number(id));
+  const comm=(window._sellerCommissions||[]).filter(c=>Number(c.seller_id)===Number(id));
+  const sold=sales.reduce((sum,s)=>sum+Number(s.amount||0),0);
+  const paid=comm.filter(c=>c.status==="paid").reduce((sum,c)=>sum+Number(c.commission_amount||0),0);
+  const pending=comm.filter(c=>c.status==="pending").reduce((sum,c)=>sum+Number(c.commission_amount||0),0);
+  const today=new Date().toISOString().slice(0,10);
+  const monthly=groupPendingCommissionMonths(comm);
+
+  openModal(`
+    <div class="title-row"><div><h2>${esc(seller.name)}</h2><div class="muted">${esc(seller.phone)}${seller.instagram?` • ${esc(seller.instagram)}`:""}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Vendas realizadas</div><div class="metric-value">${sales.length}</div></div>
+      <div class="metric-box success-soft"><div class="metric-label">Valor vendido</div><div class="metric-value">${money(sold)}</div></div>
+      <div class="metric-box"><div class="metric-label">Comissão recebida</div><div class="metric-value">${money(paid)}</div></div>
+      <div class="metric-box warning"><div class="metric-label">Comissão a receber</div><div class="metric-value">${money(pending)}</div></div>
+    </div>
+
+    <div class="history-section">
+      <h3>Pagamentos mensais pendentes</h3>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Vencimento</th><th>Vendas</th><th>Total</th><th>Situação</th><th>Ação</th></tr></thead>
+        <tbody>${monthly.map(g=>{
+          const due=g.due_date<=today;
+          return `<tr>
+            <td>${dateOnlyPt(g.due_date)}</td>
+            <td>${g.rows.length}</td>
+            <td><b>${money(g.total)}</b></td>
+            <td><span class="badge ${due?"red":""}">${due?"PAGAR AGORA":"AGUARDANDO"}</span></td>
+            <td><button class="btn ${due?"success":"secondary"} smallbtn" onclick="openCommissionBatch(${g.seller_id},'${g.due_date}',false)">Ver detalhamento</button></td>
+          </tr>`;
+        }).join("")||`<tr><td colspan="5">Nenhum pagamento mensal pendente.</td></tr>`}</tbody>
+      </table></div>
+    </div>
+
+    <div class="history-section"><h3>Histórico detalhado de comissões</h3>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Venda</th><th>Produto</th><th>Valor vendido</th><th>%</th><th>Comissão</th><th>Vencimento</th><th>Status</th><th>Pagamento</th></tr></thead>
+        <tbody>${comm.map(c=>`<tr>
+          <td>${new Date(c.sale?.sold_at||c.created_at).toLocaleString("pt-BR")}</td>
+          <td>${esc(c.sale?.product_name||"-")}</td>
+          <td>${money(c.sale_amount)}</td>
+          <td>${Number(c.commission_rate||0).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td>
+          <td><b>${money(c.commission_amount)}</b></td>
+          <td>${dateOnlyPt(c.due_date)}</td>
+          <td><span class="badge ${c.status==="paid"?"green":c.status==="pending"?"":"red"}">${c.status==="paid"?"PAGO":c.status==="pending"?"A PAGAR":"CANCELADO"}</span></td>
+          <td>${c.paid_at?new Date(c.paid_at).toLocaleString("pt-BR"):"-"}</td>
+        </tr>`).join("")||`<tr><td colspan="8">Nenhuma comissão registrada.</td></tr>`}</tbody>
+      </table></div>
+    </div>
+  `,true);
+}
+
+function commissionRowsForBatch(sellerId,dueDate){
+  return getCommissionRowsAll()
+    .filter(c=>Number(c.seller_id)===Number(sellerId)
+      && c.status==="pending"
+      && String(c.due_date||"").slice(0,10)===String(dueDate).slice(0,10))
+    .sort((a,b)=>new Date(a.sale?.sold_at||a.created_at)-new Date(b.sale?.sold_at||b.created_at));
+}
+
+function openCommissionBatch(sellerId,dueDate,fromResults=false){
+  const rows=commissionRowsForBatch(sellerId,dueDate);
+  if(!rows.length){toast("Este pagamento mensal não possui mais comissões pendentes.");return}
+  const seller=rows[0].seller || (window._adminSellers||[]).find(s=>Number(s.id)===Number(sellerId)) || {name:"Vendedor"};
+  const total=rows.reduce((s,c)=>s+Number(c.commission_amount||0),0);
+  const today=new Date().toISOString().slice(0,10);
+  const canPay=String(dueDate).slice(0,10)<=today;
+
+  openModal(`
+    <div class="title-row">
+      <div><h2>Pagamento mensal • ${esc(seller.name||"Vendedor")}</h2><div class="muted">Vencimento ${dateOnlyPt(dueDate)}</div></div>
+      <button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button>
+    </div>
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Vendas incluídas</div><div class="metric-value">${rows.length}</div></div>
+      <div class="metric-box warning"><div class="metric-label">Total da comissão</div><div class="metric-value">${money(total)}</div></div>
+    </div>
+    <div class="history-section">
+      <h3>Detalhamento das vendas deste pagamento</h3>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Venda</th><th>Cliente</th><th>Produto</th><th>Tema / Subtema</th><th>Valor vendido</th><th>%</th><th>Comissão</th></tr></thead>
+        <tbody>${rows.map(c=>`<tr>
+          <td>${new Date(c.sale?.sold_at||c.created_at).toLocaleString("pt-BR")}</td>
+          <td>${esc(c.sale?.customer?.name||"Cliente não identificado")}</td>
+          <td>${esc(c.sale?.product_name||"-")}</td>
+          <td>${esc(c.sale?.themes?.name||"-")}${c.sale?.subtheme?.name?`<br><span class="muted">${esc(c.sale.subtheme.name)}</span>`:""}</td>
+          <td>${money(c.sale_amount)}</td>
+          <td>${Number(c.commission_rate||0).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td>
+          <td><b>${money(c.commission_amount)}</b></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    ${canPay?`
+      <div class="notice">Ao confirmar, será criado <b>um único lançamento de saída</b> de ${money(total)} na Cat Encantus. Todas as ${rows.length} comissões acima serão marcadas como pagas juntas.</div>
+      <button class="btn success" style="width:100%;margin-top:14px" onclick="paySellerCommissionBatch(${sellerId},'${dueDate}',${fromResults})">Confirmar pagamento total de ${money(total)}</button>
+    `:`<div class="notice">Este lote ainda não venceu. O botão de pagamento será liberado no dia ${dateOnlyPt(dueDate)}.</div>`}
+  `,true);
+}
+
+function openNextCommissionBatch(sellerId,fromResults=false){
+  const today=new Date().toISOString().slice(0,10);
+  const groups=groupPendingCommissionMonths(getCommissionRowsAll())
+    .filter(g=>Number(g.seller_id)===Number(sellerId)&&g.due_date<=today);
+  if(!groups.length){toast("Nenhum pagamento mensal vencido para este vendedor.");return}
+  openCommissionBatch(sellerId,groups[0].due_date,fromResults);
+}
+
+async function paySellerCommissionBatch(sellerId,dueDate,fromResults=false){
+  const rows=commissionRowsForBatch(sellerId,dueDate);
+  const total=rows.reduce((s,c)=>s+Number(c.commission_amount||0),0);
+  const seller=rows[0]?.seller?.name||"vendedor";
+  if(!confirm(`Confirmar o pagamento mensal de ${money(total)} para ${seller}?\n\nEste é um único pagamento referente a ${rows.length} venda(s).`))return;
+
+  const {data,error}=await sb.rpc("admin_pay_seller_commission_batch",{
+    p_seller_id:sellerId,
+    p_due_date:dueDate
+  });
+  if(error){toast(error.message);return}
+  closeModal();
+  toast(`Pagamento mensal confirmado: ${money(data?.paid_total||total)}.`);
+  if(fromResults)await loadAdminResults();
+  else await loadAdminSellers();
+}
+
+// Compatibilidade com chamadas antigas da interface.
+function paySellerCommissions(sellerId,sellerName,fromResults=false){
+  openNextCommissionBatch(sellerId,fromResults);
+}
+
 async function loadAdminCashboxes(){
   const box=document.getElementById("adminContent");
   const {data,error}=await sb.from("theme_cashboxes").select("*,themes(name)").order("balance",{ascending:false});
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
-  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Caixinhas</h2><span class="muted">Visível somente para o administrador</span></div></div><div class="notice">As caixinhas somam <b>100% das vendas por tema</b>. Agora você pode clicar no valor de cada caixinha para descobrir quanto foi vendido em cada categoria e ver as vendas que formaram aquele total.</div><div class="grid" style="margin-top:14px">${(data||[]).map(c=>`<div class="item"><h3>${esc(c.themes?.name||"Tema")}</h3><button class="cashbox-value-btn" onclick="openCashboxBreakdown(${c.theme_id},'${esc(c.themes?.name||"Tema").replace(/'/g,"&#39;")}')">${money(c.balance)}</button><div class="muted">Clique no valor para detalhar por categoria</div></div>`).join("")||`<div class="muted">Nenhuma caixinha ainda.</div>`}</div></div>`;
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Caixinhas</h2><span class="muted">Visível somente para o administrador</span></div></div><div class="notice">As caixinhas somam <b>100% das vendas por tema global</b>. Clique no valor para detalhar por <b>categoria e subtema</b> e conferir as vendas que formaram a caixinha.</div><div class="grid" style="margin-top:14px">${(data||[]).map(c=>`<div class="item"><h3>${esc(c.themes?.name||"Tema")}</h3><button class="cashbox-value-btn" onclick="openCashboxBreakdown(${c.theme_id},'${esc(c.themes?.name||"Tema").replace(/'/g,"&#39;")}')">${money(c.balance)}</button><div class="muted">Clique no valor para detalhar</div></div>`).join("")||`<div class="muted">Nenhuma caixinha ainda.</div>`}</div></div>`;
 }
 
 async function openCashboxBreakdown(themeId,themeName){
   openModal(`<div class="title-row"><h2>${esc(themeName)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="card">Carregando detalhamento...</div>`,true);
-  const {data,error}=await sb.from("sales").select("*,category:categories(name)").eq("theme_id",themeId).order("sold_at",{ascending:false});
+  const {data,error}=await sb.from("sales").select("*,category:categories(name),subtheme:subthemes(name)").eq("theme_id",themeId).order("sold_at",{ascending:false});
   if(error){openModal(`<div class="title-row"><h2>${esc(themeName)}</h2><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><div class="msg error">${esc(error.message)}</div>`,true);return}
   const sales=data||[];
-  const breakdown={};
+  const byCategory={},bySubtheme={};
   let total=0;
   sales.forEach(s=>{
-    const name=s.category?.name||"Sem categoria / registro antigo";
-    breakdown[name]=(breakdown[name]||0)+Number(s.amount||0);
+    const category=s.category?.name||"Sem categoria / registro antigo";
+    const subtheme=s.subtheme?.name||"Sem subtema informado";
+    byCategory[category]=(byCategory[category]||0)+Number(s.amount||0);
+    bySubtheme[subtheme]=(bySubtheme[subtheme]||0)+Number(s.amount||0);
     total+=Number(s.amount||0);
   });
-  const rows=Object.entries(breakdown).sort((a,b)=>b[1]-a[1]);
+  const categoryRows=Object.entries(byCategory).sort((a,b)=>b[1]-a[1]);
+  const subthemeRows=Object.entries(bySubtheme).sort((a,b)=>b[1]-a[1]);
   openModal(`
-    <div class="title-row"><div><h2>${esc(themeName)}</h2><div class="muted">Detalhamento completo da caixinha por categoria</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
-    <div class="metric-grid"><div class="metric-box"><div class="metric-label">Total da caixinha</div><div class="metric-value">${money(total)}</div></div><div class="metric-box"><div class="metric-label">Vendas registradas</div><div class="metric-value">${sales.length}</div></div><div class="metric-box"><div class="metric-label">Categorias com vendas</div><div class="metric-value">${rows.length}</div></div></div>
-    <div class="history-section"><h3>Quanto vendeu por categoria</h3><div class="item">${rows.map(([name,value])=>`<div class="cashbox-breakdown-row"><div><b>${esc(name)}</b><div class="muted">${total?((value/total)*100).toLocaleString("pt-BR",{maximumFractionDigits:1}):0}% do tema</div></div><div class="stat-value" style="font-size:21px">${money(value)}</div></div>`).join("")||`<div class="muted">Nenhuma venda.</div>`}</div></div>
-    <div class="history-section"><h3>Vendas que formam esta caixinha</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Categoria</th><th>Produto</th><th>Valor</th></tr></thead><tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="4">Nenhuma venda.</td></tr>`}</tbody></table></div></div>
+    <div class="title-row"><div><h2>${esc(themeName)}</h2><div class="muted">Detalhamento completo da caixinha por categoria e subtema</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <div class="metric-grid">
+      <div class="metric-box"><div class="metric-label">Total da caixinha</div><div class="metric-value">${money(total)}</div></div>
+      <div class="metric-box"><div class="metric-label">Vendas registradas</div><div class="metric-value">${sales.length}</div></div>
+      <div class="metric-box"><div class="metric-label">Categorias com vendas</div><div class="metric-value">${categoryRows.length}</div></div>
+      <div class="metric-box"><div class="metric-label">Subtemas com vendas</div><div class="metric-value">${subthemeRows.length}</div></div>
+    </div>
+    <div class="history-section"><h3>Quanto vendeu por categoria</h3><div class="item">${categoryRows.map(([name,value])=>`<div class="cashbox-breakdown-row"><div><b>${esc(name)}</b><div class="muted">${total?((value/total)*100).toLocaleString("pt-BR",{maximumFractionDigits:1}):0}% do tema</div></div><div class="stat-value" style="font-size:21px">${money(value)}</div></div>`).join("")||`<div class="muted">Nenhuma venda.</div>`}</div></div>
+    <div class="history-section"><h3>Quanto vendeu por subtema</h3><div class="item">${subthemeRows.map(([name,value])=>`<div class="cashbox-breakdown-row"><div><b>${esc(name)}</b><div class="muted">${total?((value/total)*100).toLocaleString("pt-BR",{maximumFractionDigits:1}):0}% do tema</div></div><div class="stat-value" style="font-size:21px">${money(value)}</div></div>`).join("")||`<div class="muted">Nenhum subtema informado.</div>`}</div></div>
+    <div class="history-section"><h3>Vendas que formam esta caixinha</h3><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Categoria</th><th>Subtema</th><th>Produto</th><th>Valor</th></tr></thead><tbody>${sales.map(s=>`<tr><td>${new Date(s.sold_at).toLocaleString("pt-BR")}</td><td>${esc(s.category?.name||"-")}</td><td>${esc(s.subtheme?.name||"-")}</td><td>${esc(s.product_name||"-")}</td><td><b>${money(s.amount)}</b></td></tr>`).join("")||`<tr><td colspan="5">Nenhuma venda.</td></tr>`}</tbody></table></div></div>
   `,true);
 }
 
@@ -3723,6 +4687,7 @@ async function loadAdminNotifications(){
   const {data,error}=await sb
     .from("notifications")
     .select("id,investor_id,title,message,read,created_at,profiles!notifications_investor_id_fkey(name,email,role)")
+    .eq("investor_id",currentProfile.id)
     .order("created_at",{ascending:false})
     .limit(100);
 
@@ -3731,6 +4696,7 @@ async function loadAdminNotifications(){
     const fallback=await sb
       .from("notifications")
       .select("id,investor_id,title,message,read,created_at")
+      .eq("investor_id",currentProfile.id)
       .order("created_at",{ascending:false})
       .limit(100);
 
