@@ -4931,7 +4931,7 @@ async function saveSettings(){
 
 
 // ============================================================
-// V32Q — CATÁLOGO VISUAL + ESTOQUE + CARRINHO + VENDA MULTIITEM
+// V32R — CATÁLOGO VISUAL + CORREÇÕES DE IMAGEM/EXCLUSÃO + ESTOQUE + CARRINHO + VENDA MULTIITEM
 // ============================================================
 const CATALOG_BUCKET="catalog-products";
 const CATALOG_BG_URL="./catalog-background.png";
@@ -4940,6 +4940,8 @@ let catalogCart=JSON.parse(localStorage.getItem("catencantus_catalog_cart_v1")||
 let catalogVisitSent=false;
 let catalogImageRemovalModule=null;
 let catalogPasteListenerInstalled=false;
+let catalogBackgroundBlobPromise=null;
+let catalogImageProcessingBusy=false;
 
 function isCatalogMode(){return new URLSearchParams(location.search).get("catalogo")==="1" || location.hash==="#catalogo"}
 function openCatalogPage(){location.href=new URL("?catalogo=1",location.href).href}
@@ -5091,23 +5093,40 @@ function availableCatalogSubthemes(){return window._catalogSubthemes||window._sa
 
 function openCatalogProductEditor(source=null,duplicate=false,saleLineId=null){
   const p=source||{};const isNew=duplicate||!p.id;
-  window._catalogProductEditorContext={saleLineId,editingId:isNew?null:p.id,duplicate};
-  window._catalogProductImageState={catalogBlob:null,thumbBlob:null,imagePath:p.image_path||"",thumbnailPath:p.thumbnail_path||"",previewUrl:p.image_path?catalogPublicUrl(p.image_path):""};
+  window._catalogProductEditorContext={saleLineId,editingId:isNew?null:p.id,duplicate,sourceId:p.id||null};
+  window._catalogProductImageState={catalogBlob:null,thumbBlob:null,imagePath:p.image_path||"",thumbnailPath:p.thumbnail_path||"",previewUrl:p.image_path?catalogPublicUrl(p.image_path):"",sourceFile:null,backgroundMode:"apply",fitMode:"safe"};
   const themes=availableCatalogThemes();
   openModal(`<div id="catalogProductForm"><div class="title-row"><div><h2>${duplicate?"Duplicar produto":p.id?"Editar produto":"Cadastrar produto"}</h2><div class="muted">${p.id&&!duplicate?`Código: ${esc(p.code)}`:"O código será gerado automaticamente ao salvar."}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
     <div class="row" style="margin-top:10px"><div><label>Nome</label><input id="catalogProductName" value="${esc(p.name||"")}" placeholder="Ex.: Homem-Aranha vermelho"></div><div><label>Preço</label><input id="catalogProductPrice" type="number" min="0.01" step="0.01" value="${p.price??""}"></div></div>
     <div class="row"><div><label>Tema global</label><select id="catalogProductTheme" onchange="renderCatalogProductSubthemes()"><option value="">Selecione</option>${themes.map(t=>`<option value="${t.id}" ${Number(p.theme_id)===Number(t.id)?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div><div><label>Subtema</label><select id="catalogProductSubtheme"></select></div></div>
     <div class="row"><div><label>Medidas</label><input id="catalogProductDimensions" value="${esc(p.dimensions||"")}" placeholder="Ex.: 6 x 8 cm"></div><div><label>Quantidade de miçangas</label><input id="catalogProductBeads" type="number" min="0" step="1" value="${p.bead_quantity??""}"></div></div>
     <div class="row"><div><label>Quantidade em estoque</label><input id="catalogProductStock" type="number" min="0" step="1" value="${p.stock_quantity??0}"></div><div><label>Status no catálogo público</label><select id="catalogProductActive"><option value="true" ${p.active!==false?"selected":""}>Ativo</option><option value="false" ${p.active===false?"selected":""}>Inativo</option></select></div></div>
+
+    <div class="row">
+      <div><label>Tratamento do fundo</label><select id="catalogBackgroundMode" onchange="catalogBackgroundModeChanged()"><option value="apply">Aplicar fundo padrão</option><option value="ready">Fundo já aplicado</option></select><div class="muted" style="margin-top:5px">Se a foto já estiver pronta com o fundo da loja, escolha “Fundo já aplicado” para pular a remoção de fundo.</div></div>
+      <div id="catalogFitModeWrap"><label>Encaixe da peça</label><select id="catalogFitMode"><option value="safe" selected>Seguro — mostrar a peça inteira</option><option value="fill">Preencher mais — peça maior</option></select><div class="muted" style="margin-top:5px">O modo Seguro deixa uma margem maior e é o recomendado.</div></div>
+    </div>
+
     <label>Foto do produto</label>
     <div id="catalogUploadZone" class="product-upload-zone" tabindex="0"><div id="catalogUploadPrompt" class="${p.image_path?"hidden":""}">📷<br><b>Arraste, cole ou clique para escolher uma imagem</b><br><span class="muted">Também é possível tirar uma foto na hora.</span></div><img id="catalogProductPreview" class="product-upload-preview ${p.image_path?"":"hidden"}" src="${p.image_path?esc(catalogPublicUrl(p.image_path)):""}" alt="Prévia"></div>
     <input id="catalogImageInput" type="file" accept="image/*" class="hidden"><input id="catalogCameraInput" type="file" accept="image/*" capture="environment" class="hidden">
     <div class="actions" style="margin-top:9px"><button class="btn secondary" onclick="document.getElementById('catalogImageInput').click()">Carregar da galeria / computador</button><button class="btn secondary" onclick="document.getElementById('catalogCameraInput').click()">Tirar foto</button></div>
     <div id="catalogImageProgress" class="product-processing hidden"></div>
-    <div class="notice" style="margin-top:10px">A foto original fica somente no seu aparelho durante o processamento. O app remove o fundo, aplica o fundo padrão da Cat Encantus e envia apenas a versão do catálogo e a miniatura.</div>
-    <button id="catalogProductSaveBtn" class="btn" style="width:100%;margin-top:14px" onclick="saveCatalogProduct()">Salvar produto</button></div>`,true);
+    <div class="notice" style="margin-top:10px">A foto original fica somente no seu aparelho durante o processamento. O app faz um ajuste leve de nitidez visual/contraste, reduz a imagem com alta qualidade e envia apenas a versão do catálogo e a miniatura. Em “Aplicar fundo padrão”, também remove o fundo e mantém uma margem de segurança para reduzir cortes.</div>
+    <div class="actions" style="margin-top:14px">
+      ${p.id&&!duplicate?`<button class="btn danger" onclick="deleteOrArchiveCatalogProduct(${p.id})">Excluir produto</button>`:""}
+      <button id="catalogProductSaveBtn" class="btn" style="flex:1" onclick="saveCatalogProduct()">Salvar produto</button>
+    </div></div>`,true);
   renderCatalogProductSubthemes(p.subtheme_id||null);
   setupCatalogImageInputs();
+  preloadCatalogBackground();
+  loadImglyBackgroundRemoval().catch(()=>{});
+}
+function catalogBackgroundModeChanged(){
+  const mode=document.getElementById("catalogBackgroundMode")?.value||"apply";
+  const wrap=document.getElementById("catalogFitModeWrap");if(wrap)wrap.style.opacity=mode==="apply"?"1":".45";
+  const st=window._catalogProductImageState||{};st.backgroundMode=mode;window._catalogProductImageState=st;
+  if(st.sourceFile)handleCatalogImageFile(st.sourceFile,true);
 }
 function renderCatalogProductSubthemes(selected=null){
   const theme=Number(document.getElementById("catalogProductTheme")?.value||0);const sel=document.getElementById("catalogProductSubtheme");if(!sel)return;
@@ -5125,40 +5144,112 @@ async function loadImglyBackgroundRemoval(){
   catalogImageRemovalModule=await import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm");
   return catalogImageRemovalModule;
 }
-async function canvasBlob(canvas,type="image/webp",quality=.86){return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Falha ao gerar imagem.")),type,quality))}
-async function resizeInputForRemoval(file){
-  const bm=await createImageBitmap(file);const max=1600;const scale=Math.min(1,max/Math.max(bm.width,bm.height));const c=document.createElement("canvas");c.width=Math.max(1,Math.round(bm.width*scale));c.height=Math.max(1,Math.round(bm.height*scale));c.getContext("2d").drawImage(bm,0,0,c.width,c.height);bm.close?.();return canvasBlob(c,"image/webp",.92)
+function catalogRemovalConfig(progressEl=null){
+  return {
+    debug:false,
+    device:("gpu" in navigator)?"gpu":"cpu",
+    model:"isnet_fp16",
+    output:{format:"image/png",quality:.95,type:"foreground"},
+    progress:progressEl?((key,current,total)=>{if(total>0&&String(key||"").toLowerCase().includes("model")){const pct=Math.min(100,Math.round(current/total*100));progressEl.textContent=`Preparando o removedor de fundo... ${pct}% (a primeira vez neste aparelho é mais demorada)`}}):undefined
+  };
 }
-async function composeCatalogProductImages(subjectBlob){
-  const [bgBlob]=await Promise.all([fetch(CATALOG_BG_URL,{cache:"force-cache"}).then(r=>{if(!r.ok)throw new Error("Fundo padrão não encontrado.");return r.blob()})]);
-  const [bg,fg]=await Promise.all([createImageBitmap(bgBlob),createImageBitmap(subjectBlob)]);
-  const c=document.createElement("canvas");c.width=1024;c.height=1024;const ctx=c.getContext("2d");ctx.drawImage(bg,0,0,1024,1024);
-  const maxW=700,maxH=650,scale=Math.min(maxW/fg.width,maxH/fg.height);const w=fg.width*scale,h=fg.height*scale;const x=512-w/2,y=545-h/2;ctx.drawImage(fg,x,y,w,h);
-  const catalogBlob=await canvasBlob(c,"image/webp",.86);
-  const t=document.createElement("canvas");t.width=360;t.height=360;t.getContext("2d").drawImage(c,0,0,360,360);const thumbBlob=await canvasBlob(t,"image/webp",.80);bg.close?.();fg.close?.();return {catalogBlob,thumbBlob};
+async function canvasBlob(canvas,type="image/webp",quality=.88){return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("Falha ao gerar imagem.")),type,quality))}
+function drawImageHighQuality(ctx,img,dx,dy,dw,dh){ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,dx,dy,dw,dh)}
+async function prepareInputImage(file,max=1200){
+  const bm=await createImageBitmap(file);const scale=Math.min(1,max/Math.max(bm.width,bm.height));const w=Math.max(1,Math.round(bm.width*scale)),h=Math.max(1,Math.round(bm.height*scale));const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d",{willReadFrequently:false});
+  ctx.save();ctx.filter="brightness(1.02) contrast(1.055) saturate(1.025)";drawImageHighQuality(ctx,bm,0,0,w,h);ctx.restore();bm.close?.();
+  return {blob:await canvasBlob(c,"image/webp",.92),canvas:c};
 }
-async function handleCatalogImageFile(file){
+function getAlphaBounds(canvas,threshold=2){
+  const ctx=canvas.getContext("2d",{willReadFrequently:true}),d=ctx.getImageData(0,0,canvas.width,canvas.height).data;let minX=canvas.width,minY=canvas.height,maxX=-1,maxY=-1;
+  for(let y=0;y<canvas.height;y++){for(let x=0;x<canvas.width;x++){if(d[(y*canvas.width+x)*4+3]>threshold){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}}
+  if(maxX<0)return {x:0,y:0,w:canvas.width,h:canvas.height};
+  const bw=maxX-minX+1,bh=maxY-minY+1,pad=Math.max(12,Math.round(Math.max(bw,bh)*.07));
+  const x=Math.max(0,minX-pad),y=Math.max(0,minY-pad),x2=Math.min(canvas.width,maxX+pad+1),y2=Math.min(canvas.height,maxY+pad+1);
+  return {x,y,w:x2-x,h:y2-y};
+}
+async function normalizeRemovedForeground(removedBlob){
+  const fg=await createImageBitmap(removedBlob);const c=document.createElement("canvas");c.width=fg.width;c.height=fg.height;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(fg,0,0);fg.close?.();
+  // Preserva bordas sem fechar os furinhos das miçangas: reforça apenas pixels já parcialmente visíveis.
+  const img=ctx.getImageData(0,0,c.width,c.height),d=img.data;
+  for(let i=3;i<d.length;i+=4){const a=d[i];if(a>4&&a<245)d[i]=Math.min(255,Math.round(a*1.12+6))}
+  ctx.putImageData(img,0,0);return c;
+}
+function preloadCatalogBackground(){
+  if(!catalogBackgroundBlobPromise)catalogBackgroundBlobPromise=fetch(CATALOG_BG_URL,{cache:"force-cache"}).then(r=>{if(!r.ok)throw new Error("Fundo padrão não encontrado.");return r.blob()});
+  return catalogBackgroundBlobPromise;
+}
+async function composeCatalogProductImages(subjectSource,fitMode="safe"){
+  const bgBlob=await preloadCatalogBackground();const [bg]=await Promise.all([createImageBitmap(bgBlob)]);
+  const subjectCanvas=subjectSource instanceof HTMLCanvasElement?subjectSource:(()=>{throw new Error("Imagem tratada inválida.")})();
+  const bounds=getAlphaBounds(subjectCanvas,2);
+  const c=document.createElement("canvas");c.width=1024;c.height=1024;const ctx=c.getContext("2d");drawImageHighQuality(ctx,bg,0,0,1024,1024);
+  // A área segura respeita o quadro interno do fundo enviado pelo usuário.
+  const maxW=fitMode==="fill"?710:640,maxH=fitMode==="fill"?660:590;
+  const scale=Math.min(maxW/bounds.w,maxH/bounds.h);const w=bounds.w*scale,h=bounds.h*scale;const centerX=512,centerY=530;const x=centerX-w/2,y=centerY-h/2;
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(subjectCanvas,bounds.x,bounds.y,bounds.w,bounds.h,x,y,w,h);
+  const catalogBlob=await canvasBlob(c,"image/webp",.88);const t=document.createElement("canvas");t.width=360;t.height=360;drawImageHighQuality(t.getContext("2d"),c,0,0,360,360);const thumbBlob=await canvasBlob(t,"image/webp",.82);bg.close?.();return {catalogBlob,thumbBlob};
+}
+async function composeAlreadyReadyImages(preparedCanvas){
+  const c=document.createElement("canvas");c.width=1024;c.height=1024;const ctx=c.getContext("2d");ctx.fillStyle="#fff8fa";ctx.fillRect(0,0,1024,1024);
+  const scale=Math.min(1024/preparedCanvas.width,1024/preparedCanvas.height);const w=preparedCanvas.width*scale,h=preparedCanvas.height*scale;drawImageHighQuality(ctx,preparedCanvas,(1024-w)/2,(1024-h)/2,w,h);
+  const catalogBlob=await canvasBlob(c,"image/webp",.90);const t=document.createElement("canvas");t.width=360;t.height=360;drawImageHighQuality(t.getContext("2d"),c,0,0,360,360);const thumbBlob=await canvasBlob(t,"image/webp",.84);return {catalogBlob,thumbBlob};
+}
+async function handleCatalogImageFile(file,reprocess=false){
   if(!file||!String(file.type||"").startsWith("image/")){toast("Escolha um arquivo de imagem.");return}
-  const progress=document.getElementById("catalogImageProgress"),saveBtn=document.getElementById("catalogProductSaveBtn");if(progress){progress.classList.remove("hidden");progress.textContent="Preparando a imagem..."}if(saveBtn)saveBtn.disabled=true;
+  if(catalogImageProcessingBusy&&!reprocess){toast("Aguarde a imagem atual terminar de ser processada.");return}
+  catalogImageProcessingBusy=true;
+  const progress=document.getElementById("catalogImageProgress"),saveBtn=document.getElementById("catalogProductSaveBtn");if(progress){progress.classList.remove("hidden");progress.textContent="Otimizando e melhorando a imagem..."}if(saveBtn)saveBtn.disabled=true;
   try{
-    const reduced=await resizeInputForRemoval(file);if(progress)progress.textContent="Removendo o fundo automaticamente... Na primeira foto deste aparelho isso pode demorar um pouco.";
-    const mod=await loadImglyBackgroundRemoval();const fn=mod.default||mod.removeBackground;if(typeof fn!=="function")throw new Error("Módulo de remoção de fundo indisponível.");
-    const transparent=await fn(reduced);if(progress)progress.textContent="Aplicando o fundo padrão e criando a miniatura...";
-    const result=await composeCatalogProductImages(transparent);const old=window._catalogProductImageState?.previewObjectUrl;if(old)URL.revokeObjectURL(old);const previewObjectUrl=URL.createObjectURL(result.catalogBlob);
-    window._catalogProductImageState={...(window._catalogProductImageState||{}),catalogBlob:result.catalogBlob,thumbBlob:result.thumbBlob,previewObjectUrl};const preview=document.getElementById("catalogProductPreview");if(preview){preview.src=previewObjectUrl;preview.classList.remove("hidden")}document.getElementById("catalogUploadPrompt")?.classList.add("hidden");if(progress){progress.textContent=`Imagem pronta. Versão catálogo: ${(result.catalogBlob.size/1024).toFixed(0)} KB • miniatura: ${(result.thumbBlob.size/1024).toFixed(0)} KB.`}
-  }catch(e){console.error(e);if(progress)progress.textContent="Não foi possível preparar a imagem: "+(e?.message||e);toast("Não foi possível tratar essa foto. Tente outra imagem ou tente novamente.")}
-  finally{if(saveBtn)saveBtn.disabled=false}
+    const st=window._catalogProductImageState||{};st.sourceFile=file;const mode=document.getElementById("catalogBackgroundMode")?.value||st.backgroundMode||"apply";const fit=document.getElementById("catalogFitMode")?.value||st.fitMode||"safe";st.backgroundMode=mode;st.fitMode=fit;window._catalogProductImageState=st;
+    const prepared=await prepareInputImage(file,mode==="apply"?1200:1400);let result;
+    if(mode==="ready"){
+      if(progress)progress.textContent="Fundo já aplicado: ajustando qualidade e criando as versões do catálogo...";
+      result=await composeAlreadyReadyImages(prepared.canvas);
+    }else{
+      if(progress)progress.textContent="Removendo o fundo automaticamente...";
+      const mod=await loadImglyBackgroundRemoval();const fn=mod.default||mod.removeBackground;if(typeof fn!=="function")throw new Error("Módulo de remoção de fundo indisponível.");
+      let transparent;
+      try{transparent=await fn(prepared.blob,catalogRemovalConfig(progress))}catch(firstErr){console.warn("GPU/background removal fallback:",firstErr);transparent=await fn(prepared.blob,{...catalogRemovalConfig(progress),device:"cpu"})}
+      if(progress)progress.textContent="Aplicando o fundo padrão com margem de segurança...";
+      const normalized=await normalizeRemovedForeground(transparent);result=await composeCatalogProductImages(normalized,fit);
+    }
+    const old=window._catalogProductImageState?.previewObjectUrl;if(old)URL.revokeObjectURL(old);const previewObjectUrl=URL.createObjectURL(result.catalogBlob);
+    window._catalogProductImageState={...(window._catalogProductImageState||{}),catalogBlob:result.catalogBlob,thumbBlob:result.thumbBlob,previewObjectUrl,sourceFile:file,backgroundMode:mode,fitMode:fit};
+    const preview=document.getElementById("catalogProductPreview");if(preview){preview.src=previewObjectUrl;preview.classList.remove("hidden")}document.getElementById("catalogUploadPrompt")?.classList.add("hidden");if(progress){progress.textContent=`Imagem pronta. Versão catálogo: ${(result.catalogBlob.size/1024).toFixed(0)} KB • miniatura: ${(result.thumbBlob.size/1024).toFixed(0)} KB. Confira a prévia antes de salvar.`}
+  }catch(e){console.error(e);if(progress)progress.textContent="Não foi possível preparar a imagem: "+(e?.message||e);toast("Não foi possível tratar essa foto. Você pode tentar novamente ou escolher ‘Fundo já aplicado’ se a imagem já estiver pronta.")}
+  finally{catalogImageProcessingBusy=false;if(saveBtn)saveBtn.disabled=false}
 }
 async function uploadProcessedCatalogImages(){
   const st=window._catalogProductImageState||{};if(!st.catalogBlob||!st.thumbBlob)return {imagePath:st.imagePath||"",thumbnailPath:st.thumbnailPath||"",uploaded:[]};
   const key=(crypto.randomUUID?.()||(`${Date.now()}-${Math.random().toString(16).slice(2)}`));const imagePath=`products/${key}.webp`,thumbnailPath=`thumbs/${key}.webp`;
-  const a=await sb.storage.from(CATALOG_BUCKET).upload(imagePath,st.catalogBlob,{contentType:"image/webp",cacheControl:"31536000",upsert:false});if(a.error)throw a.error;
-  const b=await sb.storage.from(CATALOG_BUCKET).upload(thumbnailPath,st.thumbBlob,{contentType:"image/webp",cacheControl:"31536000",upsert:false});if(b.error){await sb.storage.from(CATALOG_BUCKET).remove([imagePath]);throw b.error}
+  const [a,b]=await Promise.all([
+    sb.storage.from(CATALOG_BUCKET).upload(imagePath,st.catalogBlob,{contentType:"image/webp",cacheControl:"31536000",upsert:false}),
+    sb.storage.from(CATALOG_BUCKET).upload(thumbnailPath,st.thumbBlob,{contentType:"image/webp",cacheControl:"31536000",upsert:false})
+  ]);
+  if(a.error||b.error){const uploaded=[];if(!a.error)uploaded.push(imagePath);if(!b.error)uploaded.push(thumbnailPath);if(uploaded.length)await sb.storage.from(CATALOG_BUCKET).remove(uploaded);throw (a.error||b.error)}
   return {imagePath,thumbnailPath,uploaded:[imagePath,thumbnailPath]};
+}
+function showCatalogProductSavedChoice(saved,saleLineId=null){
+  window._lastSavedCatalogProduct=saved;window._lastSavedCatalogSaleLineId=saleLineId;
+  openModal(`<div style="text-align:center;padding:8px 2px"><div style="font-size:42px">✓</div><h2 style="margin:8px 0;color:var(--primary)">Produto ${esc(saved.code)} salvo com sucesso</h2><div class="muted">Quer cadastrar uma variação usando os mesmos dados?</div><div class="actions" style="justify-content:center;margin-top:18px"><button class="btn" onclick="duplicateLastSavedCatalogProduct()">Duplicar</button><button class="btn secondary" onclick="finishCatalogProductSave()">Salvar e sair</button></div></div>`,false);
+}
+function duplicateLastSavedCatalogProduct(){const p=window._lastSavedCatalogProduct;if(!p)return;openCatalogProductEditor(p,true,window._lastSavedCatalogSaleLineId??null)}
+async function finishCatalogProductSave(){closeModal();toast("Produto salvo.");if(document.getElementById("adminCatalogProducts"))await loadAdminCatalog()}
+async function deleteOrArchiveCatalogProduct(id){
+  const p=catalogAdminProductById(id);if(!p)return;
+  if(!confirm(`Excluir o produto ${p.code} — ${p.name}?\n\nSe ele nunca foi usado em uma venda, será excluído de verdade. Se já tiver histórico de venda, será arquivado para preservar os relatórios.`))return;
+  const {data,error}=await sb.rpc("admin_delete_or_archive_catalog_product",{p_product_id:id});if(error){toast(error.message);return}
+  if(data?.action==="deleted"){
+    const paths=[data.image_path,data.thumbnail_path].filter(Boolean);if(paths.length){const {error:storageError}=await sb.storage.from(CATALOG_BUCKET).remove(paths);if(storageError)console.warn("Não foi possível limpar todos os arquivos do produto:",storageError)}
+    closeModal();toast("Produto excluído.");await loadAdminCatalog();return;
+  }
+  closeModal();toast("Produto arquivado porque já possui histórico de venda. Ele saiu do catálogo e do seletor de novas vendas.");await loadAdminCatalog();
 }
 async function saveCatalogProduct(){
   const ctx=window._catalogProductEditorContext||{};const name=document.getElementById("catalogProductName")?.value.trim()||"";const theme=Number(document.getElementById("catalogProductTheme")?.value||0);const subtheme=Number(document.getElementById("catalogProductSubtheme")?.value||0);const dimensions=document.getElementById("catalogProductDimensions")?.value.trim()||"";const price=Number(document.getElementById("catalogProductPrice")?.value||0);const stock=Number(document.getElementById("catalogProductStock")?.value);const beads=Number(document.getElementById("catalogProductBeads")?.value);const active=document.getElementById("catalogProductActive")?.value!=="false";
   if(!name||!theme||!subtheme||!dimensions||!price||price<=0||!Number.isInteger(stock)||stock<0||!Number.isInteger(beads)||beads<0){toast("Preencha nome, tema, subtema, medidas, preço, estoque e quantidade de miçangas corretamente.");return}
+  if(catalogImageProcessingBusy){toast("Aguarde a imagem terminar de ser processada.");return}
   const btn=document.getElementById("catalogProductSaveBtn");if(btn){btn.disabled=true;btn.textContent="Salvando..."}
   let upload=null;
   try{
@@ -5166,9 +5257,8 @@ async function saveCatalogProduct(){
     const {data,error}=await sb.rpc("admin_save_catalog_product",{p_id:ctx.editingId||null,p_name:name,p_theme_id:theme,p_subtheme_id:subtheme,p_dimensions:dimensions,p_price:price,p_stock_quantity:stock,p_bead_quantity:beads,p_image_path:upload.imagePath,p_thumbnail_path:upload.thumbnailPath,p_active:active});if(error)throw error;
     const saved={...data,image_url:catalogPublicUrl(data.image_path),thumb_url:catalogPublicUrl(data.thumbnail_path),theme:{name:(availableCatalogThemes().find(t=>Number(t.id)===theme)||{}).name||""},subtheme:{name:(availableCatalogSubthemes().find(st=>Number(st.id)===subtheme)||{}).name||""}};
     if(ctx.saleLineId!=null){if(!window._saleCatalogProducts)window._saleCatalogProducts=[];const pos=window._saleCatalogProducts.findIndex(x=>Number(x.id)===Number(saved.id));if(pos>=0)window._saleCatalogProducts[pos]=saved;else window._saleCatalogProducts.push(saved);const line=(window._saleCartLines||[]).find(l=>l.id===ctx.saleLineId);if(line)line.productId=Number(saved.id);renderSaleItems()}
-    const duplicate=!ctx.editingId && confirm(`Produto ${saved.code} salvo com sucesso.\n\nDeseja duplicar este produto para cadastrar uma variação mais rápido?`);
-    if(duplicate){openCatalogProductEditor(saved,true,ctx.saleLineId);return}
-    closeModal();toast(`Produto salvo: ${saved.code}`);if(document.getElementById("adminCatalogProducts"))await loadAdminCatalog();
+    if(!ctx.editingId){showCatalogProductSavedChoice(saved,ctx.saleLineId);return}
+    closeModal();toast(`Produto atualizado: ${saved.code}`);if(document.getElementById("adminCatalogProducts"))await loadAdminCatalog();
   }catch(e){console.error(e);if(upload?.uploaded?.length)await sb.storage.from(CATALOG_BUCKET).remove(upload.uploaded);toast(e?.message||String(e))}
   finally{if(btn){btn.disabled=false;btn.textContent="Salvar produto"}}
 }
