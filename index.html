@@ -2990,7 +2990,7 @@ function renderSalesDashboard(){
           <td><div class="actions">
             <button class="btn secondary smallbtn" onclick="openEditSale(${s.id})">Editar venda</button>
             ${remaining>0?`<button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Receber</button>`:""}
-            ${s.payment_status==="unpaid" && Number(s.paid_amount||0)===0?`<button class="btn danger smallbtn" onclick="deleteUnpaidSale(${s.id})">Excluir não paga</button>`:""}
+            <button class="btn danger smallbtn" onclick="deleteSaleAny(${s.id})">Excluir venda</button>
           </div></td>
         </tr>`;
       }).join("")||`<tr><td colspan="13">Nenhuma venda neste período.</td></tr>`}</tbody>
@@ -3237,6 +3237,7 @@ async function openEditSale(id){
 
     <div class="actions" style="margin-top:14px">
       <button class="btn" onclick="saveEditSaleFull(${sale.id})">Salvar alterações</button>
+      <button class="btn danger" onclick="deleteSaleAny(${sale.id})">Excluir venda</button>
     </div>
   `,true);
 
@@ -3515,20 +3516,38 @@ async function saveSaleSubtheme(id){
   await loadAdminSales();
 }
 
-async function deleteUnpaidSale(id,fromResults=false){
+async function deleteSaleAny(id,fromResults=false){
   const sale=findSaleForReceivable(id) || (window._adminSalesData||[]).find(s=>Number(s.id)===Number(id));
   const label=sale?.product_name?` “${sale.product_name}”`:"";
-  if(!confirm(`Excluir definitivamente a venda não paga${label}?
+  const received=Number(sale?.paid_amount||0);
+  const total=Number(sale?.amount||0);
 
-Isso só é permitido quando nenhum valor foi recebido. Como a venda não teve entrada no caixa nem nos investimentos, ela será removida também de Receitas a receber.`))return;
+  let warning=`Excluir definitivamente a venda${label}?\n\n`;
+  if(received>0){
+    warning+=`Esta venda já recebeu ${money(received)} de ${money(total)}. Ao excluir, esse valor será retirado do caixa/resultado da Cat Encantus e a fila dos investimentos será recalculada.\n\n`;
+  }else{
+    warning+=`Esta venda ainda não recebeu nenhum valor. Ela será removida também de Receitas a receber, se estiver em aberto.\n\n`;
+  }
+  warning+=`A exclusão é definitiva. Se já existir comissão paga ou repasse de investimento confirmado que não possa ser reescrito com segurança, o sistema bloqueará a operação.`;
 
-  const {error}=await sb.rpc("admin_delete_unpaid_sale",{p_sale_id:id});
+  if(!confirm(warning))return;
+
+  const {data,error}=await sb.rpc("admin_delete_sale",{p_sale_id:id});
   if(error){toast(error.message);return}
 
   closeModal();
-  toast("Venda não paga excluída.");
-  if(fromResults || document.getElementById("receivablesPanel"))await loadAdminResults();
-  else await loadAdminSales();
+  toast(`Venda excluída.${received>0?` ${money(received)} foram revertidos do caixa.`:""}`);
+
+  if(fromResults || document.getElementById("receivablesPanel")){
+    await loadAdminResults();
+  }else{
+    await loadAdminSales();
+  }
+}
+
+// Compatibilidade com botões antigos/caches anteriores.
+async function deleteUnpaidSale(id,fromResults=false){
+  return deleteSaleAny(id,fromResults);
 }
 
 
@@ -3923,7 +3942,7 @@ function renderReceivablesPanel(){
           <td>${salePaymentStatusPt(s.payment_status)}</td>
           <td><div class="actions">
             <button class="btn smallbtn" onclick="openSaleReceivable(${s.id})">Abrir / receber</button>
-            ${s.payment_status==="unpaid" && Number(s.paid_amount||0)===0?`<button class="btn danger smallbtn" onclick="deleteUnpaidSale(${s.id},true)">Excluir não paga</button>`:""}
+            <button class="btn danger smallbtn" onclick="deleteSaleAny(${s.id},true)">Excluir venda</button>
           </div></td>
         </tr>`;
       }).join("")||`<tr><td colspan="9">Nenhuma receita a receber. Todas as vendas estão pagas.</td></tr>`}</tbody>
