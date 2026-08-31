@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v32p-1";
+const CACHE_NAME="catinvestimentos-v32q-1";
 const APP_SHELL=[
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const APP_SHELL=[
   "./logo.png",
   "./icon-192.png",
   "./icon-512.png",
+  "./catalog-background.png",
   "./produto-luva.png",
   "./produto-sonic.png",
   "./produto-kitty.png",
