@@ -4942,6 +4942,10 @@ let catalogImageRemovalModule=null;
 let catalogPasteListenerInstalled=false;
 let catalogBackgroundBlobPromise=null;
 let catalogImageProcessingBusy=false;
+let catalogRemovalWorker=null;
+let catalogRemovalWorkerUrl=null;
+let catalogRemovalWorkerSeq=0;
+const catalogRemovalWorkerPending=new Map();
 
 function isCatalogMode(){return new URLSearchParams(location.search).get("catalogo")==="1" || location.hash==="#catalogo"}
 function openCatalogPage(){location.href=new URL("?catalogo=1",location.href).href}
@@ -5098,7 +5102,28 @@ function openCatalogProductEditor(source=null,duplicate=false,saleLineId=null){
   const themes=availableCatalogThemes();
   openModal(`<div id="catalogProductForm"><div class="title-row"><div><h2>${duplicate?"Duplicar produto":p.id?"Editar produto":"Cadastrar produto"}</h2><div class="muted">${p.id&&!duplicate?`Código: ${esc(p.code)}`:"O código será gerado automaticamente ao salvar."}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
     <div class="row" style="margin-top:10px"><div><label>Nome</label><input id="catalogProductName" value="${esc(p.name||"")}" placeholder="Ex.: Homem-Aranha vermelho"></div><div><label>Preço</label><input id="catalogProductPrice" type="number" min="0.01" step="0.01" value="${p.price??""}"></div></div>
-    <div class="row"><div><label>Tema global</label><select id="catalogProductTheme" onchange="renderCatalogProductSubthemes()"><option value="">Selecione</option>${themes.map(t=>`<option value="${t.id}" ${Number(p.theme_id)===Number(t.id)?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div><div><label>Subtema</label><select id="catalogProductSubtheme"></select></div></div>
+    <div class="row">
+      <div>
+        <div class="title-row" style="align-items:end"><label style="margin-bottom:6px">Tema global</label><button type="button" class="btn secondary smallbtn" onclick="toggleQuickCatalogThemeForm()">+ Novo tema</button></div>
+        <select id="catalogProductTheme" onchange="renderCatalogProductSubthemes();hideQuickCatalogSubthemeForm()"><option value="">Selecione</option>${themes.map(t=>`<option value="${t.id}" ${Number(p.theme_id)===Number(t.id)?"selected":""}>${esc(t.name)}</option>`).join("")}</select>
+        <div id="catalogQuickThemeForm" class="customer-new-fields hidden" style="margin-top:8px">
+          <b>Cadastrar tema sem sair do produto</b>
+          <label>Nome do tema</label><input id="catalogQuickThemeName" placeholder="Ex.: Esportes">
+          <label>Descrição (opcional)</label><input id="catalogQuickThemeDescription" placeholder="Ex.: Times, escudos e jogadores">
+          <div class="actions" style="margin-top:8px"><button type="button" class="btn smallbtn" onclick="quickCreateCatalogTheme()">Salvar tema</button><button type="button" class="btn secondary smallbtn" onclick="toggleQuickCatalogThemeForm(false)">Cancelar</button></div>
+        </div>
+      </div>
+      <div>
+        <div class="title-row" style="align-items:end"><label style="margin-bottom:6px">Subtema</label><button type="button" class="btn secondary smallbtn" onclick="toggleQuickCatalogSubthemeForm()">+ Novo subtema</button></div>
+        <select id="catalogProductSubtheme"></select>
+        <div id="catalogQuickSubthemeForm" class="customer-new-fields hidden" style="margin-top:8px">
+          <b>Cadastrar subtema sem sair do produto</b>
+          <div class="muted" style="margin-top:4px">Será cadastrado dentro do tema selecionado acima.</div>
+          <label>Nome do subtema</label><input id="catalogQuickSubthemeName" placeholder="Ex.: Homem-Aranha">
+          <div class="actions" style="margin-top:8px"><button type="button" class="btn smallbtn" onclick="quickCreateCatalogSubtheme()">Salvar subtema</button><button type="button" class="btn secondary smallbtn" onclick="toggleQuickCatalogSubthemeForm(false)">Cancelar</button></div>
+        </div>
+      </div>
+    </div>
     <div class="row"><div><label>Medidas</label><input id="catalogProductDimensions" value="${esc(p.dimensions||"")}" placeholder="Ex.: 6 x 8 cm"></div><div><label>Quantidade de miçangas</label><input id="catalogProductBeads" type="number" min="0" step="1" value="${p.bead_quantity??""}"></div></div>
     <div class="row"><div><label>Quantidade em estoque</label><input id="catalogProductStock" type="number" min="0" step="1" value="${p.stock_quantity??0}"></div><div><label>Status no catálogo público</label><select id="catalogProductActive"><option value="true" ${p.active!==false?"selected":""}>Ativo</option><option value="false" ${p.active===false?"selected":""}>Inativo</option></select></div></div>
 
@@ -5112,6 +5137,7 @@ function openCatalogProductEditor(source=null,duplicate=false,saleLineId=null){
     <input id="catalogImageInput" type="file" accept="image/*" class="hidden"><input id="catalogCameraInput" type="file" accept="image/*" capture="environment" class="hidden">
     <div class="actions" style="margin-top:9px"><button class="btn secondary" onclick="document.getElementById('catalogImageInput').click()">Carregar da galeria / computador</button><button class="btn secondary" onclick="document.getElementById('catalogCameraInput').click()">Tirar foto</button></div>
     <div id="catalogImageProgress" class="product-processing hidden"></div>
+    <div id="catalogImageBackgroundHint" class="muted" style="margin-top:7px">Enquanto a foto estiver sendo preparada, você pode continuar preenchendo nome, preço, tema, subtema, medidas, estoque e miçangas normalmente.</div>
     <div class="notice" style="margin-top:10px">A foto original fica somente no seu aparelho durante o processamento. O app faz um ajuste leve de nitidez visual/contraste, reduz a imagem com alta qualidade e envia apenas a versão do catálogo e a miniatura. Em “Aplicar fundo padrão”, também remove o fundo e mantém uma margem de segurança para reduzir cortes.</div>
     <div class="actions" style="margin-top:14px">
       ${p.id&&!duplicate?`<button class="btn danger" onclick="deleteOrArchiveCatalogProduct(${p.id})">Excluir produto</button>`:""}
@@ -5120,7 +5146,6 @@ function openCatalogProductEditor(source=null,duplicate=false,saleLineId=null){
   renderCatalogProductSubthemes(p.subtheme_id||null);
   setupCatalogImageInputs();
   preloadCatalogBackground();
-  loadImglyBackgroundRemoval().catch(()=>{});
 }
 function catalogBackgroundModeChanged(){
   const mode=document.getElementById("catalogBackgroundMode")?.value||"apply";
@@ -5133,12 +5158,107 @@ function renderCatalogProductSubthemes(selected=null){
   const rows=availableCatalogSubthemes().filter(st=>Number(st.theme_id)===theme&&st.active!==false);
   sel.innerHTML=`<option value="">Selecione</option>`+rows.map(st=>`<option value="${st.id}" ${Number(selected)===Number(st.id)?"selected":""}>${esc(st.name)}</option>`).join("");
 }
+function toggleQuickCatalogThemeForm(force=null){
+  const box=document.getElementById("catalogQuickThemeForm");if(!box)return;
+  const show=force===null?box.classList.contains("hidden"):Boolean(force);box.classList.toggle("hidden",!show);
+  if(show)setTimeout(()=>document.getElementById("catalogQuickThemeName")?.focus(),0);
+}
+function toggleQuickCatalogSubthemeForm(force=null){
+  const themeId=Number(document.getElementById("catalogProductTheme")?.value||0);
+  if(!themeId){toast("Escolha um tema global primeiro. Se ele ainda não existir, cadastre o tema aqui mesmo.");return}
+  const box=document.getElementById("catalogQuickSubthemeForm");if(!box)return;
+  const show=force===null?box.classList.contains("hidden"):Boolean(force);box.classList.toggle("hidden",!show);
+  if(show)setTimeout(()=>document.getElementById("catalogQuickSubthemeName")?.focus(),0);
+}
+function hideQuickCatalogSubthemeForm(){const box=document.getElementById("catalogQuickSubthemeForm");if(box)box.classList.add("hidden")}
+async function refreshCatalogTaxonomy(preferredThemeId=null,preferredSubthemeId=null){
+  const currentTheme=preferredThemeId??Number(document.getElementById("catalogProductTheme")?.value||0);
+  const currentSub=preferredSubthemeId??Number(document.getElementById("catalogProductSubtheme")?.value||0);
+  const [themesRes,subsRes]=await Promise.all([
+    sb.from("themes").select("id,name,description,active").eq("active",true).order("name"),
+    sb.from("subthemes").select("id,theme_id,name,active").eq("active",true).order("name")
+  ]);
+  const error=themesRes.error||subsRes.error;if(error)throw error;
+  window._catalogThemes=themesRes.data||[];window._saleThemes=themesRes.data||[];
+  window._catalogSubthemes=subsRes.data||[];window._saleSubthemes=subsRes.data||[];
+  const themeSel=document.getElementById("catalogProductTheme");
+  if(themeSel){themeSel.innerHTML=`<option value="">Selecione</option>`+(themesRes.data||[]).map(t=>`<option value="${t.id}" ${Number(t.id)===Number(currentTheme)?"selected":""}>${esc(t.name)}</option>`).join("")}
+  renderCatalogProductSubthemes(currentSub||null);
+}
+async function quickCreateCatalogTheme(){
+  const name=document.getElementById("catalogQuickThemeName")?.value.trim()||"";
+  const description=document.getElementById("catalogQuickThemeDescription")?.value.trim()||"";
+  if(!name){toast("Informe o nome do tema.");return}
+  const btn=document.querySelector("#catalogQuickThemeForm .btn");if(btn)btn.disabled=true;
+  try{
+    const {data,error}=await sb.rpc("admin_save_theme_basic",{p_id:null,p_name:name,p_description:description,p_image_url:"",p_active:true});if(error)throw error;
+    let newId=Number(data?.id||0);
+    if(!newId){const q=await sb.from("themes").select("id,name").eq("active",true).order("id",{ascending:false});if(q.error)throw q.error;const hit=(q.data||[]).find(t=>normalizeCatalogText(t.name)===normalizeCatalogText(name));newId=Number(hit?.id||0)}
+    await refreshCatalogTaxonomy(newId||null,null);toggleQuickCatalogThemeForm(false);
+    const subBox=document.getElementById("catalogQuickSubthemeForm");if(subBox){subBox.classList.remove("hidden");setTimeout(()=>document.getElementById("catalogQuickSubthemeName")?.focus(),0)}
+    toast("Tema cadastrado. Agora você já pode cadastrar o subtema dele.");
+  }catch(e){toast(e?.message||String(e))}finally{if(btn)btn.disabled=false}
+}
+async function quickCreateCatalogSubtheme(){
+  const themeId=Number(document.getElementById("catalogProductTheme")?.value||0);const name=document.getElementById("catalogQuickSubthemeName")?.value.trim()||"";
+  if(!themeId){toast("Escolha o tema global primeiro.");return}if(!name){toast("Informe o nome do subtema.");return}
+  const btn=document.querySelector("#catalogQuickSubthemeForm .btn");if(btn)btn.disabled=true;
+  try{
+    const {data,error}=await sb.rpc("admin_save_subtheme",{p_id:null,p_theme_id:themeId,p_name:name,p_active:true});if(error)throw error;
+    let newId=Number(data?.id||0);
+    if(!newId){const q=await sb.from("subthemes").select("id,theme_id,name").eq("theme_id",themeId).eq("active",true).order("id",{ascending:false});if(q.error)throw q.error;const hit=(q.data||[]).find(st=>normalizeCatalogText(st.name)===normalizeCatalogText(name));newId=Number(hit?.id||0)}
+    await refreshCatalogTaxonomy(themeId,newId||null);toggleQuickCatalogSubthemeForm(false);toast("Subtema cadastrado e selecionado no produto.");
+  }catch(e){toast(e?.message||String(e))}finally{if(btn)btn.disabled=false}
+}
+
 function setupCatalogImageInputs(){
   const zone=document.getElementById("catalogUploadZone"),file=document.getElementById("catalogImageInput"),camera=document.getElementById("catalogCameraInput");
   if(zone){zone.onclick=e=>{if(e.target.closest("button"))return;file?.click()};zone.ondragover=e=>{e.preventDefault();zone.classList.add("dragover")};zone.ondragleave=()=>zone.classList.remove("dragover");zone.ondrop=e=>{e.preventDefault();zone.classList.remove("dragover");const f=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith("image/"));if(f)handleCatalogImageFile(f)}}
   if(file)file.onchange=()=>file.files?.[0]&&handleCatalogImageFile(file.files[0]);if(camera)camera.onchange=()=>camera.files?.[0]&&handleCatalogImageFile(camera.files[0]);
   if(!catalogPasteListenerInstalled){catalogPasteListenerInstalled=true;document.addEventListener("paste",e=>{if(!document.getElementById("catalogProductForm"))return;let f=[...(e.clipboardData?.files||[])].find(f=>f.type.startsWith("image/"));if(!f){const item=[...(e.clipboardData?.items||[])].find(i=>String(i.type||"").startsWith("image/"));f=item?.getAsFile?.()||null}if(f){e.preventDefault();handleCatalogImageFile(f)}})}
 }
+function getCatalogRemovalWorker(){
+  if(catalogRemovalWorker)return catalogRemovalWorker;
+  if(typeof Worker==="undefined")return null;
+  const workerCode=`
+    self.onmessage=async(event)=>{
+      const msg=event.data||{};const id=msg.id;
+      try{
+        const mod=await import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm");
+        const fn=mod.default||mod.removeBackground;if(typeof fn!=="function")throw new Error("Removedor indisponível no worker.");
+        const input=new Blob([msg.buffer],{type:msg.type||"image/webp"});
+        const base={debug:false,device:(self.navigator&&self.navigator.gpu)?"gpu":"cpu",model:"isnet_fp16",output:{format:"image/png",quality:.95,type:"foreground"}};
+        let out;try{out=await fn(input,base)}catch(e){out=await fn(input,{...base,device:"cpu"})}
+        const buffer=await out.arrayBuffer();self.postMessage({id,ok:true,buffer,type:out.type||"image/png"},[buffer]);
+      }catch(error){self.postMessage({id,ok:false,error:String(error&&error.message||error)})}
+    };
+  `;
+  try{
+    catalogRemovalWorkerUrl=URL.createObjectURL(new Blob([workerCode],{type:"text/javascript"}));
+    catalogRemovalWorker=new Worker(catalogRemovalWorkerUrl,{type:"module"});
+    catalogRemovalWorker.onmessage=(event)=>{const msg=event.data||{};const pending=catalogRemovalWorkerPending.get(msg.id);if(!pending)return;catalogRemovalWorkerPending.delete(msg.id);msg.ok?pending.resolve(new Blob([msg.buffer],{type:msg.type||"image/png"})):pending.reject(new Error(msg.error||"Falha no processamento em segundo plano."))};
+    catalogRemovalWorker.onerror=(event)=>{console.warn("Worker de imagem indisponível; usando modo compatível.",event?.message||event);for(const [,p] of catalogRemovalWorkerPending){p.reject(new Error("Worker indisponível."))}catalogRemovalWorkerPending.clear();catalogRemovalWorker?.terminate();catalogRemovalWorker=null;if(catalogRemovalWorkerUrl)URL.revokeObjectURL(catalogRemovalWorkerUrl);catalogRemovalWorkerUrl=null};
+    return catalogRemovalWorker;
+  }catch(e){console.warn("Não foi possível iniciar o worker de imagem.",e);return null}
+}
+async function removeCatalogBackgroundResponsive(blob,progressEl=null){
+  const worker=getCatalogRemovalWorker();
+  if(worker){
+    try{
+      if(progressEl)progressEl.textContent="Removendo o fundo em segundo plano... Você pode continuar preenchendo os outros campos.";
+      const buffer=await blob.arrayBuffer();const id=++catalogRemovalWorkerSeq;
+      return await new Promise((resolve,reject)=>{catalogRemovalWorkerPending.set(id,{resolve,reject});worker.postMessage({id,buffer,type:blob.type||"image/webp"},[buffer])});
+    }catch(e){console.warn("Processamento em segundo plano falhou; usando modo compatível.",e)}
+  }
+  if(progressEl)progressEl.textContent="Removendo o fundo... Você ainda pode preencher os outros campos; em alguns aparelhos esta etapa pode ficar mais lenta.";
+  const mod=await loadImglyBackgroundRemoval();const fn=mod.default||mod.removeBackground;if(typeof fn!=="function")throw new Error("Módulo de remoção de fundo indisponível.");
+  try{return await fn(blob,catalogRemovalConfig(progressEl))}catch(firstErr){console.warn("GPU/background removal fallback:",firstErr);return await fn(blob,{...catalogRemovalConfig(progressEl),device:"cpu"})}
+}
+function showCatalogSourcePreview(file){
+  const st=window._catalogProductImageState||{};if(st.rawPreviewObjectUrl)URL.revokeObjectURL(st.rawPreviewObjectUrl);const rawPreviewObjectUrl=URL.createObjectURL(file);st.rawPreviewObjectUrl=rawPreviewObjectUrl;window._catalogProductImageState=st;
+  const preview=document.getElementById("catalogProductPreview");if(preview){preview.src=rawPreviewObjectUrl;preview.classList.remove("hidden")}document.getElementById("catalogUploadPrompt")?.classList.add("hidden");
+}
+
 async function loadImglyBackgroundRemoval(){
   if(catalogImageRemovalModule)return catalogImageRemovalModule;
   catalogImageRemovalModule=await import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm");
@@ -5199,23 +5319,22 @@ async function handleCatalogImageFile(file,reprocess=false){
   if(!file||!String(file.type||"").startsWith("image/")){toast("Escolha um arquivo de imagem.");return}
   if(catalogImageProcessingBusy&&!reprocess){toast("Aguarde a imagem atual terminar de ser processada.");return}
   catalogImageProcessingBusy=true;
-  const progress=document.getElementById("catalogImageProgress"),saveBtn=document.getElementById("catalogProductSaveBtn");if(progress){progress.classList.remove("hidden");progress.textContent="Otimizando e melhorando a imagem..."}if(saveBtn)saveBtn.disabled=true;
+  const progress=document.getElementById("catalogImageProgress"),saveBtn=document.getElementById("catalogProductSaveBtn");if(progress){progress.classList.remove("hidden");progress.textContent="Foto recebida. Pode continuar preenchendo os outros campos enquanto ela é preparada..."}if(saveBtn)saveBtn.disabled=true;
   try{
     const st=window._catalogProductImageState||{};st.sourceFile=file;const mode=document.getElementById("catalogBackgroundMode")?.value||st.backgroundMode||"apply";const fit=document.getElementById("catalogFitMode")?.value||st.fitMode||"safe";st.backgroundMode=mode;st.fitMode=fit;window._catalogProductImageState=st;
+    showCatalogSourcePreview(file);await new Promise(resolve=>setTimeout(resolve,25));
+    if(progress)progress.textContent="Otimizando e melhorando a imagem... Continue preenchendo o cadastro normalmente.";
     const prepared=await prepareInputImage(file,mode==="apply"?1200:1400);let result;
     if(mode==="ready"){
       if(progress)progress.textContent="Fundo já aplicado: ajustando qualidade e criando as versões do catálogo...";
       result=await composeAlreadyReadyImages(prepared.canvas);
     }else{
-      if(progress)progress.textContent="Removendo o fundo automaticamente...";
-      const mod=await loadImglyBackgroundRemoval();const fn=mod.default||mod.removeBackground;if(typeof fn!=="function")throw new Error("Módulo de remoção de fundo indisponível.");
-      let transparent;
-      try{transparent=await fn(prepared.blob,catalogRemovalConfig(progress))}catch(firstErr){console.warn("GPU/background removal fallback:",firstErr);transparent=await fn(prepared.blob,{...catalogRemovalConfig(progress),device:"cpu"})}
-      if(progress)progress.textContent="Aplicando o fundo padrão com margem de segurança...";
+      const transparent=await removeCatalogBackgroundResponsive(prepared.blob,progress);
+      if(progress)progress.textContent="Aplicando o fundo padrão com margem de segurança... Continue preenchendo o cadastro normalmente.";
       const normalized=await normalizeRemovedForeground(transparent);result=await composeCatalogProductImages(normalized,fit);
     }
-    const old=window._catalogProductImageState?.previewObjectUrl;if(old)URL.revokeObjectURL(old);const previewObjectUrl=URL.createObjectURL(result.catalogBlob);
-    window._catalogProductImageState={...(window._catalogProductImageState||{}),catalogBlob:result.catalogBlob,thumbBlob:result.thumbBlob,previewObjectUrl,sourceFile:file,backgroundMode:mode,fitMode:fit};
+    const old=window._catalogProductImageState?.previewObjectUrl;if(old)URL.revokeObjectURL(old);const rawOld=window._catalogProductImageState?.rawPreviewObjectUrl;if(rawOld)URL.revokeObjectURL(rawOld);const previewObjectUrl=URL.createObjectURL(result.catalogBlob);
+    window._catalogProductImageState={...(window._catalogProductImageState||{}),catalogBlob:result.catalogBlob,thumbBlob:result.thumbBlob,previewObjectUrl,rawPreviewObjectUrl:null,sourceFile:file,backgroundMode:mode,fitMode:fit};
     const preview=document.getElementById("catalogProductPreview");if(preview){preview.src=previewObjectUrl;preview.classList.remove("hidden")}document.getElementById("catalogUploadPrompt")?.classList.add("hidden");if(progress){progress.textContent=`Imagem pronta. Versão catálogo: ${(result.catalogBlob.size/1024).toFixed(0)} KB • miniatura: ${(result.thumbBlob.size/1024).toFixed(0)} KB. Confira a prévia antes de salvar.`}
   }catch(e){console.error(e);if(progress)progress.textContent="Não foi possível preparar a imagem: "+(e?.message||e);toast("Não foi possível tratar essa foto. Você pode tentar novamente ou escolher ‘Fundo já aplicado’ se a imagem já estiver pronta.")}
   finally{catalogImageProcessingBusy=false;if(saveBtn)saveBtn.disabled=false}
@@ -5277,9 +5396,43 @@ function renderSaleItems(){
   target.innerHTML=lines.map((l,idx)=>{const p=saleCatalogProductById(l.productId);return `<div class="sale-item-card"><div class="title-row"><b>Item ${idx+1}</b>${lines.length>1?`<button class="btn danger smallbtn" onclick="removeSaleItem(${l.id})">Remover</button>`:""}</div>${p?`<div class="sale-item-selected"><img src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.theme?.name||p.theme_name||"")} → ${esc(p.subtheme?.name||p.subtheme_name||"")}</div><div>${money(p.price)} cada • ${esc(p.dimensions||"")}</div><div class="muted">Código interno: ${esc(p.code||"")} • estoque atual: ${Number(p.stock_quantity||0)}</div><button class="btn secondary smallbtn" style="margin-top:7px" onclick="openSaleProductPicker(${l.id})">Trocar produto</button></div></div>`:`<div class="notice" style="margin-top:8px">Nenhum produto escolhido.<div class="actions" style="margin-top:8px"><button class="btn" onclick="openSaleProductPicker(${l.id})">Escolher produto pela foto</button><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${l.id})">Cadastrar produto agora</button></div></div>`}<div class="row" style="margin-top:10px"><div><label>Categoria desta venda</label><select onchange="updateSaleLineCategory(${l.id},this.value)">${cats.map(c=>`<option value="${c.id}" ${Number(l.categoryId)===Number(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Quantidade</label><input type="number" min="1" step="1" value="${Number(l.quantity||1)}" onchange="updateSaleLineQty(${l.id},this.value)"></div></div>${p?`<div class="sale-item-total">Subtotal: ${money(Number(p.price)*Number(l.quantity||1))}</div>`:""}</div>`}).join("");renderSaleOrderTotal();
 }
 function openSaleProductPicker(lineId){
-  openModal(`<div class="title-row"><div><h2>Escolher produto</h2><div class="muted">Pesquise pelo nome ou código e clique na foto correta.</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div><input id="saleProductPickerSearch" placeholder="Nome ou CAT-000123" oninput="renderSaleProductPicker(${lineId})" style="margin-top:10px"><div class="actions" style="margin:10px 0"><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${lineId})">+ Produto ainda não cadastrado</button></div><div id="saleProductPickerGrid" class="sale-picker-grid"></div>`,true);renderSaleProductPicker(lineId)
+  const themes=[...(window._saleThemes||[])].filter(t=>t.active!==false).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR"));
+  openModal(`<div class="title-row"><div><h2>Escolher produto</h2><div class="muted">Pesquise por nome ou código, ou filtre por tema e subtema.</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
+    <input id="saleProductPickerSearch" placeholder="Nome ou CAT-000123" oninput="renderSaleProductPicker(${lineId})" style="margin-top:10px">
+    <div class="row" style="margin-top:10px">
+      <div><label>Tema</label><select id="saleProductPickerTheme" onchange="updateSaleProductPickerSubthemes(${lineId})"><option value="">Todos os temas</option>${themes.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+      <div><label>Subtema</label><select id="saleProductPickerSubtheme" onchange="renderSaleProductPicker(${lineId})"><option value="">Todos os subtemas</option></select></div>
+    </div>
+    <div class="actions" style="margin:10px 0"><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${lineId})">+ Produto ainda não cadastrado</button></div>
+    <div id="saleProductPickerGrid" class="sale-picker-grid"></div>`,true);
+  updateSaleProductPickerSubthemes(lineId,false);
 }
-function renderSaleProductPicker(lineId){const q=normalizeCatalogText(document.getElementById("saleProductPickerSearch")?.value||"");const target=document.getElementById("saleProductPickerGrid");if(!target)return;const rows=(window._saleCatalogProducts||[]).filter(p=>p.active!==false&&(!q||normalizeCatalogText(p.name).includes(q)||normalizeCatalogText(p.code).includes(q)));target.innerHTML=rows.map(p=>`<div class="sale-picker-card" onclick="assignCatalogProductToSaleLine(${lineId},${p.id})"><img loading="lazy" src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><b>${esc(p.name)}</b><div class="muted">${esc(p.code||"")}</div><div>${money(p.price)}</div><div class="muted">Estoque: ${Number(p.stock_quantity||0)}</div></div>`).join("")||`<div class="muted">Nenhum produto encontrado.</div>`}
+function updateSaleProductPickerSubthemes(lineId,render=true){
+  const themeId=Number(document.getElementById("saleProductPickerTheme")?.value||0);
+  const sel=document.getElementById("saleProductPickerSubtheme");
+  if(!sel)return;
+  const current=sel.value;
+  const subs=[...(window._saleSubthemes||[])]
+    .filter(st=>st.active!==false&&(!themeId||Number(st.theme_id)===themeId))
+    .sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR"));
+  sel.innerHTML=`<option value="">Todos os subtemas</option>`+subs.map(st=>`<option value="${st.id}">${esc(st.name)}</option>`).join("");
+  if(subs.some(st=>String(st.id)===String(current)))sel.value=current;
+  if(render)renderSaleProductPicker(lineId);
+  else renderSaleProductPicker(lineId);
+}
+function renderSaleProductPicker(lineId){
+  const q=normalizeCatalogText(document.getElementById("saleProductPickerSearch")?.value||"");
+  const themeId=Number(document.getElementById("saleProductPickerTheme")?.value||0);
+  const subthemeId=Number(document.getElementById("saleProductPickerSubtheme")?.value||0);
+  const target=document.getElementById("saleProductPickerGrid");if(!target)return;
+  const rows=(window._saleCatalogProducts||[]).filter(p=>
+    p.active!==false &&
+    (!themeId||Number(p.theme_id)===themeId) &&
+    (!subthemeId||Number(p.subtheme_id)===subthemeId) &&
+    (!q||normalizeCatalogText(p.name).includes(q)||normalizeCatalogText(p.code).includes(q))
+  );
+  target.innerHTML=rows.map(p=>`<div class="sale-picker-card" onclick="assignCatalogProductToSaleLine(${lineId},${p.id})"><img loading="lazy" src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><b>${esc(p.name)}</b><div class="muted">${esc(p.code||"")}</div><div>${money(p.price)}</div><div class="muted">${esc(p.theme?.name||p.theme_name||"")} → ${esc(p.subtheme?.name||p.subtheme_name||"")}</div><div class="muted">Estoque: ${Number(p.stock_quantity||0)}</div></div>`).join("")||`<div class="muted">Nenhum produto encontrado com esses filtros.</div>`;
+}
 
 async function loadAdminSales(){
   const box=document.getElementById("adminContent");
