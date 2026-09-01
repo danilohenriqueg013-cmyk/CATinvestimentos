@@ -5163,10 +5163,11 @@ async function loadAdminCatalog(){
     <div class="row"><div><label>Link para compartilhar</label><div class="actions"><input id="catalogShareUrl" readonly value="${esc(shareUrl)}"><button class="btn secondary" onclick="navigator.clipboard.writeText(document.getElementById('catalogShareUrl').value).then(()=>toast('Link copiado.'))">Copiar</button></div></div></div>
     <div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#fffafb">
       <div style="font-weight:800;color:var(--primary);margin-bottom:8px">Filtrar Catálogo / Estoque</div>
-      <div class="filter-bar" style="margin-top:0;grid-template-columns:minmax(220px,2fr) minmax(170px,1fr) minmax(170px,1fr) auto">
+      <div class="filter-bar" style="margin-top:0;grid-template-columns:minmax(220px,2fr) minmax(160px,1fr) minmax(160px,1fr) minmax(160px,1fr) auto">
         <div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="renderAdminCatalogProducts()"></div>
         <div><label>Tema</label><select id="adminCatalogThemeFilter" onchange="renderAdminCatalogSubthemeFilter();renderAdminCatalogProducts()"><option value="">Todos os temas</option>${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
         <div><label>Subtema</label><select id="adminCatalogSubthemeFilter" onchange="renderAdminCatalogProducts()"><option value="">Todos os subtemas</option></select></div>
+        <div><label>Estoque</label><select id="adminCatalogStockFilter" onchange="renderAdminCatalogProducts()"><option value="all">Todos</option><option value="in_stock">Somente com estoque</option><option value="out_of_stock">Somente sem estoque</option></select></div>
         <button class="btn secondary" type="button" onclick="clearAdminCatalogFilters()">Limpar filtros</button>
       </div>
     </div>
@@ -5180,10 +5181,12 @@ function clearAdminCatalogFilters(){
   const search=document.getElementById("adminCatalogSearch");
   const theme=document.getElementById("adminCatalogThemeFilter");
   const sub=document.getElementById("adminCatalogSubthemeFilter");
+  const stock=document.getElementById("adminCatalogStockFilter");
   if(search)search.value="";
   if(theme)theme.value="";
   renderAdminCatalogSubthemeFilter();
   if(sub)sub.value="";
+  if(stock)stock.value="all";
   renderAdminCatalogProducts();
 }
 function renderAdminCatalogSubthemeFilter(){
@@ -5199,10 +5202,12 @@ function renderAdminCatalogProducts(){
   const q=normalizeCatalogText(document.getElementById("adminCatalogSearch")?.value||"");
   const themeId=Number(document.getElementById("adminCatalogThemeFilter")?.value||0);
   const subthemeId=Number(document.getElementById("adminCatalogSubthemeFilter")?.value||0);
+  const stockFilter=document.getElementById("adminCatalogStockFilter")?.value||"all";
   const rows=(window._catalogAdminProducts||[]).filter(p=>
     (!q||normalizeCatalogText(p.name).includes(q)||normalizeCatalogText(p.code).includes(q))&&
     (!themeId||Number(p.theme_id)===themeId)&&
-    (!subthemeId||Number(p.subtheme_id)===subthemeId)
+    (!subthemeId||Number(p.subtheme_id)===subthemeId)&&
+    (stockFilter==="all"||(stockFilter==="in_stock"&&Number(p.stock_quantity||0)>0)||(stockFilter==="out_of_stock"&&Number(p.stock_quantity||0)<=0))
   );
   target.innerHTML=`<div class="admin-product-grid">${rows.map(p=>`<div class="admin-product-card"><img loading="lazy" src="${esc(p.thumb_url)}" alt="${esc(p.name)}"><div style="margin-top:8px"><span class="admin-product-code">${esc(p.code)}</span>${p.active?`<span class="badge green" style="margin-left:6px">ATIVO</span>`:`<span class="badge red" style="margin-left:6px">INATIVO</span>`}</div><h3 style="margin:8px 0 4px;color:var(--primary)">${esc(p.name)}</h3><div><b>${money(p.price)}</b> • ${esc(p.dimensions)}</div><div class="muted" style="margin-top:5px">${esc(p.theme?.name||"")} → ${esc(p.subtheme?.name||"")}</div><div class="mini-metrics" style="margin-top:8px"><div class="mini-metric"><span class="muted">Estoque</span><b>${Number(p.stock_quantity||0)}</b></div><div class="mini-metric"><span class="muted">Miçangas</span><b>${Number(p.bead_quantity||0)}</b></div></div><div class="actions" style="margin-top:9px"><button class="btn smallbtn" onclick="openCatalogProductEditorById(${p.id})">Editar</button><button class="btn secondary smallbtn" onclick="duplicateCatalogProductById(${p.id})">Duplicar</button></div></div>`).join("")||`<div class="card muted">Nenhum produto encontrado.</div>`}</div>`;
 }
