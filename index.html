@@ -2790,8 +2790,10 @@ async function loadAdminSales(){
     </div>
 
     <div class="card" style="margin-top:14px">
-      <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Vendas pagas, parciais ou não pagas podem ser excluídas quando as travas financeiras permitirem. Itens do catálogo retornam automaticamente ao estoque.</div></div></div>
-      <div id="salesExtract"></div>
+      <div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Pesquise por cliente, produto, tema, subtema, vendedor, valor, pagamento, forma, entrega, comissão ou qualquer outra informação da venda.</div></div></div>
+      <label>Buscar no extrato</label>
+      <input id="salesExtractSearch" placeholder="Ex.: Alice, Galo, Naruto, PIX, R$ 15, vendedor..." oninput="renderSalesDashboard()">
+      <div id="salesExtract" style="margin-top:12px"></div>
     </div>
   `;
 
@@ -5159,14 +5161,29 @@ async function loadAdminCatalog(){
   const shareUrl=new URL("?catalogo=1",location.href).href;
   box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Catálogo / Estoque</h2><div class="muted">Uma única ficha alimenta o estoque interno e o catálogo público.</div></div><div class="actions"><button class="btn" onclick="openCatalogProductEditor()">+ Cadastrar produto</button><button class="btn secondary" onclick="window.open('${esc(shareUrl)}','_blank')">Ver catálogo público</button></div></div>
     <div class="row"><div><label>Link para compartilhar</label><div class="actions"><input id="catalogShareUrl" readonly value="${esc(shareUrl)}"><button class="btn secondary" onclick="navigator.clipboard.writeText(document.getElementById('catalogShareUrl').value).then(()=>toast('Link copiado.'))">Copiar</button></div></div></div>
-    <div class="filter-bar" style="margin-top:12px">
-      <div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="renderAdminCatalogProducts()"></div>
-      <div><label>Tema</label><select id="adminCatalogThemeFilter" onchange="renderAdminCatalogSubthemeFilter();renderAdminCatalogProducts()"><option value="">Todos os temas</option>${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
-      <div><label>Subtema</label><select id="adminCatalogSubthemeFilter" onchange="renderAdminCatalogProducts()"><option value="">Todos os subtemas</option></select></div>
+    <div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#fffafb">
+      <div style="font-weight:800;color:var(--primary);margin-bottom:8px">Filtrar Catálogo / Estoque</div>
+      <div class="filter-bar" style="margin-top:0;grid-template-columns:minmax(220px,2fr) minmax(170px,1fr) minmax(170px,1fr) auto">
+        <div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="renderAdminCatalogProducts()"></div>
+        <div><label>Tema</label><select id="adminCatalogThemeFilter" onchange="renderAdminCatalogSubthemeFilter();renderAdminCatalogProducts()"><option value="">Todos os temas</option>${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+        <div><label>Subtema</label><select id="adminCatalogSubthemeFilter" onchange="renderAdminCatalogProducts()"><option value="">Todos os subtemas</option></select></div>
+        <button class="btn secondary" type="button" onclick="clearAdminCatalogFilters()">Limpar filtros</button>
+      </div>
     </div>
     <div class="mini-metrics" style="margin-top:12px"><div class="mini-metric"><span class="muted">Produtos cadastrados</span><b>${(productsRes.data||[]).length}</b></div><div class="mini-metric"><span class="muted">Unidades no estoque</span><b>${(productsRes.data||[]).reduce((a,p)=>a+Number(p.stock_quantity||0),0)}</b></div><div class="mini-metric"><span class="muted">Valor do estoque pelo preço de venda</span><b>${money((productsRes.data||[]).reduce((a,p)=>a+Number(p.stock_quantity||0)*Number(p.price||0),0))}</b></div></div>
   </div><div id="adminCatalogProducts" style="margin-top:14px"></div>`;
   renderAdminCatalogSubthemeFilter();
+  renderAdminCatalogProducts();
+}
+
+function clearAdminCatalogFilters(){
+  const search=document.getElementById("adminCatalogSearch");
+  const theme=document.getElementById("adminCatalogThemeFilter");
+  const sub=document.getElementById("adminCatalogSubthemeFilter");
+  if(search)search.value="";
+  if(theme)theme.value="";
+  renderAdminCatalogSubthemeFilter();
+  if(sub)sub.value="";
   renderAdminCatalogProducts();
 }
 function renderAdminCatalogSubthemeFilter(){
@@ -5563,7 +5580,7 @@ async function loadAdminSales(){
     <button class="btn" style="width:100%;margin-top:14px" onclick="saveCatalogSale()">Registrar venda</button></div>
     <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Relatório de vendas</h3><div class="muted">Pedidos com vários itens contam como uma única venda no total de vendas.</div></div></div><div class="filter-bar"><div><label>Data inicial</label><input id="salesReportFrom" type="date"></div><div><label>Data final</label><input id="salesReportTo" type="date"></div><button class="btn" onclick="renderSalesDashboard()">Filtrar</button><button class="btn secondary" onclick="clearReportRange('salesReport',renderSalesDashboard)">Limpar filtro</button></div><div id="salesDashboard"></div></div>
     <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Produtos ainda não entregues</h3><div class="muted">Controle interno da loja.</div></div></div><div id="deliveryReport"></div></div>
-    <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Pesquise por cliente, produto, tema, subtema, vendedor, valor, pagamento, entrega ou qualquer outra informação da venda.</div></div></div><label>Buscar no extrato</label><input id="salesExtractSearch" placeholder="Ex.: Alice, Galo, Naruto, PIX, R$ 15, vendedor..." oninput="renderSalesDashboard()"><div id="salesExtract" style="margin-top:12px"></div></div>`;
+    <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Pesquise por cliente, produto, tema, subtema, vendedor, valor, pagamento, forma, entrega, comissão ou qualquer outra informação da venda.</div></div></div><label>Buscar no extrato</label><input id="salesExtractSearch" placeholder="Ex.: Alice, Galo, Naruto, PIX, R$ 15, vendedor..." oninput="renderSalesDashboard()"><div id="salesExtract" style="margin-top:12px"></div></div>`;
   renderSaleItems();toggleSalePaymentFields();toggleSaleDeliveryFields();toggleSaleCommissionFields();renderSalesDashboard();
 }
 async function saveCatalogSale(){
