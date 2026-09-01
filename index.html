@@ -3018,7 +3018,7 @@ function renderSalesDashboard(){
 
   extract.innerHTML=`
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Venda</th><th>Recebido</th><th>A receber</th><th>Pagamento</th><th>Entrega</th><th>Comissão</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Venda</th><th>Recebido</th><th>A receber</th><th>Pagamento</th><th>Forma</th><th>Entrega</th><th>Comissão</th><th>Ação</th></tr></thead>
       <tbody>${sales.map(s=>{
         const remaining=Math.max(0,Number(s.amount||0)-Number(s.paid_amount||0));
         const commission=s.has_commission
@@ -3030,11 +3030,12 @@ function renderSalesDashboard(){
           <td>${esc(s.category?.name||"Categoria não registrada")}</td>
           <td>${esc(s.themes?.name||"-")}</td>
           <td>${esc(s.subtheme?.name||"-")}</td>
-          <td>${esc(s.product_name||"-")}</td>
-          <td><b>${money(s.amount)}</b></td>
+          <td>${s.catalog_quantity&&Number(s.catalog_quantity)>1?`<b>${Number(s.catalog_quantity)}x</b> `:""}${esc(s.product_name||"-")}</td>
+          <td><b>${money(s.amount)}</b>${Number(s.catalog_discount_amount||0)>0?`<br><span class="muted">Preço cheio: ${money(s.catalog_gross_amount||Number(s.amount)+Number(s.catalog_discount_amount||0))}<br>Desconto: -${money(s.catalog_discount_amount)}</span>`:""}</td>
           <td class="flow-positive"><b>${money(s.paid_amount||0)}</b></td>
           <td class="${remaining>0?"flow-negative":"flow-neutral"}"><b>${money(remaining)}</b></td>
           <td><span class="badge ${s.payment_status==="paid"?"green":s.payment_status==="partial"?"":"red"}">${salePaymentStatusPt(s.payment_status)}</span></td>
+          <td>${esc(salePaymentMethodPt(s.payment_method))}</td>
           <td><span class="badge ${s.delivered?"green":"red"}">${s.delivered?"ENTREGUE":"NÃO ENTREGUE"}</span>${!s.delivered&&s.expected_delivery_date?`<br><span class="muted">${dateOnlyPt(s.expected_delivery_date)}</span>`:""}</td>
           <td>${commission}</td>
           <td><div class="actions">
@@ -3043,7 +3044,7 @@ function renderSalesDashboard(){
             <button class="btn danger smallbtn" onclick="deleteSaleAny(${s.id})">Excluir venda</button>
           </div></td>
         </tr>`;
-      }).join("")||`<tr><td colspan="13">Nenhuma venda neste período.</td></tr>`}</tbody>
+      }).join("")||`<tr><td colspan="14">Nenhuma venda neste período.</td></tr>`}</tbody>
     </table></div>
   `;
 
@@ -3082,7 +3083,7 @@ function renderDeliveryReport(){
           <td>${esc(s.product_name||"-")}</td>
           <td>${esc(s.themes?.name||"-")}${s.subtheme?.name?`<br><span class="muted">${esc(s.subtheme.name)}</span>`:""}</td>
           <td>${money(s.amount)}</td>
-          <td>${salePaymentStatusPt(s.payment_status)}</td>
+          <td>${salePaymentStatusPt(s.payment_status)}<br><span class="muted">${esc(salePaymentMethodPt(s.payment_method))}</span></td>
           <td><button class="btn smallbtn" onclick="openEditSale(${s.id})">Editar venda</button></td>
         </tr>
       `).join("")||`<tr><td colspan="7">Nenhum produto pendente de entrega.</td></tr>`}</tbody>
@@ -3208,11 +3209,18 @@ async function openEditSale(id){
         <input id="editSaleDateFull" type="datetime-local" value="${toDateTimeLocalValue(sale.sold_at)}" ${financialLocked?"disabled":""}>
       </div>
       <div>
-        <label>Pagamento</label>
-        <div class="item" style="padding:11px">
-          <b>${salePaymentStatusPt(sale.payment_status)}</b><br>
-          <span class="muted">Recebido: ${money(received)} • A receber: ${money(remaining)}</span>
-        </div>
+        <label>Forma de pagamento</label>
+        <select id="editSalePaymentMethodFull">
+          <option value="nao_informado" ${(!sale.payment_method||sale.payment_method==="nao_informado")?"selected":""}>Não informado (histórico)</option>
+          <option value="pix" ${sale.payment_method==="pix"?"selected":""}>PIX</option>
+          <option value="dinheiro" ${sale.payment_method==="dinheiro"?"selected":""}>Dinheiro</option>
+          <option value="cartao_debito" ${sale.payment_method==="cartao_debito"?"selected":""}>Cartão de débito</option>
+          <option value="cartao_credito" ${sale.payment_method==="cartao_credito"?"selected":""}>Cartão de crédito</option>
+          <option value="transferencia" ${sale.payment_method==="transferencia"?"selected":""}>Transferência bancária</option>
+          <option value="outro" ${sale.payment_method==="outro"?"selected":""}>Outro</option>
+          <option value="a_definir" ${sale.payment_method==="a_definir"?"selected":""}>A definir</option>
+        </select>
+        <div class="muted" style="font-size:11px;margin-top:4px">${salePaymentStatusPt(sale.payment_status)} • Recebido: ${money(received)} • A receber: ${money(remaining)}</div>
       </div>
     </div>
 
@@ -3360,6 +3368,8 @@ async function saveEditSaleFull(id){
 
   const subthemeValue=document.getElementById("editSaleSubthemeFull")?.value||"";
   const subthemeId=subthemeValue?Number(subthemeValue):null;
+  const paymentMethod=document.getElementById("editSalePaymentMethodFull")?.value||"nao_informado";
+  if(sale.payment_status!=="unpaid"&&paymentMethod==="a_definir"){toast("Venda paga ou parcialmente paga precisa ter uma forma de pagamento definida.");return}
 
   if(!confirm("Salvar as alterações desta venda?"))return;
 
@@ -3380,6 +3390,8 @@ async function saveEditSaleFull(id){
   });
 
   if(error){toast(error.message);return}
+  const {error:paymentMethodError}=await sb.rpc("admin_update_sale_payment_method",{p_sale_id:id,p_payment_method:paymentMethod});
+  if(paymentMethodError){toast("Os outros dados foram salvos, mas não foi possível atualizar a forma de pagamento: "+paymentMethodError.message);return}
   closeModal();
   toast("Venda atualizada.");
   await loadAdminSales();
@@ -3444,6 +3456,20 @@ function salePaymentStatusPt(status){
   if(status==="paid")return "PAGO";
   if(status==="partial")return "PAGO PARCIAL";
   return "NÃO PAGO";
+}
+
+function salePaymentMethodPt(method){
+  const map={
+    pix:"PIX",
+    dinheiro:"Dinheiro",
+    cartao_debito:"Cartão de débito",
+    cartao_credito:"Cartão de crédito",
+    transferencia:"Transferência bancária",
+    outro:"Outro",
+    a_definir:"A definir",
+    nao_informado:"Não informado"
+  };
+  return map[String(method||"nao_informado")]||"Não informado";
 }
 
 function findSaleForReceivable(id){
@@ -5383,17 +5409,19 @@ async function saveCatalogProduct(){
 }
 
 // ---------- Venda por foto / multiitem ----------
-function newSaleLine(){return {id:Date.now()+Math.floor(Math.random()*9999),productId:null,quantity:1,categoryId:Number((window._saleCategories||[])[0]?.id||0)}}
+function newSaleLine(){return {id:Date.now()+Math.floor(Math.random()*9999),productId:null,quantity:1,discountPerUnit:0,categoryId:Number((window._saleCategories||[])[0]?.id||0)}}
 function addSaleItem(){if(!window._saleCartLines)window._saleCartLines=[];window._saleCartLines.push(newSaleLine());renderSaleItems()}
 function removeSaleItem(id){window._saleCartLines=(window._saleCartLines||[]).filter(l=>l.id!==id);if(!window._saleCartLines.length)window._saleCartLines=[newSaleLine()];renderSaleItems()}
 function saleCatalogProductById(id){return (window._saleCatalogProducts||[]).find(p=>Number(p.id)===Number(id))}
-function assignCatalogProductToSaleLine(lineId,productId){const line=(window._saleCartLines||[]).find(l=>l.id===lineId);if(!line)return;line.productId=Number(productId);renderSaleItems();closeModal()}
+function assignCatalogProductToSaleLine(lineId,productId){const line=(window._saleCartLines||[]).find(l=>l.id===lineId);if(!line)return;line.productId=Number(productId);line.discountPerUnit=0;renderSaleItems();closeModal()}
 function updateSaleLineQty(id,value){const line=(window._saleCartLines||[]).find(l=>l.id===id);if(!line)return;line.quantity=Math.max(1,Math.floor(Number(value)||1));renderSaleItems()}
 function updateSaleLineCategory(id,value){const line=(window._saleCartLines||[]).find(l=>l.id===id);if(line)line.categoryId=Number(value||0);renderSaleOrderTotal()}
-function renderSaleOrderTotal(){const el=document.getElementById("saleOrderTotalValue");if(el)el.textContent=money((window._saleCartLines||[]).reduce((a,l)=>{const p=saleCatalogProductById(l.productId);return a+(p?Number(p.price)*Number(l.quantity||1):0)},0))}
+function updateSaleLineDiscount(id,value){const line=(window._saleCartLines||[]).find(l=>l.id===id);if(!line)return;const p=saleCatalogProductById(line.productId);let v=Math.max(0,Number(value)||0);if(p&&v>=Number(p.price||0))v=Math.max(0,Number(p.price||0)-0.01);line.discountPerUnit=Math.round(v*100)/100;renderSaleItems()}
+function saleLineAmounts(line){const p=saleCatalogProductById(line?.productId);if(!p)return {gross:0,discountPerUnit:0,discountTotal:0,total:0,finalUnit:0};const qty=Math.max(1,Number(line.quantity||1));const price=Number(p.price||0);const discountPerUnit=Math.max(0,Number(line.discountPerUnit||0));const gross=price*qty;const discountTotal=Math.min(gross,discountPerUnit*qty);return {gross,discountPerUnit,discountTotal,total:Math.max(0,gross-discountTotal),finalUnit:Math.max(0,price-discountPerUnit)}}
+function renderSaleOrderTotal(){const lines=window._saleCartLines||[];const total=lines.reduce((a,l)=>a+saleLineAmounts(l).total,0);const discount=lines.reduce((a,l)=>a+saleLineAmounts(l).discountTotal,0);const el=document.getElementById("saleOrderTotalValue");if(el)el.textContent=money(total);const de=document.getElementById("saleOrderDiscountValue");if(de){de.textContent=money(discount);de.parentElement?.classList.toggle("hidden",discount<=0)}}
 function renderSaleItems(){
   const target=document.getElementById("saleItemsList");if(!target)return;const cats=window._saleCategories||[];const lines=window._saleCartLines||[];
-  target.innerHTML=lines.map((l,idx)=>{const p=saleCatalogProductById(l.productId);return `<div class="sale-item-card"><div class="title-row"><b>Item ${idx+1}</b>${lines.length>1?`<button class="btn danger smallbtn" onclick="removeSaleItem(${l.id})">Remover</button>`:""}</div>${p?`<div class="sale-item-selected"><img src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.theme?.name||p.theme_name||"")} → ${esc(p.subtheme?.name||p.subtheme_name||"")}</div><div>${money(p.price)} cada • ${esc(p.dimensions||"")}</div><div class="muted">Código interno: ${esc(p.code||"")} • estoque atual: ${Number(p.stock_quantity||0)}</div><button class="btn secondary smallbtn" style="margin-top:7px" onclick="openSaleProductPicker(${l.id})">Trocar produto</button></div></div>`:`<div class="notice" style="margin-top:8px">Nenhum produto escolhido.<div class="actions" style="margin-top:8px"><button class="btn" onclick="openSaleProductPicker(${l.id})">Escolher produto pela foto</button><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${l.id})">Cadastrar produto agora</button></div></div>`}<div class="row" style="margin-top:10px"><div><label>Categoria desta venda</label><select onchange="updateSaleLineCategory(${l.id},this.value)">${cats.map(c=>`<option value="${c.id}" ${Number(l.categoryId)===Number(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Quantidade</label><input type="number" min="1" step="1" value="${Number(l.quantity||1)}" onchange="updateSaleLineQty(${l.id},this.value)"></div></div>${p?`<div class="sale-item-total">Subtotal: ${money(Number(p.price)*Number(l.quantity||1))}</div>`:""}</div>`}).join("");renderSaleOrderTotal();
+  target.innerHTML=lines.map((l,idx)=>{const p=saleCatalogProductById(l.productId);const a=saleLineAmounts(l);return `<div class="sale-item-card"><div class="title-row"><b>Item ${idx+1}</b>${lines.length>1?`<button class="btn danger smallbtn" onclick="removeSaleItem(${l.id})">Remover</button>`:""}</div>${p?`<div class="sale-item-selected"><img src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.theme?.name||p.theme_name||"")} → ${esc(p.subtheme?.name||p.subtheme_name||"")}</div><div>${money(p.price)} cada • ${esc(p.dimensions||"")}</div><div class="muted">Código interno: ${esc(p.code||"")} • estoque atual: ${Number(p.stock_quantity||0)}</div><button class="btn secondary smallbtn" style="margin-top:7px" onclick="openSaleProductPicker(${l.id})">Trocar produto</button></div></div>`:`<div class="notice" style="margin-top:8px">Nenhum produto escolhido.<div class="actions" style="margin-top:8px"><button class="btn" onclick="openSaleProductPicker(${l.id})">Escolher produto pela foto</button><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${l.id})">Cadastrar produto agora</button></div></div>`}<div class="row3" style="margin-top:10px"><div><label>Categoria desta venda</label><select onchange="updateSaleLineCategory(${l.id},this.value)">${cats.map(c=>`<option value="${c.id}" ${Number(l.categoryId)===Number(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Quantidade</label><input type="number" min="1" step="1" value="${Number(l.quantity||1)}" onchange="updateSaleLineQty(${l.id},this.value)"></div><div><label>Desconto por unidade (R$)</label><input type="number" min="0" ${p?`max="${Math.max(0,Number(p.price||0)-0.01).toFixed(2)}"`:""} step="0.01" value="${Number(l.discountPerUnit||0).toFixed(2)}" ${p?"":"disabled"} onchange="updateSaleLineDiscount(${l.id},this.value)"></div></div>${p?`<div class="sale-item-total">Subtotal: ${money(a.total)}${a.discountTotal>0?`<div class="muted" style="font-weight:500;margin-top:4px">Preço cheio: ${money(a.gross)} • desconto: -${money(a.discountTotal)} (${money(a.discountPerUnit)} por unidade) • preço final/unidade: ${money(a.finalUnit)}</div>`:""}</div>`:""}</div>`}).join("");renderSaleOrderTotal();
 }
 function openSaleProductPicker(lineId){
   const themes=[...(window._saleThemes||[])].filter(t=>t.active!==false).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR"));
@@ -5447,11 +5475,12 @@ async function loadAdminSales(){
   ]);
   const error=themesRes.error||subthemesRes.error||categoriesRes.error||customersRes.error||sellersRes.error||productsRes.error||salesRes.error;if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
   window._adminSalesData=salesRes.data||[];window._saleThemes=themesRes.data||[];window._saleSubthemes=subthemesRes.data||[];window._saleCategories=categoriesRes.data||[];window._saleCustomers=customersRes.data||[];window._saleSellers=sellersRes.data||[];window._saleCatalogProducts=(productsRes.data||[]).map(p=>({...p,image_url:catalogPublicUrl(p.image_path),thumb_url:catalogPublicUrl(p.thumbnail_path)}));window._saleCartLines=[newSaleLine()];
-  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Registrar venda</h2><div class="muted">Escolha os produtos pelas fotos. Tema, subtema, preço e demais dados vêm do cadastro; você escolhe a categoria e a quantidade de cada item.</div></div><button class="btn secondary" onclick="adminSection('catalog')">Abrir catálogo / estoque</button></div>
+  box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Registrar venda</h2><div class="muted">Escolha os produtos pelas fotos. Tema, subtema, preço e demais dados vêm do cadastro; você escolhe a categoria, a quantidade, a forma de pagamento e, se houver, o desconto de cada item.</div></div><button class="btn secondary" onclick="adminSection('catalog')">Abrir catálogo / estoque</button></div>
     <div id="saleItemsList" class="sale-items-list" style="margin-top:12px"></div>
     <div class="actions" style="margin-top:10px"><button class="btn secondary" onclick="addSaleItem()">+ Adicionar +1 item na venda</button></div>
-    <div class="sale-order-total"><span>Total desta venda</span><strong id="saleOrderTotalValue">R$ 0,00</strong></div>
-    <div class="row" style="margin-top:10px"><div><label>Situação do pagamento</label><select id="salePaymentStatus" onchange="toggleSalePaymentFields()"><option value="paid">Pago</option><option value="unpaid">Não pago</option><option value="partial">Pago parcialmente</option></select></div><div id="salePartialPaidField" class="hidden"><label>Valor já pago</label><input id="salePaidAmount" type="number" min="0.01" step="0.01"></div></div>
+    <div class="sale-order-total"><div><span>Total desta venda</span><div class="muted hidden" style="margin-top:3px">Desconto total: <b id="saleOrderDiscountValue">R$ 0,00</b></div></div><strong id="saleOrderTotalValue">R$ 0,00</strong></div>
+    <div class="row" style="margin-top:10px"><div><label>Situação do pagamento</label><select id="salePaymentStatus" onchange="toggleSalePaymentFields()"><option value="paid">Pago</option><option value="unpaid">Não pago</option><option value="partial">Pago parcialmente</option></select></div><div><label>Forma de pagamento</label><select id="salePaymentMethod"><option value="">Selecione</option><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao_debito">Cartão de débito</option><option value="cartao_credito">Cartão de crédito</option><option value="transferencia">Transferência bancária</option><option value="outro">Outro</option><option value="a_definir">A definir</option></select></div></div>
+    <div id="salePartialPaidField" class="hidden" style="margin-top:10px"><label>Valor já pago</label><input id="salePaidAmount" type="number" min="0.01" step="0.01"></div>
     <div class="row"><div><label>Entrega</label><select id="saleDelivered" onchange="toggleSaleDeliveryFields()"><option value="true">Entregue</option><option value="false">Não entregue</option></select></div><div id="saleExpectedDeliveryField" class="hidden"><label>Data prevista de entrega</label><input id="saleExpectedDeliveryDate" type="date"></div></div>
     <div class="row"><div><label>Comissão da venda</label><select id="saleHasCommission" onchange="toggleSaleCommissionFields()"><option value="false" selected>Sem comissão</option><option value="true">Com comissão</option></select></div><div id="saleCommissionRateField" class="hidden"><label>Comissão (%)</label><input id="saleCommissionRate" type="number" min="0.01" max="100" step="0.01" value="${Number(settings.default_sales_commission_rate||15)}"></div></div>
     <div id="saleCommissionFields" class="hidden"><label>Vendedor</label><select id="saleSeller" onchange="toggleNewSaleSeller()"><option value="">Selecione o vendedor</option>${(sellersRes.data||[]).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}<option value="__new__">+ Cadastrar novo vendedor nesta venda</option></select><div id="newSaleSellerFields" class="customer-new-fields hidden"><div class="row"><div><label>Nome do vendedor</label><input id="newSaleSellerName"></div><div><label>Número</label><input id="newSaleSellerPhone"></div></div><label>Instagram (opcional)</label><input id="newSaleSellerInstagram"></div></div>
@@ -5465,12 +5494,13 @@ async function loadAdminSales(){
 }
 async function saveCatalogSale(){
   const lines=window._saleCartLines||[];if(!lines.length||lines.some(l=>!l.productId)){toast("Escolha um produto para cada item da venda.");return}if(lines.some(l=>!l.categoryId)){toast("Escolha a categoria de cada item.");return}if(lines.some(l=>!Number.isInteger(Number(l.quantity))||Number(l.quantity)<=0)){toast("Informe uma quantidade válida para cada item.");return}
-  const total=lines.reduce((a,l)=>a+Number(saleCatalogProductById(l.productId)?.price||0)*Number(l.quantity),0);const paymentStatus=document.getElementById("salePaymentStatus")?.value||"paid";const paidAmount=paymentStatus==="partial"?Number(document.getElementById("salePaidAmount")?.value||0):null;if(paymentStatus==="partial"&&(!paidAmount||paidAmount<=0||paidAmount>=total)){toast("No pagamento parcial, o valor pago deve ser maior que zero e menor que o total da venda.");return}
+  for(const l of lines){const p=saleCatalogProductById(l.productId);const d=Number(l.discountPerUnit||0);if(d<0||!Number.isFinite(d)){toast("Informe um desconto válido.");return}if(p&&d>=Number(p.price||0)){toast(`O desconto de ${p.name} precisa ser menor que o preço unitário do produto.`);return}}
+  const total=lines.reduce((a,l)=>a+saleLineAmounts(l).total,0);const paymentStatus=document.getElementById("salePaymentStatus")?.value||"paid";const paymentMethod=document.getElementById("salePaymentMethod")?.value||"";const paidAmount=paymentStatus==="partial"?Number(document.getElementById("salePaidAmount")?.value||0):null;if(!paymentMethod){toast("Escolha a forma de pagamento.");return}if(paymentStatus!=="unpaid"&&paymentMethod==="a_definir"){toast("Para venda paga ou parcialmente paga, escolha a forma de pagamento utilizada.");return}if(paymentStatus==="partial"&&(!paidAmount||paidAmount<=0||paidAmount>=total)){toast("No pagamento parcial, o valor pago deve ser maior que zero e menor que o total da venda após os descontos.");return}
   const delivered=document.getElementById("saleDelivered")?.value!=="false";const expectedDeliveryDate=delivered?null:(document.getElementById("saleExpectedDeliveryDate")?.value||null);if(!delivered&&!expectedDeliveryDate){toast("Informe a data prevista de entrega.");return}
   const hasCommission=document.getElementById("saleHasCommission")?.value==="true";const sellerChoice=document.getElementById("saleSeller")?.value||"";const commissionRate=hasCommission?Number(document.getElementById("saleCommissionRate")?.value||0):null;if(hasCommission&&(!commissionRate||commissionRate<=0||commissionRate>100)){toast("Informe uma comissão válida.");return}
   let customerId=null;const customerChoice=document.getElementById("saleCustomer")?.value||"";if(customerChoice==="__new__"){const name=document.getElementById("newSaleCustomerName")?.value.trim()||"";if(!name){toast("Informe o nome do cliente.");return}const {data,error}=await sb.rpc("admin_save_customer",{p_customer_id:null,p_name:name,p_whatsapp:document.getElementById("newSaleCustomerWhatsapp")?.value.trim()||null,p_instagram:document.getElementById("newSaleCustomerInstagram")?.value.trim()||null});if(error){toast(error.message);return}customerId=data?.id||null}else if(customerChoice)customerId=Number(customerChoice);
   let sellerId=null;if(hasCommission){if(sellerChoice==="__new__"){const name=document.getElementById("newSaleSellerName")?.value.trim()||"",phone=document.getElementById("newSaleSellerPhone")?.value.trim()||"",instagram=document.getElementById("newSaleSellerInstagram")?.value.trim()||"";if(!name||!phone){toast("Informe nome e número do vendedor.");return}const {data,error}=await sb.rpc("admin_save_seller",{p_id:null,p_name:name,p_phone:phone,p_instagram:instagram||null,p_active:true});if(error){toast(error.message);return}sellerId=data?.id||null}else if(sellerChoice)sellerId=Number(sellerChoice);if(!sellerId){toast("Escolha ou cadastre o vendedor.");return}}
-  const payload=lines.map(l=>({product_id:Number(l.productId),quantity:Number(l.quantity),category_id:Number(l.categoryId)}));const {data,error}=await sb.rpc("admin_register_catalog_sale",{p_items:payload,p_customer_id:customerId,p_payment_status:paymentStatus,p_paid_amount:paidAmount,p_delivered:delivered,p_expected_delivery_date:expectedDeliveryDate,p_has_commission:hasCommission,p_seller_id:sellerId,p_commission_rate:commissionRate});if(error){toast(error.message);return}toast(`Venda registrada. Total: ${money(data?.total_amount||total)}`);await loadAdminSales();
+  const payload=lines.map(l=>({product_id:Number(l.productId),quantity:Number(l.quantity),category_id:Number(l.categoryId),discount_per_unit:Math.round(Number(l.discountPerUnit||0)*100)/100}));const {data,error}=await sb.rpc("admin_register_catalog_sale",{p_items:payload,p_customer_id:customerId,p_payment_status:paymentStatus,p_paid_amount:paidAmount,p_delivered:delivered,p_expected_delivery_date:expectedDeliveryDate,p_has_commission:hasCommission,p_seller_id:sellerId,p_commission_rate:commissionRate,p_payment_method:paymentMethod});if(error){toast(error.message);return}const discount=Number(data?.discount_amount||0);toast(`Venda registrada. Total: ${money(data?.total_amount||total)} • ${salePaymentMethodPt(paymentMethod)}${discount>0?` • Desconto: ${money(discount)}`:""}`);await loadAdminSales();
 }
 
 
