@@ -2958,6 +2958,23 @@ async function saveSale(){
   await loadAdminSales();
 }
 
+function saleUniversalSearchText(s){
+  const remaining=Math.max(0,Number(s.amount||0)-Number(s.paid_amount||0));
+  const parts=[
+    s.id,s.sale_group_id,new Date(s.sold_at).toLocaleString("pt-BR"),
+    s.customer?.name,s.customer?.whatsapp,s.customer?.instagram,
+    s.category?.name,s.themes?.name,s.subtheme?.name,s.product_name,
+    s.catalog_quantity,s.catalog_unit_price,s.catalog_discount_per_unit,
+    s.catalog_discount_amount,s.catalog_gross_amount,s.amount,s.paid_amount,remaining,
+    money(s.amount),money(s.paid_amount),money(remaining),
+    salePaymentStatusPt(s.payment_status),salePaymentMethodPt(s.payment_method),
+    s.delivered?"entregue":"nao entregue",s.expected_delivery_date,
+    s.has_commission?"com comissao":"sem comissao",s.commission_rate,
+    s.seller?.name,s.seller?.phone,s.seller?.instagram
+  ];
+  return normalizeCatalogText(parts.filter(v=>v!==null&&v!==undefined).join(" "));
+}
+
 function renderSalesDashboard(){
   const dash=document.getElementById("salesDashboard");
   const extract=document.getElementById("salesExtract");
@@ -2965,6 +2982,8 @@ function renderSalesDashboard(){
 
   const range=reportDateRange("salesReport");
   const sales=(window._adminSalesData||[]).filter(s=>inReportRange(s.sold_at,range));
+  const extractQuery=normalizeCatalogText(document.getElementById("salesExtractSearch")?.value||"");
+  const extractSales=extractQuery?sales.filter(s=>saleUniversalSearchText(s).includes(extractQuery)):sales;
   const total=sales.reduce((a,s)=>a+Number(s.amount||0),0);
   const received=sales.reduce((a,s)=>a+Number(s.paid_amount||0),0);
   const receivable=sales.reduce((a,s)=>a+Math.max(0,Number(s.amount||0)-Number(s.paid_amount||0)),0);
@@ -3019,7 +3038,7 @@ function renderSalesDashboard(){
   extract.innerHTML=`
     <div class="table-wrap"><table class="table">
       <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Tema global</th><th>Subtema</th><th>Produto</th><th>Venda</th><th>Recebido</th><th>A receber</th><th>Pagamento</th><th>Forma</th><th>Entrega</th><th>Comissão</th><th>Ação</th></tr></thead>
-      <tbody>${sales.map(s=>{
+      <tbody>${extractSales.map(s=>{
         const remaining=Math.max(0,Number(s.amount||0)-Number(s.paid_amount||0));
         const commission=s.has_commission
           ? `${esc(s.seller?.name||"Vendedor")}<br><span class="muted">${Number(s.commission_rate||0).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</span>`
@@ -3044,7 +3063,7 @@ function renderSalesDashboard(){
             <button class="btn danger smallbtn" onclick="deleteSaleAny(${s.id})">Excluir venda</button>
           </div></td>
         </tr>`;
-      }).join("")||`<tr><td colspan="14">Nenhuma venda neste período.</td></tr>`}</tbody>
+      }).join("")||`<tr><td colspan="14">${extractQuery?"Nenhuma venda encontrada com essa busca.":"Nenhuma venda neste período."}</td></tr>`}</tbody>
     </table></div>
   `;
 
@@ -3774,7 +3793,7 @@ async function openCustomerHistory(id){
 async function loadAdminResults(){
   const box=document.getElementById("adminContent");
 
-  const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes,receivablesRes,sellerCommissionsRes]=await Promise.all([
+  const [balancesRes,entriesRes,transferRes,repaymentRes,allRepaymentRes,investmentsRes,receivablesRes,sellerCommissionsRes,allSalesRes]=await Promise.all([
     sb.rpc("admin_get_account_balances"),
     fetchAllPaged(()=>sb.from("financial_entries").select("*").order("occurred_at",{ascending:false})),
     sb.from("investment_transfers").select("*,profiles:profiles!investment_transfers_investor_id_fkey(name,email)").eq("status","pending").order("created_at"),
@@ -3793,10 +3812,11 @@ async function loadAdminResults(){
       *,seller:sellers(id,name,phone,instagram),
       sale:sales(id,product_name,sold_at,amount,
         customer:customers(name),themes(name),subtheme:subthemes(name))
-    `).eq("status","pending").order("due_date",{ascending:true}))
+    `).eq("status","pending").order("due_date",{ascending:true})),
+    fetchAllPaged(()=>sb.from("sales").select("id,sale_group_id,sold_at,amount,paid_amount,payment_method,payment_status").order("sold_at",{ascending:false}))
   ]);
 
-  const error=balancesRes.error||entriesRes.error||transferRes.error||repaymentRes.error||allRepaymentRes.error||investmentsRes.error||receivablesRes.error||sellerCommissionsRes.error;
+  const error=balancesRes.error||entriesRes.error||transferRes.error||repaymentRes.error||allRepaymentRes.error||investmentsRes.error||receivablesRes.error||sellerCommissionsRes.error||allSalesRes.error;
   if(error){box.innerHTML=`<div class="card error">${esc(error.message)}</div>`;return}
 
   window._resultsData={
@@ -3807,7 +3827,8 @@ async function loadAdminResults(){
     repayments:allRepaymentRes.data||[],
     investments:investmentsRes.data||[],
     receivables:receivablesRes.data||[],
-    sellerCommissions:sellerCommissionsRes.data||[]
+    sellerCommissions:sellerCommissionsRes.data||[],
+    sales:allSalesRes.data||[]
   };
 
   box.innerHTML=`
@@ -3836,23 +3857,26 @@ async function loadAdminResults(){
       <div class="title-row"><div><h3>Registrar entrada ou saída manual</h3><div class="muted">Use para movimentos que o aplicativo não reconhece sozinho.</div></div></div>
 
       <div class="row">
-        <div><label>Conta</label><select id="financeAccount"><option value="cat_encantus">Cat Encantus</option><option value="cat_investimentos">CATinvestimentos</option></select></div>
+        <div><label>Conta</label><select id="financeAccount" onchange="updateFinancialCategoryOptions()"><option value="cat_encantus">Cat Encantus</option><option value="cat_investimentos">CATinvestimentos</option></select></div>
         <div><label>Tipo</label><select id="financeDirection" onchange="updateFinancialCategoryOptions()"><option value="out">Saída</option><option value="in">Entrada</option></select></div>
       </div>
 
       <div class="row">
+        <div><label id="financeFundLocationLabel">Saiu de</label><select id="financeFundLocation"><option value="bank">Banco</option><option value="wallet">Carteira / dinheiro físico</option></select></div>
         <div><label>Categoria</label><select id="financeCategory"></select></div>
+      </div>
+      <div class="row">
         <div><label>Valor</label><input id="financeAmount" type="number" min="0.01" step="0.01"></div>
+        <div><label>Descrição</label><input id="financeDescription" placeholder="Ex.: Compra de Hama Beads"></div>
       </div>
 
       <div class="row">
-        <div><label>Descrição</label><input id="financeDescription" placeholder="Ex.: Compra de Hama Beads"></div>
         <div><label>Local / Destino / Origem</label><input id="financeCounterparty" placeholder="Shopee, Mercado Livre, vendedor..."></div>
+        <div><label>Observação (opcional)</label><input id="financeNotes"></div>
       </div>
 
       <div class="row">
         <div><label>Data</label><input id="financeDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-        <div><label>Observação (opcional)</label><input id="financeNotes"></div>
       </div>
 
       <button class="btn" style="margin-top:14px" onclick="saveManualFinancialEntry()">Registrar movimentação</button>
@@ -3898,17 +3922,33 @@ function financialCategoriesFor(direction){
 
 function updateFinancialCategoryOptions(){
   const direction=document.getElementById("financeDirection")?.value||"out";
+  const account=document.getElementById("financeAccount")?.value||"cat_encantus";
   const select=document.getElementById("financeCategory");
-  if(!select)return;
-  select.innerHTML=financialCategoriesFor(direction).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  if(select)select.innerHTML=financialCategoriesFor(direction).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  const loc=document.getElementById("financeFundLocation");
+  const label=document.getElementById("financeFundLocationLabel");
+  if(label)label.textContent=direction==="out"?"Saiu de":"Entrou em";
+  if(loc){if(account==="cat_investimentos"){loc.value="bank";loc.disabled=true}else loc.disabled=false;}
 }
 
 function renderResultsDashboard(){
   if(!window._resultsData)return;
 
-  const {balances,entries,pendingTransfers,pendingRepayments,repayments,investments,receivables,sellerCommissions}=window._resultsData;
+  const {balances,entries,pendingTransfers,pendingRepayments,repayments,investments,receivables,sellerCommissions,sales}=window._resultsData;
   const range=reportDateRange("resultsReport");
   const filtered=entries.filter(e=>inReportRange(e.occurred_at,range));
+  const salesFiltered=(sales||[]).filter(s=>inReportRange(s.sold_at,range));
+  const normalizedMethod=s=>{const m=String(s.payment_method||"").trim();return (!m||m==="nao_informado")?"pix":m};
+  const paymentSummary=method=>{
+    const rows=salesFiltered.filter(s=>normalizedMethod(s)===method&&Number(s.paid_amount||0)>0);
+    return {value:rows.reduce((a,s)=>a+Number(s.paid_amount||0),0),count:new Set(rows.map(s=>s.sale_group_id||`legacy-${s.id}`)).size};
+  };
+  const pixSummary=paymentSummary("pix");
+  const cashSummary=paymentSummary("dinheiro");
+  const walletCurrent=entries.filter(e=>e.account_code==="cat_encantus"&&e.fund_location==="wallet").reduce((sum,e)=>sum+(e.direction==="in"?1:-1)*Number(e.amount||0),0);
+  const storeBalanceRow=(balances||[]).find(b=>b.account_code==="cat_encantus");
+  const storeCurrent=Number(storeBalanceRow?.current_balance||0);
+  const bankCurrent=storeCurrent-walletCurrent;
 
   const ce=filtered.filter(e=>e.account_code==="cat_encantus");
   const ci=filtered.filter(e=>e.account_code==="cat_investimentos");
@@ -3947,6 +3987,8 @@ function renderResultsDashboard(){
 
   document.getElementById("currentAccountBalances").innerHTML=`
     <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Saldo no banco • Cat Encantus</div><div class="metric-value">${money(bankCurrent)}</div><div class="muted">PIX, cartões, transferências e outras formas não em dinheiro</div></div>
+      <div class="metric-box warning"><div class="metric-label">Saldo na carteira • Cat Encantus</div><div class="metric-value">${money(walletCurrent)}</div><div class="muted">Dinheiro físico registrado no app</div></div>
       ${balances.map(b=>`
         <div class="metric-box balance-card ${b.initialized?"success-soft":"warning"}">
           <div class="metric-label">Saldo atual • ${esc(b.account_name)}</div>
@@ -3970,6 +4012,8 @@ function renderResultsDashboard(){
 
   document.getElementById("resultsDashboard").innerHTML=`
     <div class="metric-grid">
+      <div class="metric-box success-soft"><div class="metric-label">Vendas recebidas via PIX</div><div class="metric-value">${money(pixSummary.value)}</div><div class="muted">${pixSummary.count} venda(s) • vendas antigas sem forma identificada contam como PIX</div></div>
+      <div class="metric-box warning"><div class="metric-label">Vendas recebidas em dinheiro</div><div class="metric-value">${money(cashSummary.value)}</div><div class="muted">${cashSummary.count} venda(s) • entram na carteira</div></div>
       <div class="metric-box success-soft"><div class="metric-label">Entradas • Cat Encantus</div><div class="metric-value">${money(ceIn)}</div></div>
       <div class="metric-box danger-soft"><div class="metric-label">Saídas • Cat Encantus</div><div class="metric-value">${money(ceOut)}</div></div>
       <div class="metric-box"><div class="metric-label">Saldo líquido de caixa</div><div class="metric-value">${money(ceIn-ceOut)}</div><div class="muted">Entradas - saídas do período</div></div>
@@ -4157,7 +4201,7 @@ function renderFinancialExtract(entries){
 
   target.innerHTML=`
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Destino / Origem</th><th>Valor</th><th>Efeito no resultado</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Conta</th><th>Local</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Destino / Origem</th><th>Valor</th><th>Efeito no resultado</th><th>Ação</th></tr></thead>
       <tbody>${entries.map(e=>{
         const manual=["manual_income","manual_expense"].includes(e.entry_type);
         const action=manual
@@ -4169,6 +4213,7 @@ function renderFinancialExtract(entries){
         <tr>
           <td>${new Date(e.occurred_at).toLocaleString("pt-BR")}</td>
           <td>${e.account_code==="cat_encantus"?"Cat Encantus":"CATinvestimentos"}</td>
+          <td>${e.account_code==="cat_encantus"?(e.fund_location==="wallet"?"Carteira":"Banco"):"Banco"}</td>
           <td>${e.direction==="in"?"Entrada":"Saída"}</td>
           <td>${esc(e.category||"-")}</td>
           <td>${esc(e.description||"-")}</td>
@@ -4181,18 +4226,22 @@ function renderFinancialExtract(entries){
               : `<span class="flow-negative">- ${money(Math.abs(Number(e.result_amount)))}</span>`}</td>
           <td>${action}</td>
         </tr>`;
-      }).join("")||`<tr><td colspan="9">Nenhuma movimentação neste período.</td></tr>`}</tbody>
+      }).join("")||`<tr><td colspan="10">Nenhuma movimentação neste período.</td></tr>`}</tbody>
     </table></div>
   `;
 }
 
 function renderEditFinancialCategories(selected=null){
   const direction=document.getElementById("editFinanceDirection")?.value||"out";
+  const account=document.getElementById("editFinanceAccount")?.value||"cat_encantus";
   const select=document.getElementById("editFinanceCategory");
-  if(!select)return;
   const list=financialCategoriesFor(direction);
   if(selected&&!list.includes(selected))list.push(selected);
-  select.innerHTML=list.map(x=>`<option value="${esc(x)}" ${x===selected?"selected":""}>${esc(x)}</option>`).join("");
+  if(select)select.innerHTML=list.map(x=>`<option value="${esc(x)}" ${x===selected?"selected":""}>${esc(x)}</option>`).join("");
+  const loc=document.getElementById("editFinanceFundLocation");
+  const label=document.getElementById("editFinanceFundLocationLabel");
+  if(label)label.textContent=direction==="out"?"Saiu de":"Entrou em";
+  if(loc){if(account==="cat_investimentos"){loc.value="bank";loc.disabled=true}else loc.disabled=false;}
 }
 
 function openEditFinancialEntry(id){
@@ -4206,11 +4255,14 @@ function openEditFinancialEntry(id){
   openModal(`
     <div class="title-row"><div><h2>Editar movimentação</h2><div class="muted">Lançamento manual #${entry.id}</div></div><button class="btn secondary smallbtn" onclick="closeModal()">Fechar</button></div>
     <div class="row">
-      <div><label>Conta</label><select id="editFinanceAccount"><option value="cat_encantus" ${entry.account_code==="cat_encantus"?"selected":""}>Cat Encantus</option><option value="cat_investimentos" ${entry.account_code==="cat_investimentos"?"selected":""}>CATinvestimentos</option></select></div>
+      <div><label>Conta</label><select id="editFinanceAccount" onchange="renderEditFinancialCategories()"><option value="cat_encantus" ${entry.account_code==="cat_encantus"?"selected":""}>Cat Encantus</option><option value="cat_investimentos" ${entry.account_code==="cat_investimentos"?"selected":""}>CATinvestimentos</option></select></div>
       <div><label>Tipo</label><select id="editFinanceDirection" onchange="renderEditFinancialCategories()"><option value="in" ${entry.direction==="in"?"selected":""}>Entrada</option><option value="out" ${entry.direction==="out"?"selected":""}>Saída</option></select></div>
     </div>
     <div class="row">
+      <div><label id="editFinanceFundLocationLabel">${entry.direction==="out"?"Saiu de":"Entrou em"}</label><select id="editFinanceFundLocation"><option value="bank" ${entry.fund_location!=="wallet"?"selected":""}>Banco</option><option value="wallet" ${entry.fund_location==="wallet"?"selected":""}>Carteira / dinheiro físico</option></select></div>
       <div><label>Categoria</label><select id="editFinanceCategory"></select></div>
+    </div>
+    <div class="row">
       <div><label>Valor</label><input id="editFinanceAmount" type="number" min="0.01" step="0.01" value="${Number(entry.amount||0).toFixed(2)}"></div>
     </div>
     <div class="row">
@@ -4234,7 +4286,7 @@ async function saveEditFinancialEntry(id){
   if(!amount||amount<=0){toast("Informe um valor válido.");return}
   if(!confirm("Salvar as alterações desta movimentação? O saldo e o resultado serão recalculados automaticamente."))return;
 
-  const {error}=await sb.rpc("admin_update_manual_financial_entry",{
+  const {error}=await sb.rpc("admin_update_manual_financial_entry_with_location",{
     p_entry_id:id,
     p_account_code:document.getElementById("editFinanceAccount")?.value,
     p_direction:document.getElementById("editFinanceDirection")?.value,
@@ -4243,7 +4295,8 @@ async function saveEditFinancialEntry(id){
     p_description:document.getElementById("editFinanceDescription")?.value||"",
     p_counterparty:document.getElementById("editFinanceCounterparty")?.value||null,
     p_notes:document.getElementById("editFinanceNotes")?.value||null,
-    p_occurred_at:occurred
+    p_occurred_at:occurred,
+    p_fund_location:document.getElementById("editFinanceFundLocation")?.value||"bank"
   });
   if(error){toast(error.message);return}
   closeModal();
@@ -4255,7 +4308,7 @@ async function saveManualFinancialEntry(){
   const date=document.getElementById("financeDate").value;
   const occurred=date?new Date(date+"T12:00:00").toISOString():null;
 
-  const {error}=await sb.rpc("admin_add_financial_entry",{
+  const {error}=await sb.rpc("admin_add_financial_entry_with_location",{
     p_account_code:document.getElementById("financeAccount").value,
     p_direction:document.getElementById("financeDirection").value,
     p_amount:Number(document.getElementById("financeAmount").value),
@@ -4263,7 +4316,8 @@ async function saveManualFinancialEntry(){
     p_description:document.getElementById("financeDescription").value,
     p_counterparty:document.getElementById("financeCounterparty").value||null,
     p_notes:document.getElementById("financeNotes").value||null,
-    p_occurred_at:occurred
+    p_occurred_at:occurred,
+    p_fund_location:document.getElementById("financeFundLocation")?.value||"bank"
   });
 
   if(error){toast(error.message);return}
@@ -5104,15 +5158,35 @@ async function loadAdminCatalog(){
   window._catalogThemes=themesRes.data||[];window._catalogSubthemes=subthemesRes.data||[];
   const shareUrl=new URL("?catalogo=1",location.href).href;
   box.innerHTML=`<div class="card"><div class="title-row"><div><h2>Catálogo / Estoque</h2><div class="muted">Uma única ficha alimenta o estoque interno e o catálogo público.</div></div><div class="actions"><button class="btn" onclick="openCatalogProductEditor()">+ Cadastrar produto</button><button class="btn secondary" onclick="window.open('${esc(shareUrl)}','_blank')">Ver catálogo público</button></div></div>
-    <div class="row"><div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="renderAdminCatalogProducts()"></div><div><label>Link para compartilhar</label><div class="actions"><input id="catalogShareUrl" readonly value="${esc(shareUrl)}"><button class="btn secondary" onclick="navigator.clipboard.writeText(document.getElementById('catalogShareUrl').value).then(()=>toast('Link copiado.'))">Copiar</button></div></div></div>
+    <div class="row"><div><label>Link para compartilhar</label><div class="actions"><input id="catalogShareUrl" readonly value="${esc(shareUrl)}"><button class="btn secondary" onclick="navigator.clipboard.writeText(document.getElementById('catalogShareUrl').value).then(()=>toast('Link copiado.'))">Copiar</button></div></div></div>
+    <div class="filter-bar" style="margin-top:12px">
+      <div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="renderAdminCatalogProducts()"></div>
+      <div><label>Tema</label><select id="adminCatalogThemeFilter" onchange="renderAdminCatalogSubthemeFilter();renderAdminCatalogProducts()"><option value="">Todos os temas</option>${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+      <div><label>Subtema</label><select id="adminCatalogSubthemeFilter" onchange="renderAdminCatalogProducts()"><option value="">Todos os subtemas</option></select></div>
+    </div>
     <div class="mini-metrics" style="margin-top:12px"><div class="mini-metric"><span class="muted">Produtos cadastrados</span><b>${(productsRes.data||[]).length}</b></div><div class="mini-metric"><span class="muted">Unidades no estoque</span><b>${(productsRes.data||[]).reduce((a,p)=>a+Number(p.stock_quantity||0),0)}</b></div><div class="mini-metric"><span class="muted">Valor do estoque pelo preço de venda</span><b>${money((productsRes.data||[]).reduce((a,p)=>a+Number(p.stock_quantity||0)*Number(p.price||0),0))}</b></div></div>
   </div><div id="adminCatalogProducts" style="margin-top:14px"></div>`;
+  renderAdminCatalogSubthemeFilter();
   renderAdminCatalogProducts();
+}
+function renderAdminCatalogSubthemeFilter(){
+  const select=document.getElementById("adminCatalogSubthemeFilter");if(!select)return;
+  const themeId=Number(document.getElementById("adminCatalogThemeFilter")?.value||0);
+  const current=select.value;
+  const rows=(window._catalogSubthemes||[]).filter(st=>st.active!==false&&(!themeId||Number(st.theme_id)===themeId));
+  select.innerHTML=`<option value="">Todos os subtemas</option>${rows.map(st=>`<option value="${st.id}">${esc(st.name)}</option>`).join("")}`;
+  if(rows.some(st=>String(st.id)===String(current)))select.value=current;
 }
 function renderAdminCatalogProducts(){
   const target=document.getElementById("adminCatalogProducts");if(!target)return;
   const q=normalizeCatalogText(document.getElementById("adminCatalogSearch")?.value||"");
-  const rows=(window._catalogAdminProducts||[]).filter(p=>!q||normalizeCatalogText(p.name).includes(q)||normalizeCatalogText(p.code).includes(q));
+  const themeId=Number(document.getElementById("adminCatalogThemeFilter")?.value||0);
+  const subthemeId=Number(document.getElementById("adminCatalogSubthemeFilter")?.value||0);
+  const rows=(window._catalogAdminProducts||[]).filter(p=>
+    (!q||normalizeCatalogText(p.name).includes(q)||normalizeCatalogText(p.code).includes(q))&&
+    (!themeId||Number(p.theme_id)===themeId)&&
+    (!subthemeId||Number(p.subtheme_id)===subthemeId)
+  );
   target.innerHTML=`<div class="admin-product-grid">${rows.map(p=>`<div class="admin-product-card"><img loading="lazy" src="${esc(p.thumb_url)}" alt="${esc(p.name)}"><div style="margin-top:8px"><span class="admin-product-code">${esc(p.code)}</span>${p.active?`<span class="badge green" style="margin-left:6px">ATIVO</span>`:`<span class="badge red" style="margin-left:6px">INATIVO</span>`}</div><h3 style="margin:8px 0 4px;color:var(--primary)">${esc(p.name)}</h3><div><b>${money(p.price)}</b> • ${esc(p.dimensions)}</div><div class="muted" style="margin-top:5px">${esc(p.theme?.name||"")} → ${esc(p.subtheme?.name||"")}</div><div class="mini-metrics" style="margin-top:8px"><div class="mini-metric"><span class="muted">Estoque</span><b>${Number(p.stock_quantity||0)}</b></div><div class="mini-metric"><span class="muted">Miçangas</span><b>${Number(p.bead_quantity||0)}</b></div></div><div class="actions" style="margin-top:9px"><button class="btn smallbtn" onclick="openCatalogProductEditorById(${p.id})">Editar</button><button class="btn secondary smallbtn" onclick="duplicateCatalogProductById(${p.id})">Duplicar</button></div></div>`).join("")||`<div class="card muted">Nenhum produto encontrado.</div>`}</div>`;
 }
 function catalogAdminProductById(id){return (window._catalogAdminProducts||window._saleCatalogProducts||[]).find(p=>Number(p.id)===Number(id))}
@@ -5489,7 +5563,7 @@ async function loadAdminSales(){
     <button class="btn" style="width:100%;margin-top:14px" onclick="saveCatalogSale()">Registrar venda</button></div>
     <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Relatório de vendas</h3><div class="muted">Pedidos com vários itens contam como uma única venda no total de vendas.</div></div></div><div class="filter-bar"><div><label>Data inicial</label><input id="salesReportFrom" type="date"></div><div><label>Data final</label><input id="salesReportTo" type="date"></div><button class="btn" onclick="renderSalesDashboard()">Filtrar</button><button class="btn secondary" onclick="clearReportRange('salesReport',renderSalesDashboard)">Limpar filtro</button></div><div id="salesDashboard"></div></div>
     <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Produtos ainda não entregues</h3><div class="muted">Controle interno da loja.</div></div></div><div id="deliveryReport"></div></div>
-    <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Vendas pagas, parciais ou não pagas podem ser excluídas quando as travas financeiras permitirem. Itens do catálogo retornam automaticamente ao estoque.</div></div></div><div id="salesExtract"></div></div>`;
+    <div class="card" style="margin-top:14px"><div class="title-row"><div><h3>Extrato de vendas</h3><div class="muted">Pesquise por cliente, produto, tema, subtema, vendedor, valor, pagamento, entrega ou qualquer outra informação da venda.</div></div></div><label>Buscar no extrato</label><input id="salesExtractSearch" placeholder="Ex.: Alice, Galo, Naruto, PIX, R$ 15, vendedor..." oninput="renderSalesDashboard()"><div id="salesExtract" style="margin-top:12px"></div></div>`;
   renderSaleItems();toggleSalePaymentFields();toggleSaleDeliveryFields();toggleSaleCommissionFields();renderSalesDashboard();
 }
 async function saveCatalogSale(){
