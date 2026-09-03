@@ -5505,11 +5505,39 @@ async function saveCatalogProduct(){
 }
 
 // ---------- Venda por foto / multiitem ----------
-function newSaleLine(){return {id:Date.now()+Math.floor(Math.random()*9999),productId:null,quantity:1,discountPerUnit:0,categoryId:Number((window._saleCategories||[])[0]?.id||0)}}
+function defaultSaleCategoryId(){
+  const cats=window._saleCategories||[];
+  const normalize=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  const chaveiro=cats.find(c=>{const n=normalize(c.name);return n==="chaveiro"||n==="chaveiros"||n.includes("chaveir")});
+  return Number(chaveiro?.id||cats[0]?.id||0);
+}
+function newSaleLine(){return {id:Date.now()+Math.floor(Math.random()*9999),productId:null,quantity:1,discountPerUnit:0,categoryId:defaultSaleCategoryId()}}
 function addSaleItem(){if(!window._saleCartLines)window._saleCartLines=[];window._saleCartLines.push(newSaleLine());renderSaleItems()}
 function removeSaleItem(id){window._saleCartLines=(window._saleCartLines||[]).filter(l=>l.id!==id);if(!window._saleCartLines.length)window._saleCartLines=[newSaleLine()];renderSaleItems()}
 function saleCatalogProductById(id){return (window._saleCatalogProducts||[]).find(p=>Number(p.id)===Number(id))}
 function assignCatalogProductToSaleLine(lineId,productId){const line=(window._saleCartLines||[]).find(l=>l.id===lineId);if(!line)return;line.productId=Number(productId);line.discountPerUnit=0;renderSaleItems();closeModal()}
+async function addStockFromSale(lineId){
+  const line=(window._saleCartLines||[]).find(l=>l.id===lineId);
+  const p=saleCatalogProductById(line?.productId);
+  if(!line||!p){toast("Escolha um produto primeiro.");return}
+  const raw=prompt(`Estoque atual de ${p.name}: ${Number(p.stock_quantity||0)}\n\nQuantas unidades deseja ADICIONAR ao estoque?`,"1");
+  if(raw===null)return;
+  const qty=Number(raw);
+  if(!Number.isInteger(qty)||qty<=0){toast("Informe uma quantidade inteira maior que zero.");return}
+  try{
+    const {data,error}=await sb.rpc("admin_add_catalog_stock",{p_product_id:Number(p.id),p_quantity:qty,p_note:"Estoque adicionado durante o registro de venda"});
+    if(error)throw error;
+    const updated=Array.isArray(data)?data[0]:data;
+    if(updated){
+      const pos=(window._saleCatalogProducts||[]).findIndex(x=>Number(x.id)===Number(p.id));
+      if(pos>=0)window._saleCatalogProducts[pos]={...window._saleCatalogProducts[pos],stock_quantity:Number(updated.stock_quantity)};
+    }else{
+      p.stock_quantity=Number(p.stock_quantity||0)+qty;
+    }
+    renderSaleItems();
+    toast(`${qty} unidade${qty===1?"":"s"} adicionada${qty===1?"":"s"} ao estoque de ${p.name}.`);
+  }catch(e){console.error(e);toast(e?.message||String(e))}
+}
 function updateSaleLineQty(id,value){const line=(window._saleCartLines||[]).find(l=>l.id===id);if(!line)return;line.quantity=Math.max(1,Math.floor(Number(value)||1));renderSaleItems()}
 function updateSaleLineCategory(id,value){const line=(window._saleCartLines||[]).find(l=>l.id===id);if(line)line.categoryId=Number(value||0);renderSaleOrderTotal()}
 function updateSaleLineDiscount(id,value){const line=(window._saleCartLines||[]).find(l=>l.id===id);if(!line)return;const p=saleCatalogProductById(line.productId);let v=Math.max(0,Number(value)||0);if(p&&v>=Number(p.price||0))v=Math.max(0,Number(p.price||0)-0.01);line.discountPerUnit=Math.round(v*100)/100;renderSaleItems()}
@@ -5517,7 +5545,7 @@ function saleLineAmounts(line){const p=saleCatalogProductById(line?.productId);i
 function renderSaleOrderTotal(){const lines=window._saleCartLines||[];const total=lines.reduce((a,l)=>a+saleLineAmounts(l).total,0);const discount=lines.reduce((a,l)=>a+saleLineAmounts(l).discountTotal,0);const el=document.getElementById("saleOrderTotalValue");if(el)el.textContent=money(total);const de=document.getElementById("saleOrderDiscountValue");if(de){de.textContent=money(discount);de.parentElement?.classList.toggle("hidden",discount<=0)}}
 function renderSaleItems(){
   const target=document.getElementById("saleItemsList");if(!target)return;const cats=window._saleCategories||[];const lines=window._saleCartLines||[];
-  target.innerHTML=lines.map((l,idx)=>{const p=saleCatalogProductById(l.productId);const a=saleLineAmounts(l);return `<div class="sale-item-card"><div class="title-row"><b>Item ${idx+1}</b>${lines.length>1?`<button class="btn danger smallbtn" onclick="removeSaleItem(${l.id})">Remover</button>`:""}</div>${p?`<div class="sale-item-selected"><img src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.theme?.name||p.theme_name||"")} → ${esc(p.subtheme?.name||p.subtheme_name||"")}</div><div>${money(p.price)} cada • ${esc(p.dimensions||"")}</div><div class="muted">Código interno: ${esc(p.code||"")} • estoque atual: ${Number(p.stock_quantity||0)}</div><button class="btn secondary smallbtn" style="margin-top:7px" onclick="openSaleProductPicker(${l.id})">Trocar produto</button></div></div>`:`<div class="notice" style="margin-top:8px">Nenhum produto escolhido.<div class="actions" style="margin-top:8px"><button class="btn" onclick="openSaleProductPicker(${l.id})">Escolher produto pela foto</button><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${l.id})">Cadastrar produto agora</button></div></div>`}<div class="row3" style="margin-top:10px"><div><label>Categoria desta venda</label><select onchange="updateSaleLineCategory(${l.id},this.value)">${cats.map(c=>`<option value="${c.id}" ${Number(l.categoryId)===Number(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Quantidade</label><input type="number" min="1" step="1" value="${Number(l.quantity||1)}" onchange="updateSaleLineQty(${l.id},this.value)"></div><div><label>Desconto por unidade (R$)</label><input type="number" min="0" ${p?`max="${Math.max(0,Number(p.price||0)-0.01).toFixed(2)}"`:""} step="0.01" value="${Number(l.discountPerUnit||0).toFixed(2)}" ${p?"":"disabled"} onchange="updateSaleLineDiscount(${l.id},this.value)"></div></div>${p?`<div class="sale-item-total">Subtotal: ${money(a.total)}${a.discountTotal>0?`<div class="muted" style="font-weight:500;margin-top:4px">Preço cheio: ${money(a.gross)} • desconto: -${money(a.discountTotal)} (${money(a.discountPerUnit)} por unidade) • preço final/unidade: ${money(a.finalUnit)}</div>`:""}</div>`:""}</div>`}).join("");renderSaleOrderTotal();
+  target.innerHTML=lines.map((l,idx)=>{const p=saleCatalogProductById(l.productId);const a=saleLineAmounts(l);return `<div class="sale-item-card"><div class="title-row"><b>Item ${idx+1}</b>${lines.length>1?`<button class="btn danger smallbtn" onclick="removeSaleItem(${l.id})">Remover</button>`:""}</div>${p?`<div class="sale-item-selected"><img src="${esc(p.thumb_url||catalogPublicUrl(p.thumbnail_path))}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.theme?.name||p.theme_name||"")} → ${esc(p.subtheme?.name||p.subtheme_name||"")}</div><div>${money(p.price)} cada • ${esc(p.dimensions||"")}</div><div class="muted">Código interno: ${esc(p.code||"")} • estoque atual: ${Number(p.stock_quantity||0)}</div>${Number(l.quantity||1)>Number(p.stock_quantity||0)?`<div class="badge red" style="margin-top:7px">Estoque insuficiente para a quantidade informada</div>`:""}<div class="actions" style="margin-top:7px"><button class="btn secondary smallbtn" onclick="openSaleProductPicker(${l.id})">Trocar produto</button><button class="btn success smallbtn" onclick="addStockFromSale(${l.id})">+ Adicionar estoque</button></div></div></div>`:`<div class="notice" style="margin-top:8px">Nenhum produto escolhido.<div class="actions" style="margin-top:8px"><button class="btn" onclick="openSaleProductPicker(${l.id})">Escolher produto pela foto</button><button class="btn secondary" onclick="openCatalogProductEditor(null,false,${l.id})">Cadastrar produto agora</button></div></div>`}<div class="row3" style="margin-top:10px"><div><label>Categoria desta venda</label><select onchange="updateSaleLineCategory(${l.id},this.value)">${cats.map(c=>`<option value="${c.id}" ${Number(l.categoryId)===Number(c.id)?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div><div><label>Quantidade</label><input type="number" min="1" step="1" value="${Number(l.quantity||1)}" onchange="updateSaleLineQty(${l.id},this.value)"></div><div><label>Desconto por unidade (R$)</label><input type="number" min="0" ${p?`max="${Math.max(0,Number(p.price||0)-0.01).toFixed(2)}"`:""} step="0.01" value="${Number(l.discountPerUnit||0).toFixed(2)}" ${p?"":"disabled"} onchange="updateSaleLineDiscount(${l.id},this.value)"></div></div>${p?`<div class="sale-item-total">Subtotal: ${money(a.total)}${a.discountTotal>0?`<div class="muted" style="font-weight:500;margin-top:4px">Preço cheio: ${money(a.gross)} • desconto: -${money(a.discountTotal)} (${money(a.discountPerUnit)} por unidade) • preço final/unidade: ${money(a.finalUnit)}</div>`:""}</div>`:""}</div>`}).join("");renderSaleOrderTotal();
 }
 function openSaleProductPicker(lineId){
   const themes=[...(window._saleThemes||[])].filter(t=>t.active!==false).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"pt-BR"));
