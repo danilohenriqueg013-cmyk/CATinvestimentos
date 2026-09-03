@@ -1,4 +1,4 @@
-const CACHE_NAME="catinvestimentos-v33a-1";
+const CACHE_NAME="catinvestimentos-V33B-1";
 const APP_SHELL=[
   "./",
   "./index.html",

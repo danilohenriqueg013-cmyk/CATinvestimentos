@@ -5147,7 +5147,35 @@ async function checkoutCatalogCart(){
 }
 
 // ---------- Administração do catálogo ----------
+// V33B: mantém os filtros do Catálogo / Estoque ADM ao editar, duplicar, arquivar ou excluir produtos.
+window._adminCatalogFilterState=window._adminCatalogFilterState||{search:"",theme:"",subtheme:"",stock:"all"};
+function rememberAdminCatalogFilters(){
+  const state=window._adminCatalogFilterState||{search:"",theme:"",subtheme:"",stock:"all"};
+  const search=document.getElementById("adminCatalogSearch");
+  const theme=document.getElementById("adminCatalogThemeFilter");
+  const sub=document.getElementById("adminCatalogSubthemeFilter");
+  const stock=document.getElementById("adminCatalogStockFilter");
+  if(search)state.search=search.value||"";
+  if(theme)state.theme=theme.value||"";
+  if(sub)state.subtheme=sub.value||"";
+  if(stock)state.stock=stock.value||"all";
+  window._adminCatalogFilterState=state;
+  return state;
+}
+function restoreAdminCatalogFilters(){
+  const state=window._adminCatalogFilterState||{search:"",theme:"",subtheme:"",stock:"all"};
+  const search=document.getElementById("adminCatalogSearch");
+  const theme=document.getElementById("adminCatalogThemeFilter");
+  const stock=document.getElementById("adminCatalogStockFilter");
+  if(search)search.value=state.search||"";
+  if(theme)theme.value=state.theme||"";
+  if(stock)stock.value=state.stock||"all";
+  renderAdminCatalogSubthemeFilter(state.subtheme||"");
+  const sub=document.getElementById("adminCatalogSubthemeFilter");
+  if(sub&&[...sub.options].some(o=>String(o.value)===String(state.subtheme||"")))sub.value=state.subtheme||"";
+}
 async function loadAdminCatalog(){
+  rememberAdminCatalogFilters();
   const box=document.getElementById("adminContent");
   const [productsRes,themesRes,subthemesRes]=await Promise.all([
     fetchAllPaged(()=>sb.from("catalog_products").select(`*,theme:themes(name),subtheme:subthemes(name)`).order("name")),
@@ -5164,16 +5192,16 @@ async function loadAdminCatalog(){
     <div style="margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#fffafb">
       <div style="font-weight:800;color:var(--primary);margin-bottom:8px">Filtrar Catálogo / Estoque</div>
       <div class="filter-bar" style="margin-top:0;grid-template-columns:minmax(220px,2fr) minmax(160px,1fr) minmax(160px,1fr) minmax(160px,1fr) auto">
-        <div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="renderAdminCatalogProducts()"></div>
-        <div><label>Tema</label><select id="adminCatalogThemeFilter" onchange="renderAdminCatalogSubthemeFilter();renderAdminCatalogProducts()"><option value="">Todos os temas</option>${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
-        <div><label>Subtema</label><select id="adminCatalogSubthemeFilter" onchange="renderAdminCatalogProducts()"><option value="">Todos os subtemas</option></select></div>
-        <div><label>Estoque</label><select id="adminCatalogStockFilter" onchange="renderAdminCatalogProducts()"><option value="all">Todos</option><option value="in_stock">Somente com estoque</option><option value="out_of_stock">Somente sem estoque</option></select></div>
+        <div><label>Pesquisar por nome ou código</label><input id="adminCatalogSearch" placeholder="Ex.: Homem-Aranha ou CAT-000123" oninput="rememberAdminCatalogFilters();renderAdminCatalogProducts()"></div>
+        <div><label>Tema</label><select id="adminCatalogThemeFilter" onchange="window._adminCatalogFilterState.theme=this.value;window._adminCatalogFilterState.subtheme='';renderAdminCatalogSubthemeFilter();rememberAdminCatalogFilters();renderAdminCatalogProducts()"><option value="">Todos os temas</option>${(themesRes.data||[]).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></div>
+        <div><label>Subtema</label><select id="adminCatalogSubthemeFilter" onchange="rememberAdminCatalogFilters();renderAdminCatalogProducts()"><option value="">Todos os subtemas</option></select></div>
+        <div><label>Estoque</label><select id="adminCatalogStockFilter" onchange="rememberAdminCatalogFilters();renderAdminCatalogProducts()"><option value="all">Todos</option><option value="in_stock">Somente com estoque</option><option value="out_of_stock">Somente sem estoque</option></select></div>
         <button class="btn secondary" type="button" onclick="clearAdminCatalogFilters()">Limpar filtros</button>
       </div>
     </div>
     <div class="mini-metrics" style="margin-top:12px"><div class="mini-metric"><span class="muted">Produtos cadastrados</span><b>${(productsRes.data||[]).length}</b></div><div class="mini-metric"><span class="muted">Unidades no estoque</span><b>${(productsRes.data||[]).reduce((a,p)=>a+Number(p.stock_quantity||0),0)}</b></div><div class="mini-metric"><span class="muted">Valor do estoque pelo preço de venda</span><b>${money((productsRes.data||[]).reduce((a,p)=>a+Number(p.stock_quantity||0)*Number(p.price||0),0))}</b></div></div>
   </div><div id="adminCatalogProducts" style="margin-top:14px"></div>`;
-  renderAdminCatalogSubthemeFilter();
+  restoreAdminCatalogFilters();
   renderAdminCatalogProducts();
 }
 
@@ -5187,18 +5215,20 @@ function clearAdminCatalogFilters(){
   renderAdminCatalogSubthemeFilter();
   if(sub)sub.value="";
   if(stock)stock.value="all";
+  window._adminCatalogFilterState={search:"",theme:"",subtheme:"",stock:"all"};
   renderAdminCatalogProducts();
 }
-function renderAdminCatalogSubthemeFilter(){
+function renderAdminCatalogSubthemeFilter(preferred=null){
   const select=document.getElementById("adminCatalogSubthemeFilter");if(!select)return;
   const themeId=Number(document.getElementById("adminCatalogThemeFilter")?.value||0);
-  const current=select.value;
+  const current=preferred!==null?String(preferred):select.value;
   const rows=(window._catalogSubthemes||[]).filter(st=>st.active!==false&&(!themeId||Number(st.theme_id)===themeId));
   select.innerHTML=`<option value="">Todos os subtemas</option>${rows.map(st=>`<option value="${st.id}">${esc(st.name)}</option>`).join("")}`;
   if(rows.some(st=>String(st.id)===String(current)))select.value=current;
 }
 function renderAdminCatalogProducts(){
   const target=document.getElementById("adminCatalogProducts");if(!target)return;
+  rememberAdminCatalogFilters();
   const q=normalizeCatalogText(document.getElementById("adminCatalogSearch")?.value||"");
   const themeId=Number(document.getElementById("adminCatalogThemeFilter")?.value||0);
   const subthemeId=Number(document.getElementById("adminCatalogSubthemeFilter")?.value||0);
